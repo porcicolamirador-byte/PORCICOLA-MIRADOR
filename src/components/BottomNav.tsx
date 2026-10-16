@@ -77,8 +77,8 @@ const TABS = [
 ];
 
 /**
- * Barra de navegación inferior al estilo WhatsApp. Fija al borde inferior
- * y solo visible en el dashboard.
+ * Barra de navegación inferior al estilo WhatsApp, dentro de un módulo
+ * rectangular fijo sobre el borde inferior. Solo visible en el dashboard.
  */
 export default function BottomNav() {
   const router = useRouter();
@@ -95,10 +95,11 @@ export default function BottomNav() {
   return (
     <nav
       aria-label="Navegación principal"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-[#e9edef] bg-white"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)", transform: "translateZ(0)" }}
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)", transform: "translateZ(0)" }}
     >
-      <ul className="mx-auto grid w-full max-w-md grid-cols-4 px-1 pb-1.5 pt-2">
+      {/* Módulo rectangular fijo que contiene las cuatro secciones */}
+      <ul className="pointer-events-auto mx-auto grid w-full max-w-md grid-cols-4 rounded-[20px] border border-[#e9edef] bg-white px-1.5 py-2 shadow-[0_10px_30px_-12px_rgba(17,27,33,0.28),0_2px_6px_-2px_rgba(17,27,33,0.08)]">
         {TABS.map(({ nombre, ruta, Icono, conPendientes }) => {
           const activa = pathname === ruta;
           const globo = conPendientes && pendientes > 0 ? (pendientes > 99 ? "99+" : String(pendientes)) : null;

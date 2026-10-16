@@ -317,7 +317,7 @@ export default function Dashboard() {
         <button
           type="button"
           onClick={() => router.push('/tareas')}
-          style={{ bottom: "calc(env(safe-area-inset-bottom) + 5.5rem)" }}
+          style={{ bottom: "calc(env(safe-area-inset-bottom) + 6.5rem)" }}
           className={`fixed right-4 z-50 flex h-16 w-16 items-center justify-center rounded-full text-white shadow-2xl transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
             hayCriticas
               ? 'bg-rose-600 hover:bg-rose-700 focus-visible:ring-rose-600'
