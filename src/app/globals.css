@@ -39,3 +39,18 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   -webkit-tap-highlight-color: transparent;
 }
+
+/*
+ * Sin barras de desplazamiento visibles en toda la app (página, listas,
+ * filtros y ventanas). El contenido se sigue desplazando normalmente con
+ * el dedo, la rueda del mouse o el teclado.
+ */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Edge antiguo */
+}
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Edge */
+  width: 0;
+  height: 0;
+}

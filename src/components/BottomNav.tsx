@@ -1,124 +1,132 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { leerCerdas, useVersionDatos } from "@/lib/datos";
+import { calcularTareasPendientes } from "@/utils/pendingTasks";
 
-/* Iconos de línea, claros a tamaño pequeño */
-function Icono({ children }: { children: ReactNode }) {
+/* Colores al estilo de la barra de WhatsApp */
+const PILDORA = "#d8fdd2"; // fondo verde claro de la pestaña activa
+const ACTIVO = "#111b21"; // ícono y texto activos
+const INACTIVO = "#54656f"; // ícono y texto inactivos
+const GLOBO = "#25d366"; // globo con el número de pendientes
+
+/* Íconos: contorno cuando la pestaña está inactiva, rellenos cuando está activa */
+function Svg({ children }: { children: ReactNode }) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.9}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-[22px] w-[22px]"
-      aria-hidden="true"
-    >
+    <svg viewBox="0 0 24 24" className="h-6 w-6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       {children}
     </svg>
   );
 }
 
-const TABS: { nombre: string; ayuda: string; ruta: string; icono: ReactNode }[] = [
-  {
-    nombre: "Inicio",
-    ayuda: "Resumen del día",
-    ruta: "/dashboard",
-    icono: (
-      <Icono>
-        <path d="M3.5 10.5 12 3.5l8.5 7V19a1.5 1.5 0 0 1-1.5 1.5h-4v-6h-6v6H5A1.5 1.5 0 0 1 3.5 19z" />
-      </Icono>
-    ),
-  },
-  {
-    nombre: "Producción",
-    ayuda: "Cerdas y gestación",
-    ruta: "/gestacion",
-    icono: (
-      // Galpón / granja
-      <Icono>
-        <path d="M3 10 12 4l9 6" />
-        <path d="M5 9v11h14V9" />
-        <path d="M9.5 20v-6h5v6" />
-        <path d="M9.5 14l5 6M14.5 14l-5 6" />
-      </Icono>
-    ),
-  },
-  {
-    nombre: "Indicadores",
-    ayuda: "Rendimiento",
-    ruta: "/indicadores",
-    icono: (
-      <Icono>
-        <path d="M4 20h16" />
-        <rect x="5.5" y="12" width="3" height="5" rx="1" />
-        <rect x="10.5" y="7" width="3" height="10" rx="1" />
-        <rect x="15.5" y="10" width="3" height="7" rx="1" />
-      </Icono>
-    ),
-  },
-  {
-    nombre: "Ajustes",
-    ayuda: "Granja y datos",
-    ruta: "/ajustes",
-    icono: (
-      // Engranaje
-      <Icono>
-        <circle cx="12" cy="12" r="3" />
-        <path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7" />
-      </Icono>
-    ),
-  },
+function IconoInicio({ lleno }: { lleno: boolean }) {
+  return (
+    <Svg>
+      <path
+        d="M3.5 10.5 12 3.5l8.5 7V19a1.5 1.5 0 0 1-1.5 1.5h-4v-6h-6v6H5A1.5 1.5 0 0 1 3.5 19z"
+        fill={lleno ? "currentColor" : "none"}
+        stroke="currentColor"
+        strokeWidth={1.8}
+      />
+    </Svg>
+  );
+}
+
+function IconoProduccion({ lleno }: { lleno: boolean }) {
+  const detalle = lleno ? PILDORA : "currentColor";
+  return (
+    <Svg>
+      <path d="M4 9.5 12 4l8 5.5V20H4z" fill={lleno ? "currentColor" : "none"} stroke="currentColor" strokeWidth={1.8} />
+      <path d="M8.5 20v-7.5h7V20M8.5 12.5l7 7.5M15.5 12.5l-7 7.5" fill="none" stroke={detalle} strokeWidth={1.6} />
+    </Svg>
+  );
+}
+
+function IconoIndicadores({ lleno }: { lleno: boolean }) {
+  const relleno = lleno ? "currentColor" : "none";
+  return (
+    <Svg>
+      <path d="M4 20h16" fill="none" stroke="currentColor" strokeWidth={1.8} />
+      <rect x="5.5" y="12" width="3" height="5" rx="1" fill={relleno} stroke="currentColor" strokeWidth={1.6} />
+      <rect x="10.5" y="6.5" width="3" height="10.5" rx="1" fill={relleno} stroke="currentColor" strokeWidth={1.6} />
+      <rect x="15.5" y="9.5" width="3" height="7.5" rx="1" fill={relleno} stroke="currentColor" strokeWidth={1.6} />
+    </Svg>
+  );
+}
+
+function IconoAjustes({ lleno }: { lleno: boolean }) {
+  return (
+    <Svg>
+      <path
+        d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"
+        fill={lleno ? "currentColor" : "none"}
+        stroke="currentColor"
+        strokeWidth={1.7}
+      />
+      <circle cx="12" cy="12" r="3" fill={lleno ? PILDORA : "none"} stroke={lleno ? PILDORA : "currentColor"} strokeWidth={1.7} />
+    </Svg>
+  );
+}
+
+const TABS = [
+  { nombre: "Inicio", ruta: "/dashboard", Icono: IconoInicio, conPendientes: true },
+  { nombre: "Producción", ruta: "/gestacion", Icono: IconoProduccion, conPendientes: false },
+  { nombre: "Indicadores", ruta: "/indicadores", Icono: IconoIndicadores, conPendientes: false },
+  { nombre: "Ajustes", ruta: "/ajustes", Icono: IconoAjustes, conPendientes: false },
 ];
 
 /**
- * Barra de navegación principal, fija al borde inferior. Solo se muestra en el dashboard;
- * en los módulos se navega con el botón de volver.
+ * Barra de navegación inferior al estilo WhatsApp. Fija al borde inferior
+ * y solo visible en el dashboard.
  */
 export default function BottomNav() {
   const router = useRouter();
   const pathname = usePathname() ?? "";
+  const version = useVersionDatos();
+
+  const pendientes = useMemo(
+    () => (version < 0 ? 0 : calcularTareasPendientes(leerCerdas()).length),
+    [version]
+  );
 
   if (pathname !== "/dashboard") return null;
 
   return (
     <nav
       aria-label="Navegación principal"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-[#e9edef] bg-white"
       style={{ paddingBottom: "env(safe-area-inset-bottom)", transform: "translateZ(0)" }}
     >
-      <ul className="mx-auto grid w-full max-w-md grid-cols-4 gap-1 px-2 pb-1.5 pt-1.5">
-        {TABS.map((tab) => {
-          const activa = pathname === tab.ruta;
+      <ul className="mx-auto grid w-full max-w-md grid-cols-4 px-1 pb-1.5 pt-2">
+        {TABS.map(({ nombre, ruta, Icono, conPendientes }) => {
+          const activa = pathname === ruta;
+          const globo = conPendientes && pendientes > 0 ? (pendientes > 99 ? "99+" : String(pendientes)) : null;
           return (
-            <li key={tab.nombre}>
+            <li key={nombre}>
               <button
                 type="button"
-                onClick={() => router.push(tab.ruta)}
+                onClick={() => router.push(ruta)}
                 aria-current={activa ? "page" : undefined}
-                title={tab.ayuda}
-                className={`group flex w-full flex-col items-center gap-1 rounded-[20px] px-1 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${
-                  activa ? "bg-emerald-50" : "hover:bg-slate-50"
-                }`}
+                aria-label={globo ? `${nombre}, ${globo} tareas pendientes` : nombre}
+                className="flex w-full flex-col items-center gap-1 rounded-xl py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+                style={{ color: activa ? ACTIVO : INACTIVO, WebkitTapHighlightColor: "transparent" }}
               >
                 <span
-                  className={`flex h-9 w-12 items-center justify-center rounded-2xl ${
-                    activa
-                      ? "bg-emerald-800 text-white shadow-[0_6px_14px_-6px_rgba(6,95,70,0.8)]"
-                      : "text-slate-500 group-hover:text-emerald-800"
-                  }`}
+                  className="relative flex h-8 w-16 items-center justify-center rounded-full"
+                  style={{ backgroundColor: activa ? PILDORA : "transparent" }}
                 >
-                  {tab.icono}
+                  <Icono lleno={activa} />
+                  {globo && (
+                    <span
+                      className="absolute -top-1 left-[38px] flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[11px] font-bold leading-none text-white tabular-nums"
+                      style={{ backgroundColor: GLOBO }}
+                    >
+                      {globo}
+                    </span>
+                  )}
                 </span>
-                <span
-                  className={`text-[11px] leading-none ${
-                    activa ? "font-bold text-emerald-900" : "font-medium text-slate-500"
-                  }`}
-                >
-                  {tab.nombre}
-                </span>
+                <span className={`text-[12px] leading-none ${activa ? "font-semibold" : "font-medium"}`}>{nombre}</span>
               </button>
             </li>
           );
