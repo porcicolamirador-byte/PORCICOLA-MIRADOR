@@ -8,13 +8,15 @@
  *    y, si no hay conexión o el servidor no responde, usa la copia guardada.
  *  - Archivos de /_next/static (tienen nombre único por versión): se sirven
  *    desde la copia guardada sin ir a la red.
+ *  - Imágenes y datos de navegación entre pantallas: se muestran al instante
+ *    desde la copia guardada y se actualizan en segundo plano.
  * Los datos de la granja ya viven en el teléfono (localStorage), así que con
  * esto la app funciona completa sin conexión.
  */
 
 const VERSION = new URL(self.location.href).searchParams.get("v") || "1";
 const CACHE = `mirador-${VERSION}`;
-const ESPERA_RED_MS = 4000;
+const ESPERA_RED_MS = 3000;
 
 // Pantallas que se guardan al instalar. "/cerda/_" y "/cerda/_/parto" son
 // plantillas que sirven para cualquier cerda cuando no hay conexión.
@@ -36,6 +38,7 @@ const RUTAS = [
 const ARCHIVOS = [
   "/manifest.webmanifest",
   "/images/logo.png",
+  "/images/logo-header.png",
   "/images/icons/icon-192.png",
   "/images/icons/icon-512.png",
   "/images/icons/maskable-512.png",
@@ -192,6 +195,25 @@ async function redPrimero(request) {
   }
 }
 
+/** Copia guardada al instante y actualización en segundo plano */
+async function guardadaYActualizar(event, request) {
+  const cache = await caches.open(CACHE);
+  const guardada = await cache.match(request, { ignoreVary: true });
+  const red = fetch(request)
+    .then((res) => {
+      if (res.ok && res.type === "basic") return cache.put(request, res.clone()).then(() => res);
+      return res;
+    })
+    .catch(() => undefined);
+  if (guardada) {
+    event.waitUntil(red);
+    return guardada;
+  }
+  const res = await red;
+  // Sin copia ni red: error para que Next.js recargue la pantalla desde la caché
+  return res || Response.error();
+}
+
 /** Primero la copia guardada (archivos con nombre único por versión) */
 async function cachePrimero(request) {
   const cache = await caches.open(CACHE);
@@ -210,10 +232,19 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/_next/webpack-hmr") || url.pathname.includes("__nextjs")) return;
   if (url.pathname === "/sw.js") return;
 
+  const esRsc = request.headers.get("RSC") === "1" || url.searchParams.has("_rsc");
+  const esImagen =
+    url.pathname.startsWith("/_next/image") ||
+    url.pathname.startsWith("/images/") ||
+    /\.(png|jpe?g|webp|svg|ico|woff2?)$/i.test(url.pathname);
+
   if (request.mode === "navigate") {
     event.respondWith(navegar(request, url));
   } else if (url.pathname.startsWith("/_next/static/")) {
     event.respondWith(cachePrimero(request));
+  } else if (esRsc || esImagen) {
+    // Cambiar de pantalla y volver atrás sin esperar a la red
+    event.respondWith(guardadaYActualizar(event, request));
   } else {
     event.respondWith(redPrimero(request));
   }

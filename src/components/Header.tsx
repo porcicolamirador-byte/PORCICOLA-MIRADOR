@@ -64,10 +64,13 @@ export default function Header({
           className={`flex h-16 w-16 items-center justify-center rounded-3xl ${iconBgColor} shadow-sm`}
         >
           <Image
-            src="/images/logo.png"
+            src="/images/logo-header.png"
             alt="Logo Porcícola El Mirador"
             width={48}
             height={48}
+            unoptimized
+            preload
+            loading="eager"
             className="h-12 w-12 rounded-2xl object-contain"
           />
         </div>

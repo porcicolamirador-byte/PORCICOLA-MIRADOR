@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type TouchEvent } from "react";
+import { useEffect, useMemo, useState, type TouchEvent } from "react";
 import { useRouter } from "next/navigation";
 import PageShell from "@/components/PageShell";
 
@@ -445,14 +445,25 @@ export default function Gestacion() {
     resetForm();
   }
 
-  const filtradas = cerdas
+  // Historial de cada cerda leído una sola vez (no en cada render ni al deslizar)
+  const historiales = useMemo(() => {
+    const mapa = new Map<string, any[]>();
+    for (const c of cerdas) {
+      try {
+        const h = JSON.parse(localStorage.getItem(`historial-${c.id}`) || "[]");
+        mapa.set(c.id, Array.isArray(h) ? h : []);
+      } catch {
+        mapa.set(c.id, []);
+      }
+    }
+    return mapa;
+  }, [cerdas]);
+
+  const filtradas = useMemo(() => cerdas
     .filter((c) => {
       const matchesId = (c.id || "").toLowerCase().includes(buscar.toLowerCase());
 
-      const historialRaw = JSON.parse(
-        localStorage.getItem(`historial-${c.id}`) || "[]"
-      );
-      const historial = Array.isArray(historialRaw) ? historialRaw : [];
+      const historial = historiales.get(c.id) ?? [];
       const ultimoRegistro = historial[0] || null;
       const estado = ultimoRegistro
         ? obtenerEstadoPorRegistro(ultimoRegistro.tipo)
@@ -464,14 +475,11 @@ export default function Gestacion() {
     })
     .sort((a, b) => {
       return new Date(b.fecha).getTime() - new Date(a.fecha).getTime();
-    });
+    }), [cerdas, buscar, estadoFiltro, historiales]);
 
-  const totales = cerdas.reduce(
+  const totales = useMemo(() => cerdas.reduce(
     (acc, cerda) => {
-      const historialRaw = JSON.parse(
-        localStorage.getItem(`historial-${cerda.id}`) || "[]"
-      );
-      const historial = Array.isArray(historialRaw) ? historialRaw : [];
+      const historial = historiales.get(cerda.id) ?? [];
       const ultimoRegistro = historial[0] || null;
       const estadoLabel = ultimoRegistro
         ? obtenerEstadoPorRegistro(ultimoRegistro.tipo)
@@ -508,7 +516,7 @@ export default function Gestacion() {
       proxPartos: 0,
       alertas: 0,
     }
-  );
+  ), [cerdas, historiales]);
 
   const pct = (n: number) => (cerdas.length ? `${Math.round((n / cerdas.length) * 100)}%` : "0%");
 
@@ -611,10 +619,7 @@ export default function Gestacion() {
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {filtradas.map((cerda, index) => {
-              const historialRaw = JSON.parse(
-                localStorage.getItem(`historial-${cerda.id}`) || "[]"
-              );
-              const historial = Array.isArray(historialRaw) ? historialRaw : [];
+              const historial = historiales.get(cerda.id) ?? [];
 
               const ultimoRegistro = historial[0] || null;
               const estadoLabel = ultimoRegistro

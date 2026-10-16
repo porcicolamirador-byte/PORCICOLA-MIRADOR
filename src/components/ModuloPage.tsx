@@ -43,7 +43,7 @@ export default function ModuloPage({
         <header className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => router.push(volverA)}
+            onClick={() => (window.history.length > 1 ? router.back() : router.push(volverA))}
             aria-label="Volver"
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition hover:bg-slate-200 active:scale-95"
           >
