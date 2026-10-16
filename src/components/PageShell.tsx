@@ -48,7 +48,12 @@ export default function PageShell({
   return (
     <main
       className={`min-h-screen px-4 pt-4 pb-24 sm:px-6 ${textColor} ${className}`}
-      style={{ backgroundColor, color: isDark ? "#ffffff" : "#111827" }}
+      style={{
+        backgroundColor,
+        color: isDark ? "#ffffff" : "#111827",
+        // El contenido no queda debajo de la isla dinámica / notch
+        paddingTop: "calc(env(safe-area-inset-top) + 1rem)",
+      }}
     >
       {children}
     </main>

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
+import usePageBackground from "@/hooks/usePageBackground";
 
 // Tiempos de la pantalla de inicio (ms)
 const DURACION_CARGA = 2400; // lo que tarda la barra en llenarse
@@ -10,20 +10,17 @@ const INICIO_SALIDA = 2700; // empieza el desvanecido
 const IR_AL_DASHBOARD = 3200; // navegación final
 
 export default function Home() {
-  const router = useRouter();
+  usePageBackground("#ffffff");
   const [saliendo, setSaliendo] = useState(false);
 
   useEffect(() => {
-    router.prefetch("/dashboard");
-
     const timers = [
       setTimeout(() => setSaliendo(true), INICIO_SALIDA),
-      // replace: el botón "atrás" no regresa a la pantalla de carga
-      setTimeout(() => router.replace("/dashboard"), IR_AL_DASHBOARD),
+      setTimeout(() => window.location.replace("/dashboard"), IR_AL_DASHBOARD),
     ];
 
     return () => timers.forEach(clearTimeout);
-  }, [router]);
+  }, []);
 
   return (
     <>
@@ -40,7 +37,7 @@ export default function Home() {
         <section className="relative z-10 flex flex-1 flex-col items-center justify-center px-8">
           <div className="splash-logo">
             <Image
-              src="/logo.png"
+              src="/images/logo.png"
               alt="Granja Porcícola El Mirador"
               width={1254}
               height={1254}

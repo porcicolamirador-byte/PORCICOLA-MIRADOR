@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 
+const BLANCO = "#ffffff";
+
 function isColorDark(color: string): boolean {
   if (!color) return false;
 
@@ -25,38 +27,44 @@ function isColorDark(color: string): boolean {
   return luminance < 0.5;
 }
 
-export default function usePageBackground(bgColor: string) {
+/** Pone (o crea) <meta name="theme-color">, que Safari usa para la zona de la isla dinámica. */
+function setThemeColor(color: string) {
+  const metas = document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]');
+  if (metas.length === 0) {
+    const meta = document.createElement("meta");
+    meta.name = "theme-color";
+    meta.content = color;
+    document.head.appendChild(meta);
+    return;
+  }
+  metas.forEach((m) => {
+    m.removeAttribute("media");
+    m.content = color;
+  });
+}
+
+/**
+ * Cambia el color de fondo global (html, body, barra de estado e isla dinámica)
+ * al color de la página. Al salir de la página vuelve a blanco.
+ */
+export default function usePageBackground(bgColor: string = BLANCO) {
   useEffect(() => {
     const root = document.documentElement;
-    const body = document.body;
+    const color = bgColor || BLANCO;
+    const pageFg = isColorDark(color) ? "#ffffff" : "#111827";
 
-    const prevBg = root.style.getPropertyValue("--page-bg");
-    const prevFg = root.style.getPropertyValue("--page-fg");
-
-    const isDark = isColorDark(bgColor);
-    const pageFg = isDark ? "#ffffff" : "#111827";
-
-    root.style.setProperty("--page-bg", bgColor);
+    root.style.setProperty("--page-bg", color);
     root.style.setProperty("--page-fg", pageFg);
-    body.style.setProperty("--page-bg", bgColor);
-    body.style.setProperty("--page-fg", pageFg);
+    root.style.backgroundColor = color;
+    document.body.style.backgroundColor = color;
+    setThemeColor(color);
 
     return () => {
-      if (prevBg) {
-        root.style.setProperty("--page-bg", prevBg);
-        body.style.setProperty("--page-bg", prevBg);
-      } else {
-        root.style.removeProperty("--page-bg");
-        body.style.removeProperty("--page-bg");
-      }
-
-      if (prevFg) {
-        root.style.setProperty("--page-fg", prevFg);
-        body.style.setProperty("--page-fg", prevFg);
-      } else {
-        root.style.removeProperty("--page-fg");
-        body.style.removeProperty("--page-fg");
-      }
+      root.style.setProperty("--page-bg", BLANCO);
+      root.style.setProperty("--page-fg", "#111827");
+      root.style.backgroundColor = BLANCO;
+      document.body.style.backgroundColor = BLANCO;
+      setThemeColor(BLANCO);
     };
   }, [bgColor]);
 }

@@ -1,8 +1,17 @@
 @import "tailwindcss";
 
+/*
+ * Fondo global: siempre blanco, también con el iPhone en modo oscuro.
+ * --page-bg lo cambia cada página (hook usePageBackground) y pinta
+ * html/body, que es lo que Safari usa para colorear la zona de la
+ * isla dinámica, la barra de estado y el rebote del scroll.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --page-bg: #ffffff;
+  --page-fg: #111827;
+  --background: var(--page-bg);
+  --foreground: var(--page-fg);
+  color-scheme: light only;
 }
 
 @theme inline {
@@ -12,15 +21,21 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  background-color: var(--page-bg);
+  color: var(--page-fg);
+}
+
+html {
+  /* evita el gris/negro al hacer "rebote" arriba y abajo en iOS */
+  min-height: 100%;
+  /* sin rebote elástico: la barra inferior y el encabezado no se mueven */
+  overscroll-behavior-y: none;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  -webkit-tap-highlight-color: transparent;
 }
