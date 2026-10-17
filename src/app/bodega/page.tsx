@@ -13,6 +13,7 @@ import {
   type ArticuloBodega,
   type CategoriaBodega,
 } from "@/lib/datos";
+import { confirmar } from "@/components/Dialogo";
 
 const CATEGORIAS: { valor: CategoriaBodega; icono: string }[] = [
   { valor: "Alimento", icono: "🌾" },
@@ -229,8 +230,8 @@ function DetalleArticulo({ articulo: a, onCerrar }: { articulo: ArticuloBodega; 
     volver();
   };
 
-  const eliminar = () => {
-    if (!window.confirm(`¿Eliminar ${a.nombre} y su historial?`)) return;
+  const eliminar = async () => {
+    if (!(await confirmar({ titulo: `Eliminar ${a.nombre}`, mensaje: "Se borrará el artículo y todos sus movimientos.", aceptar: "Eliminar", destructivo: true }))) return;
     guardarArticulos(leerArticulos().filter((x) => x.id !== a.id));
     onCerrar();
   };

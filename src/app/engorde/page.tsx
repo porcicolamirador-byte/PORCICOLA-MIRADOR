@@ -16,6 +16,7 @@ import {
   useVersionDatos,
   type Lote,
 } from "@/lib/datos";
+import { confirmar } from "@/components/Dialogo";
 
 /** Indicadores calculados de un lote */
 function resumenLote(l: Lote) {
@@ -234,14 +235,14 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
     limpiar();
   };
 
-  const cerrarLote = () => {
-    if (!window.confirm(`¿Cerrar ${lote.nombre}? Pasará a la lista de lotes cerrados.`)) return;
+  const cerrarLote = async () => {
+    if (!(await confirmar({ titulo: `Cerrar ${lote.nombre}`, mensaje: "El lote pasará a la lista de lotes cerrados. Puedes reabrirlo después.", aceptar: "Cerrar lote" }))) return;
     actualizarLote(lote.id, (l) => ({ ...l, activo: false, fechaSalida: hoy() }));
     onCerrar();
   };
   const reabrir = () => actualizarLote(lote.id, (l) => ({ ...l, activo: true, fechaSalida: undefined }));
-  const eliminar = () => {
-    if (!window.confirm(`¿Eliminar ${lote.nombre} y todos sus registros?`)) return;
+  const eliminar = async () => {
+    if (!(await confirmar({ titulo: `Eliminar ${lote.nombre}`, mensaje: "Se borrarán el lote y todos sus pesajes, alimento y mortalidad.", aceptar: "Eliminar", destructivo: true }))) return;
     guardarLotes(leerLotes().filter((l) => l.id !== lote.id));
     onCerrar();
   };

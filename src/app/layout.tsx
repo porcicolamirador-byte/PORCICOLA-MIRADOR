@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ModoSinConexion from "@/components/ModoSinConexion";
+import DialogoHost from "@/components/Dialogo";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -47,6 +48,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col bg-white">
         <ModoSinConexion />
+        <DialogoHost />
         {children}
       </body>
     </html>

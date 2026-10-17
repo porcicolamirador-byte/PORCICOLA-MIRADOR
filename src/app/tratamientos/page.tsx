@@ -21,6 +21,7 @@ import {
   type Tratamiento,
   type TipoTratamiento,
 } from "@/lib/datos";
+import { confirmar } from "@/components/Dialogo";
 
 const COLOR_TIPO: Record<TipoTratamiento, string> = {
   Tratamiento: "bg-rose-50 text-rose-700 ring-rose-200",
@@ -59,8 +60,8 @@ export default function TratamientosPage() {
     };
   }, [version]);
 
-  const eliminar = (id: string) => {
-    if (!window.confirm("¿Eliminar este registro?")) return;
+  const eliminar = async (id: string) => {
+    if (!(await confirmar({ titulo: "Eliminar registro", mensaje: "El tratamiento se borrará de la lista.", aceptar: "Eliminar", destructivo: true }))) return;
     guardarTratamientos(leerTratamientos().filter((t) => t.id !== id));
   };
 

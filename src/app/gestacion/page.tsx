@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type TouchEvent } from "react";
 import { useRouter } from "next/navigation";
 import PageShell from "@/components/PageShell";
+import { confirmar } from "@/components/Dialogo";
 
 const ESTADOS = [
   "Todos",
@@ -362,7 +363,7 @@ export default function Gestacion() {
     setTouchCurrentX(null);
   }
 
-  function agregarOCrear() {
+  async function agregarOCrear() {
     const razaFinal = raza === "OTRA" ? otraRaza : raza;
 
     if (!id.trim()) {
@@ -427,9 +428,13 @@ export default function Gestacion() {
     };
 
     if (editIndex !== null) {
-      const confirmar = confirm("¿Confirmas actualizar cerda?");
+      const ok = await confirmar({
+        titulo: "Actualizar cerda",
+        mensaje: `Se guardarán los cambios de la cerda ${idMayus}.`,
+        aceptar: "Actualizar",
+      });
 
-      if (!confirmar) return;
+      if (!ok) return;
 
       const nuevas = [...cerdas];
 
@@ -885,53 +890,75 @@ export default function Gestacion() {
           )}
         </div>
 
-        {/* CONFIRMAR ELIMINACIÓN */}
+        {/* CONFIRMAR ELIMINACIÓN: alerta con estilo de app nativa y clave */}
         {confirmDeleteIndex !== null && (
           <div
-            role="dialog"
+            role="alertdialog"
             aria-modal="true"
-            aria-label="Confirmar eliminación"
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-3"
+            aria-labelledby="eliminar-titulo"
+            className="fixed inset-0 z-[90] flex items-center justify-center p-6"
           >
-            <div className="w-full max-w-sm rounded-3xl bg-white p-5 text-slate-900 shadow-2xl">
-              <h3 className="text-lg font-bold text-red-700">
-                Eliminar cerda {cerdas[confirmDeleteIndex]?.id || ""}
-              </h3>
-              <p className="mt-2 text-sm text-slate-600">
-                Ingresa la clave de confirmación. Esta acción no se podrá restablecer.
-              </p>
+            <div aria-hidden="true" className="dialogo-fondo absolute inset-0 bg-slate-950/40" onClick={cancelarEliminarCerda} />
+            <div className="dialogo-caja relative w-full max-w-[290px] overflow-hidden rounded-[18px] bg-white/95 text-center shadow-2xl backdrop-blur-xl">
+              <div className="px-5 pb-4 pt-5">
+                <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-full bg-red-50 text-red-600" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />
+                  </svg>
+                </div>
+                <h2 id="eliminar-titulo" className="text-[17px] font-semibold leading-snug text-slate-900">
+                  Eliminar cerda {cerdas[confirmDeleteIndex]?.id || ""}
+                </h2>
+                <p className="mt-1.5 text-[13px] leading-snug text-slate-600">
+                  Se borrarán la cerda y todo su historial. Escribe la clave para confirmar.
+                </p>
 
-              <input
-                type="password"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                autoFocus
-                value={deletePinInput}
-                onChange={(e) => setDeletePinInput(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") confirmarEliminarCerda();
-                }}
-                aria-label="Clave de confirmación"
-                className={`mt-4 text-center text-2xl tracking-[0.5em] ${inputBase} border ${deletePinError ? "border-red-500" : "border-slate-300"}`}
-              />
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoFocus
+                  value={deletePinInput}
+                  onChange={(e) => {
+                    setDeletePinInput(e.target.value.replace(/\D/g, "").slice(0, 4));
+                    if (deletePinError) setDeletePinError("");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") confirmarEliminarCerda();
+                    if (e.key === "Escape") cancelarEliminarCerda();
+                  }}
+                  placeholder="••••"
+                  aria-label="Clave de confirmación"
+                  className={`mt-3 h-11 w-full rounded-xl border bg-slate-50 text-center text-xl tracking-[0.6em] text-slate-900 outline-none placeholder:text-slate-300 focus:bg-white focus:ring-2 ${
+                    deletePinError ? "border-red-400 focus:ring-red-200" : "border-slate-200 focus:ring-emerald-200"
+                  }`}
+                />
+                {deletePinError ? <p className="mt-2 text-[13px] font-medium text-red-600">{deletePinError}</p> : null}
+              </div>
 
-              {deletePinError ? <p className="mt-2 text-sm text-red-600">{deletePinError}</p> : null}
-
-              <div className="mt-5 flex justify-end gap-2">
+              <div className="grid grid-cols-2 divide-x divide-slate-200 border-t border-slate-200">
                 <button
+                  type="button"
                   onClick={cancelarEliminarCerda}
-                  className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
+                  className="py-3 text-[17px] text-emerald-700 transition active:bg-slate-100"
                 >
                   Cancelar
                 </button>
                 <button
+                  type="button"
                   onClick={confirmarEliminarCerda}
-                  className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white"
+                  className="py-3 text-[17px] font-semibold text-red-600 transition active:bg-slate-100"
                 >
                   Eliminar
                 </button>
               </div>
             </div>
+            <style>{`
+              .dialogo-fondo { animation: dialogo-fade 160ms ease-out both; }
+              .dialogo-caja { animation: dialogo-entrar 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+              @keyframes dialogo-fade { from { opacity: 0 } to { opacity: 1 } }
+              @keyframes dialogo-entrar { from { transform: scale(1.12); opacity: 0 } to { transform: none; opacity: 1 } }
+            `}</style>
           </div>
         )}
 

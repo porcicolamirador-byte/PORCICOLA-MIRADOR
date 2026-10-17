@@ -13,6 +13,7 @@ import {
   useVersionDatos,
   type Movimiento,
 } from "@/lib/datos";
+import { confirmar } from "@/components/Dialogo";
 
 const CATEGORIAS: Record<Movimiento["tipo"], string[]> = {
   ingreso: ["Venta de cerdos de engorde", "Venta de lechones", "Venta de cerdas de descarte", "Otros ingresos"],
@@ -60,8 +61,8 @@ export default function ContabilidadPage() {
     return { movs, ingresos, gastos, porCategoria };
   }, [version, mes]);
 
-  const eliminar = (id: string) => {
-    if (!window.confirm("¿Eliminar este movimiento?")) return;
+  const eliminar = async (id: string) => {
+    if (!(await confirmar({ titulo: "Eliminar movimiento", mensaje: "El ingreso o gasto se borrará y el balance del mes se recalculará.", aceptar: "Eliminar", destructivo: true }))) return;
     guardarMovimientos(leerMovimientos().filter((m) => m.id !== id));
   };
 

@@ -13,6 +13,7 @@ import {
   type Lectura,
   type ZonaMonitoreo,
 } from "@/lib/datos";
+import { confirmar } from "@/components/Dialogo";
 
 /** Rangos de confort recomendados por zona (°C) y humedad relativa (%) */
 const ZONAS: { zona: ZonaMonitoreo; icono: string; min: number; max: number }[] = [
@@ -63,8 +64,8 @@ export default function MonitoreoPage() {
     return { lecturas, porZona, alertas };
   }, [version]);
 
-  const eliminar = (id: string) => {
-    if (!window.confirm("¿Eliminar esta lectura?")) return;
+  const eliminar = async (id: string) => {
+    if (!(await confirmar({ titulo: "Eliminar lectura", mensaje: "Esta lectura se borrará del historial.", aceptar: "Eliminar", destructivo: true }))) return;
     guardarLecturas(leerLecturas().filter((l) => l.id !== id));
   };
 

@@ -12,6 +12,7 @@ import {
   notificarCambio,
   useVersionDatos,
 } from "@/lib/datos";
+import { avisar as mostrarAviso, confirmar } from "@/components/Dialogo";
 
 export default function AjustesPage() {
   const version = useVersionDatos();
@@ -58,19 +59,19 @@ export default function AjustesPage() {
     try {
       const json = JSON.parse(await f.text()) as { app?: string; datos?: Record<string, unknown> };
       if (json.app !== "porcicola-mirador" || !json.datos) throw new Error("formato");
-      if (!window.confirm("Se reemplazarán los datos actuales por los del respaldo. ¿Continuar?")) return;
+      if (!(await confirmar({ titulo: "Restaurar respaldo", mensaje: "Se reemplazarán los datos actuales por los del respaldo.", aceptar: "Restaurar", destructivo: true }))) return;
       for (const k of clavesDeLaApp()) localStorage.removeItem(k);
       for (const [k, v] of Object.entries(json.datos)) localStorage.setItem(k, JSON.stringify(v));
       notificarCambio();
       avisar("Respaldo restaurado");
     } catch {
-      window.alert("El archivo no es un respaldo válido de El Mirador.");
+      await mostrarAviso({ titulo: "Archivo no válido", mensaje: "El archivo no es un respaldo de El Mirador." });
     }
   };
 
-  const borrarTodo = () => {
-    if (!window.confirm("¿Borrar TODOS los datos de la granja en este dispositivo?")) return;
-    if (!window.confirm("Esta acción no se puede deshacer. Te recomendamos exportar un respaldo antes. ¿Borrar de todas formas?")) return;
+  const borrarTodo = async () => {
+    if (!(await confirmar({ titulo: "Borrar todos los datos", mensaje: "Se borrará toda la información de la granja guardada en este dispositivo.", aceptar: "Continuar", destructivo: true }))) return;
+    if (!(await confirmar({ titulo: "¿Estás seguro?", mensaje: "Esta acción no se puede deshacer. Te recomendamos exportar un respaldo antes.", aceptar: "Borrar todo", destructivo: true }))) return;
     for (const k of clavesDeLaApp()) localStorage.removeItem(k);
     notificarCambio();
     avisar("Datos borrados");

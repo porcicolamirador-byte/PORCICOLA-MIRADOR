@@ -14,6 +14,7 @@ import {
   sumarDias,
   useVersionDatos,
 } from "@/lib/datos";
+import { confirmar } from "@/components/Dialogo";
 
 const PROTOCOLOS = [
   { id: "pediluvios", texto: "Pediluvios con desinfectante renovado" },
@@ -55,8 +56,8 @@ export default function BioseguridadPage() {
     guardarChecks({ ...checks, [fecha]: [...actuales] });
   };
 
-  const eliminarVisita = (id: string) => {
-    if (!window.confirm("¿Eliminar esta visita?")) return;
+  const eliminarVisita = async (id: string) => {
+    if (!(await confirmar({ titulo: "Eliminar visita", mensaje: "La visita se borrará del registro.", aceptar: "Eliminar", destructivo: true }))) return;
     guardarVisitas(leerVisitas().filter((v) => v.id !== id));
   };
 

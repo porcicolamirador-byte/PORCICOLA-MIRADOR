@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type TouchEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import usePageBackground from "@/hooks/usePageBackground";
 import { cargarLogoJpeg, entregarPdf, generarPdfFicha, type LogoJpeg } from "@/lib/pdfFicha";
+import { confirmar } from "@/components/Dialogo";
 
 const DIAS_GESTACION = 114;
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -182,8 +183,9 @@ export default function CerdaDetalle() {
     guardar(nuevos);
   }
 
-  function eliminarHistorialCompleto() {
-    if (!confirm("¿Eliminar Historial? Esta acción no se podrá reestablecerse")) return;
+  async function eliminarHistorialCompleto() {
+    setMostrarMenu(false);
+    if (!(await confirmar({ titulo: "Eliminar historial", mensaje: "Se borrarán todos los registros de esta cerda. Esta acción no se puede deshacer.", aceptar: "Eliminar", destructivo: true }))) return;
     localStorage.removeItem(`historial-${id}`);
     setRegistros([]);
     setMostrarMenu(false);
