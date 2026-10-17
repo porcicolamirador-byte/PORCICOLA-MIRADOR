@@ -101,7 +101,7 @@ export function Boton({
 
 /* Los campos usan text-base (16px) para que el iPhone no haga zoom al escribir. */
 const claseCampo =
-  "w-full rounded-xl bg-slate-50 px-3.5 py-2.5 text-base text-slate-900 ring-1 ring-slate-200 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600";
+  "block w-full min-w-0 max-w-full appearance-none rounded-xl bg-slate-50 px-3.5 py-2.5 text-base text-slate-900 ring-1 ring-slate-200 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600";
 
 export function Campo({
   etiqueta,
@@ -113,7 +113,7 @@ export function Campo({
   ayuda?: string;
 }) {
   return (
-    <label className="flex flex-col gap-1.5">
+    <label className="flex min-w-0 flex-col gap-1.5">
       <span className="text-[13px] font-medium text-slate-700">{etiqueta}</span>
       {children}
       {ayuda && <span className="text-xs text-slate-500">{ayuda}</span>}
@@ -239,7 +239,7 @@ export function Hoja({
         className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]"
       />
       <div
-        className="relative max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-[28px] bg-white px-5 pt-3 shadow-2xl sm:rounded-[28px]"
+        className="relative max-h-[92dvh] w-full max-w-lg overflow-y-auto overflow-x-hidden overscroll-contain rounded-t-[28px] bg-white px-5 pt-3 shadow-2xl sm:rounded-[28px]"
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.25rem)" }}
       >
         <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-slate-200 sm:hidden" />

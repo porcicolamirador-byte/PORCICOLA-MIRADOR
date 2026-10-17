@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Boton, Campo, Chevron, Chips, Dato, Entrada, Hoja, IconoMas, Insignia, Selector, Vacio } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
+import Modal from "@/components/Modal";
 import { CATEGORIAS_BODEGA, IconoCategoria } from "@/components/CatalogoProductos";
 import {
   calcularInventario,
@@ -362,7 +363,14 @@ function NuevaFactura({
   };
 
   return (
-    <Hoja abierta={abierta} titulo="Ingresar factura" onCerrar={cerrar}>
+    <Modal
+      abierta={abierta}
+      etiqueta="Bodega"
+      titulo="Ingresar factura"
+      subtitulo="Compra de insumos"
+      icono="🧾"
+      onCerrar={cerrar}
+    >
       <form onSubmit={guardar} className="flex flex-col gap-3.5">
         <div className="grid grid-cols-2 gap-3">
           <Campo etiqueta="Número de factura *">
@@ -378,7 +386,7 @@ function NuevaFactura({
             value={proveedor}
             onChange={(e) => setProveedor(e.target.value)}
             placeholder="Ej. Agropecuaria La Esperanza"
-            className="w-full rounded-xl bg-slate-50 px-3.5 py-2.5 text-base text-slate-900 ring-1 ring-slate-200 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
+            className="block w-full min-w-0 rounded-xl bg-slate-50 px-3.5 py-2.5 text-base text-slate-900 ring-1 ring-slate-200 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
           />
           <datalist id="proveedores-bodega">
             {proveedores.map((p) => (
@@ -391,7 +399,7 @@ function NuevaFactura({
           <p className="mb-2 text-[13px] font-medium text-slate-700">Productos *</p>
           <div className="flex flex-col gap-2.5">
             {lineas.map((l, i) => (
-              <div key={l.clave} className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
+              <div key={l.clave} className="min-w-0 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-xs font-semibold text-slate-500">Producto {i + 1}</span>
                   {lineas.length > 1 && (
@@ -469,7 +477,7 @@ function NuevaFactura({
           Guardar factura
         </Boton>
       </form>
-    </Hoja>
+    </Modal>
   );
 }
 
