@@ -89,6 +89,54 @@ function decodificar(valor: string): string {
   }
 }
 
+const TIPOS_HISTORIAL = [
+  "Inseminación",
+  "Confirmación de Gestación",
+  "Celo",
+  "Parto",
+  "Destete",
+  "Aborto",
+  "Tratamiento",
+  "Vacunación",
+  "Desparasitación",
+  "Baja",
+  "Evento",
+];
+
+function infoTipo(tipo: string): { icono: string; fondo: string; borde: string; texto: string } {
+  switch (tipo) {
+    case "Inseminación":
+      return { icono: "💉", fondo: "bg-sky-100", borde: "border-sky-100", texto: "text-sky-800" };
+    case "Confirmación de Gestación":
+      return { icono: "✅", fondo: "bg-blue-100", borde: "border-blue-100", texto: "text-blue-800" };
+    case "Celo":
+      return { icono: "🔥", fondo: "bg-amber-100", borde: "border-amber-100", texto: "text-amber-800" };
+    case "Parto":
+      return { icono: "🐷", fondo: "bg-emerald-100", borde: "border-emerald-100", texto: "text-emerald-800" };
+    case "Destete":
+      return { icono: "🍼", fondo: "bg-orange-100", borde: "border-orange-100", texto: "text-orange-800" };
+    case "Aborto":
+      return { icono: "⚠️", fondo: "bg-pink-100", borde: "border-pink-100", texto: "text-pink-800" };
+    case "Tratamiento":
+      return { icono: "🩺", fondo: "bg-purple-100", borde: "border-purple-100", texto: "text-purple-800" };
+    case "Vacunación":
+      return { icono: "🛡️", fondo: "bg-cyan-100", borde: "border-cyan-100", texto: "text-cyan-800" };
+    case "Desparasitación":
+      return { icono: "💊", fondo: "bg-violet-100", borde: "border-violet-100", texto: "text-violet-800" };
+    case "Baja":
+      return { icono: "⛔", fondo: "bg-red-100", borde: "border-red-100", texto: "text-red-800" };
+    default:
+      return { icono: "📝", fondo: "bg-slate-100", borde: "border-slate-100", texto: "text-slate-800" };
+  }
+}
+
+const MESES_LARGOS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+function tituloMes(clave: string): string {
+  const [a, m] = clave.split("-").map(Number);
+  if (!a || !m) return "Sin fecha";
+  return `${MESES_LARGOS[m - 1]} ${a}`;
+}
+
 export default function CerdaDetalle() {
   const params = useParams<{ id: string }>();
   // Sin conexión la pantalla puede venir de una copia guardada de otra cerda:
@@ -182,6 +230,19 @@ export default function CerdaDetalle() {
   function eliminarRegistro(index: number) {
     const nuevos = registros.filter((_, i) => i !== index);
     guardar(nuevos);
+  }
+
+  async function pedirEliminarRegistro(index: number) {
+    const r = registros[index];
+    setSwipedIndex(null);
+    if (!r) return;
+    const ok = await confirmar({
+      titulo: `Eliminar ${String(r.tipo || "registro").toLowerCase()}`,
+      mensaje: r.fecha ? `Se borrará el registro del ${formatearFechaCorta(r.fecha)}.` : "Se borrará este registro.",
+      aceptar: "Eliminar",
+      destructivo: true,
+    });
+    if (ok) eliminarRegistro(index);
   }
 
   async function eliminarHistorialCompleto() {
@@ -711,151 +772,193 @@ export default function CerdaDetalle() {
           </div>
         )}
 
-        {/* HISTORIAL */}
-        <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 mb-3">
-          <div className="flex items-center justify-between mb-4 gap-2">
-            <h3 className="text-sm font-bold text-black">Historial</h3>
-            <div className="flex items-center gap-2">
-              <select
-                value={filtro}
-                onChange={(e) => setFiltro(e.target.value)}
-                className="px-2 py-2 rounded-xl border border-gray-200 bg-gray-50 text-black text-xs outline-none"
-              >
-                <option value="Todos">Todos</option>
-                <option value="Inseminación">Inseminación</option>
-                <option value="Celo">Celo</option>
-                <option value="Parto">Parto</option>
-                <option value="Destete">Destete</option>
-                <option value="Aborto">Aborto</option>
-                <option value="Baja">Baja</option>
-                <option value="Tratamiento">Tratamiento</option>
-                <option value="Evento">Evento</option>
-              </select>
-              <button
-                onClick={() => setMostrarForm(true)}
-                className="bg-emerald-700 text-white px-4 py-2 rounded-2xl font-bold text-sm hover:bg-emerald-800"
-              >
-                + Nuevo registro
-              </button>
-            </div>
-          </div>
+        {/* HISTORIAL: línea de tiempo agrupada por mes, del más reciente al más antiguo */}
+        {(() => {
+          const ordenados = registros
+            .map((r, idx) => ({ r, idx }))
+            .sort((a, b) => String(b.r.fecha || "").localeCompare(String(a.r.fecha || "")) || a.idx - b.idx);
+          const tiposPresentes = TIPOS_HISTORIAL.filter((t) => registros.some((r) => r.tipo === t));
+          const visibles = ordenados.filter(({ r }) => filtro === "Todos" || r.tipo === filtro);
+          const grupos: { clave: string; titulo: string; items: typeof visibles }[] = [];
+          for (const item of visibles) {
+            const clave = String(item.r.fecha || "").slice(0, 7) || "sin-fecha";
+            let g = grupos.find((x) => x.clave === clave);
+            if (!g) {
+              g = { clave, titulo: tituloMes(clave), items: [] };
+              grupos.push(g);
+            }
+            g.items.push(item);
+          }
 
-          {/* TIMELINE */}
-          <div className="space-y-3" onClick={() => setSwipedIndex(null)}>
-            {registros.length === 0 ? (
-              <p className="text-gray-500 text-center py-6">Sin registros</p>
-            ) : (
-              registros
-                .filter((r) => filtro === "Todos" || r.tipo === filtro)
-                .map((r, i) => {
-                    const isActiveMove = activeTouchIndex === i && touchStartX !== null && touchCurrentX !== null;
-                    const moveDx = isActiveMove ? Math.min(0, touchCurrentX! - touchStartX!) : 0;
-                    const isSwiped = swipedIndex === i;
-                    const translateX = isSwiped ? -80 : moveDx; // reveal width ~80px
+          return (
+            <section className="mb-3 overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
+              <div className="flex items-center justify-between gap-3 px-4 pt-4">
+                <div className="min-w-0">
+                  <h3 className="text-[15px] font-bold text-slate-900">Historial</h3>
+                  <p className="text-xs text-slate-500">
+                    {registros.length === 1 ? "1 registro" : `${registros.length} registros`} · más recientes primero
+                  </p>
+                </div>
+                <button
+                  onClick={() => setMostrarForm(true)}
+                  className="shrink-0 whitespace-nowrap rounded-full bg-emerald-700 px-3.5 py-2 text-sm font-bold text-white transition hover:bg-emerald-800 active:scale-95"
+                >
+                  + Registro
+                </button>
+              </div>
+
+              {/* Filtros por tipo, con cantidad */}
+              {registros.length > 0 && (
+                <div className="mt-3 flex gap-2 overflow-x-auto px-4 pb-1">
+                  {["Todos", ...tiposPresentes].map((t) => {
+                    const activo = filtro === t;
+                    const n = t === "Todos" ? registros.length : registros.filter((r) => r.tipo === t).length;
                     return (
-                      <div
-                        key={i}
-                        className="relative overflow-hidden rounded-lg"
-                        onPointerDown={() => iniciarLongPress(i)}
-                        onPointerUp={cancelarLongPress}
-                        onPointerLeave={cancelarLongPress}
-                        onPointerCancel={cancelarLongPress}
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setFiltro(t)}
+                        aria-pressed={activo}
+                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium transition ${
+                          activo ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                        }`}
                       >
-                        <div
-                          className={`absolute inset-y-0 right-0 z-0 flex items-center justify-end pr-3 bg-red-500 rounded-r-lg w-20 transition ${isSwiped || longPressIndex === i ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
-                        >
-                          {longPressIndex === i ? (
-                            <div className="flex gap-2">
-                              <button
-                                data-swipe-ignore="true"
-                                onPointerDown={(e) => e.stopPropagation()}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  eliminarRegistro(i);
-                                  setLongPressIndex(null);
-                                }}
-                                className="bg-white text-red-600 text-[10px] px-2 py-1 rounded-md font-semibold"
-                                aria-label={`Eliminar registro ${r.tipo}`}
-                              >
-                                Eliminar
-                              </button>
-                              <button
-                                data-swipe-ignore="true"
-                                onPointerDown={(e) => e.stopPropagation()}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setLongPressIndex(null);
-                                }}
-                                className="bg-gray-100 text-black text-[10px] px-2 py-1 rounded-md"
-                              >
-                                Cancelar
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              data-swipe-ignore="true"
-                              onPointerDown={(e) => e.stopPropagation()}
-                              onClick={(e) => { e.stopPropagation(); eliminarRegistro(i); }}
-                              className="bg-white text-red-600 text-[10px] px-2 py-1 rounded-md font-semibold"
-                              aria-label={`Eliminar registro ${r.tipo}`}
-                            >
-                              Eliminar
-                            </button>
-                          )}
-                        </div>
-
-                        <div
-                          className={`relative z-10 flex gap-2 py-2 border-b border-gray-200 last:border-0 p-1 rounded-lg ${r.tipo === 'Evento' ? 'bg-slate-100 hover:bg-slate-200' : 'bg-white hover:bg-gray-50'}`}
-                          onTouchStart={(e) => { handleTouchStart(e, i); e.stopPropagation(); }}
-                          onTouchMove={(e) => { handleTouchMove(e, i); e.stopPropagation(); }}
-                          onTouchEnd={(e) => { handleTouchEnd(e, i); e.stopPropagation(); }}
-                          style={{ transform: `translateX(${translateX}px)` }}
-                        >
-                          <div className={`w-3 h-3 rounded-full ${obtenerColorPorTipo(r.tipo)} flex-shrink-0 mt-1`} />
-                          <div className="flex-1 min-w-0 pr-12">
-                            <div className="flex justify-between items-center">
-                              <p className="font-semibold text-black text-sm">{r.tipo}</p>
-                              <div className="flex items-center gap-2">
-                                {r.tipo === 'Parto' && (
-                                  <button
-                                    data-swipe-ignore="true"
-                                    onClick={(e) => { e.stopPropagation(); setSelectedRegistro(selectedRegistro === r ? null : r); }}
-                                    className="text-slate-600 text-sm"
-                                    aria-label={`Ver detalles de parto ${r.fecha}`}
-                                  >
-                                    📋
-                                  </button>
-                                )}
-                                <p className="text-gray-500 text-[11px]">{formatearFechaCorta(r.fecha)}</p>
-                              </div>
-                            </div>
-                            {r.mensaje && <p className="text-gray-700 text-[11px] mt-1 truncate">{r.mensaje}</p>}
-                            {r.descripcion && <p className="text-gray-600 text-[11px] italic mt-1 truncate">{r.descripcion}</p>}
-                            {selectedRegistro === r && r.tipo === "Parto" && (
-                              <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 rounded-lg bg-emerald-50 p-2 text-[10px] text-slate-700 sm:grid-cols-4">
-                                <span><b>Código:</b> {r.codigoParto || "-"}</span>
-                                <span><b>Total:</b> {r.lechones ?? "-"}</span>
-                                <span><b>Vivos:</b> {r.vivos ?? "-"}</span>
-                                <span><b>Muertos:</b> {r.muertos ?? "-"}</span>
-                                <span><b>Hora:</b> {r.horaInicio || "-"}</span>
-                                <span><b>Tipo:</b> {r.tipoParto || "-"}</span>
-                                <span><b>Asistido:</b> {r.asistidoPor || "-"}</span>
-                                <span><b>Peso lechón:</b> {r.pesoPromedio != null ? `${r.pesoPromedio} kg` : "-"}</span>
-                                <span><b>Raza:</b> {r.raza || "-"}</span>
-                                <span><b>Peso cerda:</b> {r.pesoCerda != null ? `${r.pesoCerda} kg` : "-"}</span>
-                                <span><b>Estado:</b> {r.estadoSalud || "-"}</span>
-                                <span className="col-span-2 sm:col-span-4"><b>Observaciones:</b> {r.observaciones || "-"}</span>
-                                <span className="col-span-2 sm:col-span-4"><b>Observaciones lechones:</b> {r.observacionesLechones || "-"}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+                        {t !== "Todos" && <span aria-hidden="true">{infoTipo(t).icono}</span>}
+                        {t}
+                        <span className={`tabular-nums ${activo ? "text-white/70" : "text-slate-400"}`}>{n}</span>
+                      </button>
                     );
-                  })
-            )}
-          </div>
-        </div>
+                  })}
+                </div>
+              )}
+
+              <div className="px-4 pb-4 pt-3" onClick={() => setSwipedIndex(null)}>
+                {registros.length === 0 ? (
+                  <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-slate-200 px-6 py-10 text-center">
+                    <span className="text-3xl" aria-hidden="true">📋</span>
+                    <p className="mt-1 text-sm font-semibold text-slate-800">Sin registros todavía</p>
+                    <p className="text-xs text-slate-500">Toca “+ Registro” para anotar la primera inseminación, celo o parto.</p>
+                  </div>
+                ) : visibles.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-slate-500">No hay registros de este tipo.</p>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    {grupos.map((g) => (
+                      <div key={g.clave}>
+                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{g.titulo}</p>
+                        <ol className="relative flex flex-col gap-2.5 before:absolute before:bottom-3 before:left-[19px] before:top-3 before:w-0.5 before:rounded-full before:bg-slate-100">
+                          {g.items.map(({ r, idx }) => {
+                            const info = infoTipo(r.tipo);
+                            const isActiveMove = activeTouchIndex === idx && touchStartX !== null && touchCurrentX !== null;
+                            const moveDx = isActiveMove ? Math.min(0, touchCurrentX! - touchStartX!) : 0;
+                            const isSwiped = swipedIndex === idx;
+                            const translateX = isSwiped ? -92 : moveDx;
+                            const dias = r.fecha ? calcularDiasEntre(r.fecha, fechaHoy) : null;
+                            const relativo =
+                              dias === null ? "" : dias === 0 ? "Hoy" : dias === 1 ? "Ayer" : dias > 0 ? `Hace ${dias} días` : `En ${-dias} días`;
+                            return (
+                              <li key={`${idx}-${r.fecha}-${r.tipo}`} className="relative flex gap-3">
+                                <span
+                                  aria-hidden="true"
+                                  className={`relative z-10 mt-1.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-lg ring-4 ring-white ${info.fondo}`}
+                                >
+                                  {info.icono}
+                                </span>
+
+                                <div className="relative min-w-0 flex-1 overflow-hidden rounded-2xl">
+                                  {/* Acción al deslizar */}
+                                  <div
+                                    className={`absolute inset-y-0 right-0 flex w-[88px] items-center justify-center rounded-r-2xl bg-red-500 transition-opacity ${
+                                      isSwiped ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+                                    }`}
+                                  >
+                                    <button
+                                      data-swipe-ignore="true"
+                                      onPointerDown={(e) => e.stopPropagation()}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        pedirEliminarRegistro(idx);
+                                      }}
+                                      className="flex flex-col items-center gap-0.5 text-[11px] font-semibold text-white"
+                                      aria-label={`Eliminar registro ${r.tipo}`}
+                                    >
+                                      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                        <path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />
+                                      </svg>
+                                      Eliminar
+                                    </button>
+                                  </div>
+
+                                  <div
+                                    className={`relative z-10 rounded-2xl border bg-white px-3.5 py-3 ${info.borde}`}
+                                    onTouchStart={(e) => { handleTouchStart(e, idx); e.stopPropagation(); }}
+                                    onTouchMove={(e) => { handleTouchMove(e, idx); e.stopPropagation(); }}
+                                    onTouchEnd={(e) => { handleTouchEnd(e, idx); e.stopPropagation(); }}
+                                    style={{
+                                      transform: `translateX(${translateX}px)`,
+                                      transition: isActiveMove ? "none" : "transform 200ms ease-out",
+                                    }}
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <p className={`min-w-0 text-sm font-bold leading-snug ${info.texto}`}>{r.tipo}</p>
+                                      <div className="shrink-0 text-right">
+                                        <p className="whitespace-nowrap text-xs font-semibold text-slate-700">{r.fecha ? formatearFechaCorta(r.fecha) : "–"}</p>
+                                        {relativo && <p className="whitespace-nowrap text-[11px] text-slate-400">{relativo}</p>}
+                                      </div>
+                                    </div>
+
+                                    {r.tipo === "Parto" && (
+                                      <div className="mt-2 flex flex-wrap gap-1.5">
+                                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+                                          {r.vivos ?? 0} vivos
+                                        </span>
+                                        {Number(r.muertos) > 0 && (
+                                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">{r.muertos} muertos</span>
+                                        )}
+                                        {Number(r.momias) > 0 && (
+                                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">{r.momias} momias</span>
+                                        )}
+                                        {r.lechones != null && (
+                                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">{r.lechones} en total</span>
+                                        )}
+                                      </div>
+                                    )}
+                                    {r.tipo === "Destete" && r.destetados != null && (
+                                      <p className="mt-1.5 text-xs font-semibold text-orange-800">{r.destetados} lechones destetados</p>
+                                    )}
+
+                                    {r.mensaje && <p className="mt-1.5 text-xs text-slate-600">{r.mensaje}</p>}
+                                    {(r.descripcion || r.notas) && (
+                                      <p className="mt-1 text-xs italic text-slate-500">{r.descripcion || r.notas}</p>
+                                    )}
+
+                                    {r.tipo === "Parto" && (
+                                      <button
+                                        data-swipe-ignore="true"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedRegistro(r);
+                                        }}
+                                        className="mt-2 text-xs font-semibold text-emerald-700 hover:underline"
+                                      >
+                                        Ver detalle del parto ›
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ol>
+                      </div>
+                    ))}
+                    <p className="text-center text-[11px] text-slate-400">Desliza un registro a la izquierda para eliminarlo</p>
+                  </div>
+                )}
+              </div>
+            </section>
+          );
+        })()}
 
         {/* FORMULARIO */}
         {mostrarForm && (
