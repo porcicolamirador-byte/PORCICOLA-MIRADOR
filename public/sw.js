@@ -30,6 +30,7 @@ const RUTAS = [
   "/indicadores",
   "/contabilidad",
   "/ajustes",
+  "/ajustes/avanzados",
   "/tareas",
   "/monitoreo",
   "/bodega",
