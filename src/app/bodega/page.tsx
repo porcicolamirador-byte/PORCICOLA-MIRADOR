@@ -245,6 +245,7 @@ export default function BodegaPage() {
       </p>
 
       {datos && (
+        <>
         <DialogoClave
           abierto={pedirClave}
           titulo="Clave de facturas"
@@ -264,6 +265,7 @@ export default function BodegaPage() {
           facturas={datos.facturas}
           onCerrar={() => setNuevaFactura(false)}
         />
+        </>
       )}
       {producto && <DetalleProducto item={producto} onCerrar={() => setProductoSel(null)} />}
       {factura && datos && (
