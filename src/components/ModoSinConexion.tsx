@@ -97,33 +97,19 @@ export default function ModoSinConexion() {
 
   if (!sinConexion) return null;
 
-  // Ícono rojo de "sin red" en la esquina superior derecha
+  // Punto rojo que parpadea (cambia cada 0,5 s) en la esquina superior derecha
   return (
-    <div
+    <span
       role="status"
       aria-label="Sin conexión: local backup"
       title="Sin conexión: local backup"
-      className="pointer-events-none fixed z-[80] flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-white shadow-md ring-2 ring-white"
-      style={{ top: "calc(env(safe-area-inset-top) + 0.25rem)", right: "0.5rem" }}
+      className="punto-sin-red pointer-events-none fixed z-[80] block h-2.5 w-2.5 rounded-full bg-red-600 ring-2 ring-white"
+      style={{ top: "calc(env(safe-area-inset-top) + 0.6rem)", right: "0.75rem" }}
     >
-      <svg
-        viewBox="0 0 24 24"
-        className="h-4 w-4"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2.4}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
-        <path d="M12 20h.01" />
-        <path d="M8.5 16.43a5 5 0 0 1 7 0" />
-        <path d="M5 12.86a10 10 0 0 1 5.17-2.69" />
-        <path d="M19 12.86a10 10 0 0 0-2-1.52" />
-        <path d="M2 8.82a15 15 0 0 1 4.18-2.64" />
-        <path d="M22 8.82a15 15 0 0 0-11.29-3.76" />
-        <path d="m2 2 20 20" />
-      </svg>
-    </div>
+      <style>{`
+        .punto-sin-red { animation: punto-sin-red 1s steps(1, end) infinite; }
+        @keyframes punto-sin-red { 0% { opacity: 1 } 50% { opacity: 0.15 } }
+      `}</style>
+    </span>
   );
 }
