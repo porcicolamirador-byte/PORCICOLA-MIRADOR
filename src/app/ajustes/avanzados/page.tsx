@@ -8,6 +8,7 @@ import { avisar, confirmar } from "@/components/Dialogo";
 import { ajustesDesbloqueados, bloquearAjustes } from "@/lib/acceso";
 import { CONFIG_POR_DEFECTO, guardarConfig, leerConfig, type ConfigGranja } from "@/lib/config";
 import { notificarCambio } from "@/lib/datos";
+import CatalogoProductos from "@/components/CatalogoProductos";
 
 /**
  * Sección oculta de ajustes: solo se abre después de ingresar el código
@@ -71,6 +72,8 @@ export default function AjustesAvanzadosPage() {
         actual={config.claveEliminar}
         onGuardar={(clave) => guardar({ claveEliminar: clave })}
       />
+
+      <CatalogoProductos />
 
       <DiasDestete min={config.desteteMin} max={config.desteteMax} onGuardar={(min, max) => guardar({ desteteMin: min, desteteMax: max })} />
 

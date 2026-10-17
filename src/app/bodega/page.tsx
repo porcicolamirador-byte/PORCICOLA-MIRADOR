@@ -1,321 +1,542 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Boton, Campo, Chevron, Chips, Dato, Entrada, Hoja, IconoMas, Insignia, Selector, Vacio } from "@/components/ui";
+import { avisar, confirmar } from "@/components/Dialogo";
+import { iconoCategoria } from "@/components/CatalogoProductos";
 import {
+  calcularInventario,
   formatoFecha,
-  guardarArticulos,
+  formatoPesos,
+  guardarFacturas,
+  guardarMovimientos,
+  guardarSalidas,
   hoy,
-  leerArticulos,
+  leerFacturas,
+  leerMovimientos,
+  leerProductos,
+  leerSalidas,
+  migrarBodegaAnterior,
   nuevoId,
+  totalFactura,
   useVersionDatos,
-  type ArticuloBodega,
   type CategoriaBodega,
+  type ExistenciaProducto,
+  type Factura,
+  type ProductoBodega,
 } from "@/lib/datos";
-import { confirmar } from "@/components/Dialogo";
 
-const CATEGORIAS: { valor: CategoriaBodega; icono: string }[] = [
-  { valor: "Alimento", icono: "🌾" },
-  { valor: "Medicamentos", icono: "💊" },
-  { valor: "Vacunas", icono: "💉" },
-  { valor: "Limpieza", icono: "🧴" },
-  { valor: "Otros", icono: "🧰" },
-];
-const UNIDADES = ["bultos", "kg", "unidades", "frascos", "dosis", "litros", "cajas"];
-const icono = (c: CategoriaBodega) => CATEGORIAS.find((x) => x.valor === c)?.icono ?? "📦";
 const num = (v: string) => {
-  const n = Number(v.replace(",", "."));
+  const n = Number(String(v).replace(",", "."));
   return Number.isFinite(n) ? n : 0;
 };
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
-type Filtro = "todos" | "bajos" | CategoriaBodega;
+/** Categoría de Contabilidad según el tipo de producto */
+const CATEGORIA_GASTO: Record<CategoriaBodega, string> = {
+  Alimento: "Alimento",
+  Medicamentos: "Medicamentos y vacunas",
+  Vacunas: "Medicamentos y vacunas",
+  Limpieza: "Otros gastos",
+  Otros: "Otros gastos",
+};
+
+type Vista = "inventario" | "reponer" | "facturas";
 
 export default function BodegaPage() {
+  const router = useRouter();
   const version = useVersionDatos();
-  const [filtro, setFiltro] = useState<Filtro>("todos");
+  const [vista, setVista] = useState<Vista>("inventario");
   const [busqueda, setBusqueda] = useState("");
-  const [nuevo, setNuevo] = useState(false);
-  const [seleccionado, setSeleccionado] = useState<string | null>(null);
+  const [nuevaFactura, setNuevaFactura] = useState(false);
+  const [productoSel, setProductoSel] = useState<string | null>(null);
+  const [facturaSel, setFacturaSel] = useState<string | null>(null);
 
-  const articulos = useMemo(() => (version < 0 ? null : leerArticulos()), [version]);
-  const bajos = (articulos ?? []).filter((a) => a.cantidad <= a.minimo);
-  const visibles = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
-    return (articulos ?? [])
-      .filter((a) => (filtro === "todos" ? true : filtro === "bajos" ? a.cantidad <= a.minimo : a.categoria === filtro))
-      .filter((a) => !q || a.nombre.toLowerCase().includes(q))
-      .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
-  }, [articulos, filtro, busqueda]);
-  const articulo = articulos?.find((a) => a.id === seleccionado) ?? null;
+  // Una sola vez: los artículos de la bodega anterior pasan al catálogo
+  useEffect(() => {
+    if (version >= 0) migrarBodegaAnterior();
+  }, [version]);
+
+  const datos = useMemo(() => {
+    if (version < 0) return null;
+    const inventario = calcularInventario();
+    const facturas = leerFacturas().sort((a, b) => b.fecha.localeCompare(a.fecha) || b.numero.localeCompare(a.numero));
+    return { inventario, facturas, productos: leerProductos() };
+  }, [version]);
+
+  const q = busqueda.trim().toLowerCase();
+  const bajos = datos?.inventario.filter((i) => i.bajoMinimo) ?? [];
+  const inventarioVisible = (vista === "reponer" ? bajos : datos?.inventario ?? [])
+    .filter((i) => !q || i.producto.nombre.toLowerCase().includes(q))
+    .sort((a, b) => a.producto.nombre.localeCompare(b.producto.nombre, "es"));
+  const facturasVisibles = (datos?.facturas ?? []).filter(
+    (f) => !q || f.numero.toLowerCase().includes(q) || (f.proveedor ?? "").toLowerCase().includes(q)
+  );
+  const mesActual = hoy().slice(0, 7);
+  const compradoMes = (datos?.facturas ?? []).filter((f) => f.fecha.slice(0, 7) === mesActual).reduce((s, f) => s + totalFactura(f), 0);
+
+  const sinCatalogo = datos !== null && datos.productos.length === 0;
+  const producto = datos?.inventario.find((i) => i.producto.id === productoSel) ?? null;
+  const factura = datos?.facturas.find((f) => f.id === facturaSel) ?? null;
 
   return (
     <ModuloPage
       titulo="Bodega"
-      subtitulo="Inventario de alimento, medicamentos e insumos"
+      subtitulo="Facturas, existencias y consumo de insumos"
       icono="📦"
       tono="teal"
       accion={
-        <Boton onClick={() => setNuevo(true)} className="px-3.5">
-          <IconoMas /> Artículo
+        <Boton onClick={() => setNuevaFactura(true)} className="px-3.5" disabled={sinCatalogo}>
+          <IconoMas /> Factura
         </Boton>
       }
     >
-      <div className="grid grid-cols-2 gap-2">
-        <Dato titulo="Artículos" valor={articulos ? articulos.length : "–"} />
-        <Dato titulo="Bajo el mínimo" valor={articulos ? bajos.length : "–"} detalle={bajos.length ? "Hay que reponer" : "Todo en orden"} />
+      <div className="grid grid-cols-3 gap-2">
+        <Dato titulo="Productos" valor={datos ? datos.productos.length : "–"} />
+        <Dato titulo="Por reponer" valor={datos ? bajos.length : "–"} />
+        <Dato titulo="Compras del mes" valor={datos ? formatoPesos(compradoMes) : "–"} />
       </div>
 
-      <input
-        type="search"
-        value={busqueda}
-        onChange={(e) => setBusqueda(e.target.value)}
-        placeholder="Buscar artículo"
-        className="w-full rounded-2xl bg-slate-100 px-4 py-3 text-base text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
-      />
-
-      <Chips
-        opciones={[
-          { valor: "todos", texto: "Todos" },
-          { valor: "bajos", texto: `Por reponer${bajos.length ? ` (${bajos.length})` : ""}` },
-          ...CATEGORIAS.map((c) => ({ valor: c.valor, texto: c.valor })),
-        ]}
-        valor={filtro}
-        onChange={setFiltro}
-      />
-
-      {articulos === null ? (
-        <div className="h-40 animate-pulse rounded-3xl bg-slate-100" />
-      ) : articulos.length === 0 ? (
+      {sinCatalogo ? (
         <Vacio
-          titulo="La bodega está vacía"
-          texto="Registra el alimento, los medicamentos y demás insumos para controlar las existencias."
-          accion={<Boton onClick={() => setNuevo(true)}>Agregar artículo</Boton>}
+          titulo="Primero crea los productos"
+          texto="Los productos de la bodega se definen en Ajustes → Ajustes (con código) → Productos de bodega. Después podrás ingresar facturas."
+          accion={<Boton onClick={() => router.push("/ajustes")}>Ir a Ajustes</Boton>}
         />
-      ) : visibles.length === 0 ? (
-        <p className="py-8 text-center text-sm text-slate-500">Ningún artículo coincide con el filtro.</p>
       ) : (
-        <ul className="divide-y divide-slate-100 overflow-hidden rounded-3xl bg-white ring-1 ring-slate-200/80">
-          {visibles.map((a) => {
-            const bajo = a.cantidad <= a.minimo;
-            return (
-              <li key={a.id}>
-                <button
-                  type="button"
-                  onClick={() => setSeleccionado(a.id)}
-                  className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-slate-50 active:bg-slate-100"
-                >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-xl" aria-hidden="true">
-                    {icono(a.categoria)}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-slate-900">{a.nombre}</span>
-                    <span className="block truncate text-xs text-slate-500">
-                      {a.categoria} · mínimo {fmt(a.minimo)} {a.unidad}
+        <>
+          <input
+            type="search"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder={vista === "facturas" ? "Buscar por número o proveedor" : "Buscar producto"}
+            className="w-full rounded-2xl bg-slate-100 px-4 py-3 text-base text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
+          />
+
+          <Chips
+            opciones={[
+              { valor: "inventario", texto: "Inventario" },
+              { valor: "reponer", texto: `Por reponer${bajos.length ? ` (${bajos.length})` : ""}` },
+              { valor: "facturas", texto: `Facturas${datos?.facturas.length ? ` (${datos.facturas.length})` : ""}` },
+            ]}
+            valor={vista}
+            onChange={setVista}
+          />
+
+          {datos === null ? (
+            <div className="h-40 animate-pulse rounded-3xl bg-slate-100" />
+          ) : vista === "facturas" ? (
+            facturasVisibles.length === 0 ? (
+              <Vacio
+                titulo="Sin facturas"
+                texto="Ingresa la factura de cada compra para que las existencias se actualicen solas."
+                accion={<Boton onClick={() => setNuevaFactura(true)}>Ingresar factura</Boton>}
+              />
+            ) : (
+              <ul className="divide-y divide-slate-100 overflow-hidden rounded-3xl bg-white ring-1 ring-slate-200/80">
+                {facturasVisibles.map((f) => (
+                  <li key={f.id}>
+                    <button
+                      type="button"
+                      onClick={() => setFacturaSel(f.id)}
+                      className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-slate-50 active:bg-slate-100"
+                    >
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-xl" aria-hidden="true">
+                        🧾
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-slate-900">Factura {f.numero}</span>
+                        <span className="block truncate text-xs text-slate-500">
+                          {formatoFecha(f.fecha, true)}
+                          {f.proveedor ? ` · ${f.proveedor}` : ""} · {f.lineas.length}{" "}
+                          {f.lineas.length === 1 ? "producto" : "productos"}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-sm font-bold text-slate-900 tabular-nums">{formatoPesos(totalFactura(f))}</span>
+                      <Chevron />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )
+          ) : inventarioVisible.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-500">
+              {vista === "reponer" ? "No hay productos por reponer. 👍" : "Ningún producto coincide con la búsqueda."}
+            </p>
+          ) : (
+            <ul className="divide-y divide-slate-100 overflow-hidden rounded-3xl bg-white ring-1 ring-slate-200/80">
+              {inventarioVisible.map(({ producto: p, existencia, bajoMinimo }) => (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    onClick={() => setProductoSel(p.id)}
+                    className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-slate-50 active:bg-slate-100"
+                  >
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-xl" aria-hidden="true">
+                      {iconoCategoria(p.categoria)}
                     </span>
-                  </span>
-                  <span className="flex shrink-0 flex-col items-end gap-1">
-                    <span className={`text-sm font-bold tabular-nums ${bajo ? "text-red-600" : "text-slate-900"}`}>
-                      {fmt(a.cantidad)} <span className="text-xs font-medium text-slate-500">{a.unidad}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-slate-900">{p.nombre}</span>
+                      <span className="block truncate text-xs text-slate-500">
+                        {p.categoria} · mínimo {fmt(p.minimo)} {p.unidad}
+                      </span>
                     </span>
-                    {bajo && <Insignia clase="bg-red-50 text-red-700 ring-red-200">Reponer</Insignia>}
-                  </span>
-                  <Chevron />
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+                    <span className="flex shrink-0 flex-col items-end gap-1">
+                      <span className={`text-sm font-bold tabular-nums ${bajoMinimo ? "text-red-600" : "text-slate-900"}`}>
+                        {fmt(existencia)} <span className="text-xs font-medium text-slate-500">{p.unidad}</span>
+                      </span>
+                      {bajoMinimo && <Insignia clase="bg-red-50 text-red-700 ring-red-200">Reponer</Insignia>}
+                    </span>
+                    <Chevron />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
 
-      <NuevoArticulo abierta={nuevo} onCerrar={() => setNuevo(false)} />
-      {articulo && <DetalleArticulo articulo={articulo} onCerrar={() => setSeleccionado(null)} />}
+      <p className="px-1 text-[11px] leading-relaxed text-slate-400">
+        Las existencias se calculan con las facturas ingresadas menos las salidas por consumo. Los productos se administran
+        en Ajustes avanzados.
+      </p>
+
+      {datos && (
+        <NuevaFactura
+          abierta={nuevaFactura}
+          productos={datos.productos}
+          facturas={datos.facturas}
+          onCerrar={() => setNuevaFactura(false)}
+        />
+      )}
+      {producto && <DetalleProducto item={producto} onCerrar={() => setProductoSel(null)} />}
+      {factura && datos && (
+        <DetalleFactura factura={factura} productos={datos.productos} onCerrar={() => setFacturaSel(null)} />
+      )}
     </ModuloPage>
   );
 }
 
-function actualizar(id: string, cambio: (a: ArticuloBodega) => ArticuloBodega) {
-  guardarArticulos(leerArticulos().map((a) => (a.id === id ? cambio(a) : a)));
+/* ───────────────────── Nueva factura ───────────────────── */
+
+interface LineaForm {
+  clave: string;
+  productoId: string;
+  cantidad: string;
+  valor: string;
 }
 
-function NuevoArticulo({ abierta, onCerrar }: { abierta: boolean; onCerrar: () => void }) {
-  const [nombre, setNombre] = useState("");
-  const [categoria, setCategoria] = useState<CategoriaBodega>("Alimento");
-  const [unidad, setUnidad] = useState("bultos");
-  const [cantidad, setCantidad] = useState("");
-  const [minimo, setMinimo] = useState("");
+const lineaVacia = (): LineaForm => ({ clave: nuevoId(), productoId: "", cantidad: "", valor: "" });
 
-  const guardar = (e: FormEvent) => {
-    e.preventDefault();
-    if (!nombre.trim()) return;
-    const inicial = num(cantidad);
-    guardarArticulos([
-      ...leerArticulos(),
-      {
-        id: nuevoId(),
-        nombre: nombre.trim(),
-        categoria,
-        unidad,
-        cantidad: inicial,
-        minimo: num(minimo),
-        movimientos: inicial > 0 ? [{ fecha: hoy(), tipo: "entrada", cantidad: inicial, nota: "Existencia inicial" }] : [],
-      },
-    ]);
-    setNombre("");
-    setCantidad("");
-    setMinimo("");
+function NuevaFactura({
+  abierta,
+  productos,
+  facturas,
+  onCerrar,
+}: {
+  abierta: boolean;
+  productos: ProductoBodega[];
+  facturas: Factura[];
+  onCerrar: () => void;
+}) {
+  const [numero, setNumero] = useState("");
+  const [proveedor, setProveedor] = useState("");
+  const [fecha, setFecha] = useState(hoy());
+  const [nota, setNota] = useState("");
+  const [lineas, setLineas] = useState<LineaForm[]>([lineaVacia()]);
+  const [comoGasto, setComoGasto] = useState(true);
+  const [error, setError] = useState("");
+
+  const ordenados = [...productos].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  const unidadDe = (id: string) => productos.find((p) => p.id === id)?.unidad ?? "";
+  const total = lineas.reduce((s, l) => s + num(l.cantidad) * num(l.valor), 0);
+  const proveedores = Array.from(new Set(facturas.map((f) => f.proveedor).filter(Boolean))) as string[];
+
+  const limpiar = () => {
+    setNumero("");
+    setProveedor("");
+    setFecha(hoy());
+    setNota("");
+    setLineas([lineaVacia()]);
+    setComoGasto(true);
+    setError("");
+  };
+  const cerrar = () => {
+    limpiar();
     onCerrar();
   };
 
+  const cambiarLinea = (clave: string, cambio: Partial<LineaForm>) => {
+    setLineas((ls) => ls.map((l) => (l.clave === clave ? { ...l, ...cambio } : l)));
+    setError("");
+  };
+
+  const guardar = async (e: FormEvent) => {
+    e.preventDefault();
+    const n = numero.trim();
+    if (!n) return setError("Escribe el número de la factura.");
+    const validas = lineas.filter((l) => l.productoId && num(l.cantidad) > 0);
+    if (validas.length === 0) return setError("Agrega al menos un producto con su cantidad.");
+    if (lineas.some((l) => l.productoId && num(l.cantidad) <= 0)) return setError("Hay productos sin cantidad.");
+    const ids = validas.map((l) => l.productoId);
+    if (new Set(ids).size !== ids.length) return setError("Un producto está repetido; súmalo en una sola línea.");
+    const repetida = facturas.find(
+      (f) => f.numero.toLowerCase() === n.toLowerCase() && (f.proveedor ?? "").toLowerCase() === proveedor.trim().toLowerCase()
+    );
+    if (
+      repetida &&
+      !(await confirmar({
+        titulo: "Factura ya ingresada",
+        mensaje: `Ya existe la factura ${repetida.numero}${repetida.proveedor ? ` de ${repetida.proveedor}` : ""}. ¿Ingresarla de nuevo?`,
+        aceptar: "Ingresar",
+      }))
+    )
+      return;
+
+    const factura: Factura = {
+      id: nuevoId(),
+      numero: n,
+      proveedor: proveedor.trim() || undefined,
+      fecha,
+      nota: nota.trim() || undefined,
+      lineas: validas.map((l) => ({ productoId: l.productoId, cantidad: num(l.cantidad), valorUnitario: num(l.valor) })),
+    };
+    const valor = totalFactura(factura);
+    if (comoGasto && valor > 0) {
+      const primero = productos.find((p) => p.id === factura.lineas[0].productoId);
+      const movimientoId = nuevoId();
+      guardarMovimientos([
+        ...leerMovimientos(),
+        {
+          id: movimientoId,
+          fecha,
+          tipo: "gasto",
+          categoria: primero ? CATEGORIA_GASTO[primero.categoria] : "Otros gastos",
+          descripcion: `Factura ${n}${factura.proveedor ? ` · ${factura.proveedor}` : ""}`,
+          monto: valor,
+        },
+      ]);
+      factura.movimientoId = movimientoId;
+    }
+    guardarFacturas([...leerFacturas(), factura]);
+    cerrar();
+  };
+
   return (
-    <Hoja abierta={abierta} titulo="Nuevo artículo" onCerrar={onCerrar}>
+    <Hoja abierta={abierta} titulo="Ingresar factura" onCerrar={cerrar}>
       <form onSubmit={guardar} className="flex flex-col gap-3.5">
-        <Campo etiqueta="Nombre *">
-          <Entrada value={nombre} onChange={setNombre} placeholder="Ej. Concentrado levante" required />
+        <div className="grid grid-cols-2 gap-3">
+          <Campo etiqueta="Número de factura *">
+            <Entrada value={numero} onChange={(v) => { setNumero(v); setError(""); }} placeholder="Ej. FE-1234" required />
+          </Campo>
+          <Campo etiqueta="Fecha">
+            <Entrada type="date" value={fecha} onChange={setFecha} required />
+          </Campo>
+        </div>
+        <Campo etiqueta="Proveedor">
+          <input
+            list="proveedores-bodega"
+            value={proveedor}
+            onChange={(e) => setProveedor(e.target.value)}
+            placeholder="Ej. Agropecuaria La Esperanza"
+            className="w-full rounded-xl bg-slate-50 px-3.5 py-2.5 text-base text-slate-900 ring-1 ring-slate-200 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
+          />
+          <datalist id="proveedores-bodega">
+            {proveedores.map((p) => (
+              <option key={p} value={p} />
+            ))}
+          </datalist>
         </Campo>
-        <div className="grid grid-cols-2 gap-3">
-          <Campo etiqueta="Categoría">
-            <Selector
-              value={categoria}
-              onChange={(v) => setCategoria(v as CategoriaBodega)}
-              opciones={CATEGORIAS.map((c) => ({ valor: c.valor, texto: `${c.icono} ${c.valor}` }))}
-            />
-          </Campo>
-          <Campo etiqueta="Unidad">
-            <Selector value={unidad} onChange={setUnidad} opciones={UNIDADES.map((u) => ({ valor: u, texto: u }))} />
-          </Campo>
+
+        <div>
+          <p className="mb-2 text-[13px] font-medium text-slate-700">Productos *</p>
+          <div className="flex flex-col gap-2.5">
+            {lineas.map((l, i) => (
+              <div key={l.clave} className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-500">Producto {i + 1}</span>
+                  {lineas.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setLineas((ls) => ls.filter((x) => x.clave !== l.clave))}
+                      className="rounded-full px-2 py-0.5 text-xs text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                    >
+                      Quitar
+                    </button>
+                  )}
+                </div>
+                <Selector
+                  value={l.productoId}
+                  onChange={(v) => cambiarLinea(l.clave, { productoId: v })}
+                  opciones={[
+                    { valor: "", texto: "Elige un producto…" },
+                    ...ordenados.map((p) => ({ valor: p.id, texto: `${iconoCategoria(p.categoria)} ${p.nombre} (${p.unidad})` })),
+                  ]}
+                />
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <Campo etiqueta={`Cantidad${unidadDe(l.productoId) ? ` (${unidadDe(l.productoId)})` : ""}`}>
+                    <Entrada
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step="any"
+                      value={l.cantidad}
+                      onChange={(v) => cambiarLinea(l.clave, { cantidad: v })}
+                    />
+                  </Campo>
+                  <Campo etiqueta="Valor unitario ($)">
+                    <Entrada
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      step="any"
+                      value={l.valor}
+                      onChange={(v) => cambiarLinea(l.clave, { valor: v })}
+                    />
+                  </Campo>
+                </div>
+                {num(l.cantidad) > 0 && num(l.valor) > 0 && (
+                  <p className="mt-1.5 text-right text-xs text-slate-500">
+                    Subtotal: <b className="text-slate-800">{formatoPesos(num(l.cantidad) * num(l.valor))}</b>
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setLineas((ls) => [...ls, lineaVacia()])}
+            className="mt-2 w-full rounded-2xl border border-dashed border-emerald-300 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+          >
+            + Agregar otro producto
+          </button>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Campo etiqueta="Existencia actual">
-            <Entrada type="number" inputMode="decimal" min={0} step="any" value={cantidad} onChange={setCantidad} placeholder="0" />
-          </Campo>
-          <Campo etiqueta="Mínimo" ayuda="Avisa cuando queda esto o menos">
-            <Entrada type="number" inputMode="decimal" min={0} step="any" value={minimo} onChange={setMinimo} placeholder="0" />
-          </Campo>
+
+        <Campo etiqueta="Nota">
+          <Entrada value={nota} onChange={setNota} placeholder="Opcional" />
+        </Campo>
+
+        <div className="flex items-center justify-between rounded-2xl bg-teal-50 px-4 py-3 ring-1 ring-teal-100">
+          <span className="text-sm font-medium text-teal-900">Total de la factura</span>
+          <span className="text-lg font-bold text-teal-900 tabular-nums">{formatoPesos(total)}</span>
         </div>
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input type="checkbox" checked={comoGasto} onChange={(e) => setComoGasto(e.target.checked)} className="h-5 w-5 accent-emerald-700" />
+          Registrar el total como gasto en Contabilidad
+        </label>
+
+        {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
         <Boton type="submit" className="mt-1 w-full py-3">
-          Guardar artículo
+          Guardar factura
         </Boton>
       </form>
     </Hoja>
   );
 }
 
-function DetalleArticulo({ articulo: a, onCerrar }: { articulo: ArticuloBodega; onCerrar: () => void }) {
-  const [modo, setModo] = useState<"resumen" | "entrada" | "salida">("resumen");
+/* ───────────────────── Detalle de producto (salidas) ───────────────────── */
+
+function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerrar: () => void }) {
+  const { producto: p, existencia, bajoMinimo, movimientos } = item;
+  const [salida, setSalida] = useState(false);
   const [cantidad, setCantidad] = useState("");
-  const [nota, setNota] = useState("");
   const [fecha, setFecha] = useState(hoy());
+  const [nota, setNota] = useState("");
   const [error, setError] = useState("");
 
   const volver = () => {
-    setModo("resumen");
+    setSalida(false);
     setCantidad("");
     setNota("");
-    setError("");
     setFecha(hoy());
+    setError("");
   };
 
   const registrar = (e: FormEvent) => {
     e.preventDefault();
     const n = num(cantidad);
     if (n <= 0) return setError("Escribe una cantidad mayor que cero.");
-    if (modo === "salida" && n > a.cantidad) return setError(`Solo hay ${fmt(a.cantidad)} ${a.unidad} en bodega.`);
-    actualizar(a.id, (x) => ({
-      ...x,
-      cantidad: Math.max(0, x.cantidad + (modo === "entrada" ? n : -n)),
-      movimientos: [...x.movimientos, { fecha, tipo: modo === "entrada" ? "entrada" : "salida", cantidad: n, nota: nota.trim() || undefined }],
-    }));
+    if (n > existencia) return setError(`Solo hay ${fmt(existencia)} ${p.unidad} en bodega.`);
+    guardarSalidas([...leerSalidas(), { id: nuevoId(), productoId: p.id, fecha, cantidad: n, nota: nota.trim() || undefined }]);
     volver();
   };
 
-  const eliminar = async () => {
-    if (!(await confirmar({ titulo: `Eliminar ${a.nombre}`, mensaje: "Se borrará el artículo y todos sus movimientos.", aceptar: "Eliminar", destructivo: true }))) return;
-    guardarArticulos(leerArticulos().filter((x) => x.id !== a.id));
-    onCerrar();
+  const quitarSalida = async (salidaId: string) => {
+    if (!(await confirmar({ titulo: "Eliminar salida", mensaje: "La cantidad volverá a sumar a la existencia.", aceptar: "Eliminar", destructivo: true }))) return;
+    guardarSalidas(leerSalidas().filter((s) => s.id !== salidaId));
   };
 
-  const bajo = a.cantidad <= a.minimo;
-  const titulo = modo === "resumen" ? a.nombre : modo === "entrada" ? "Registrar entrada" : "Registrar salida";
-
   return (
-    <Hoja abierta titulo={titulo} onCerrar={modo === "resumen" ? onCerrar : volver}>
-      {modo === "resumen" ? (
+    <Hoja abierta titulo={salida ? "Registrar salida" : p.nombre} onCerrar={salida ? volver : onCerrar}>
+      {!salida ? (
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-3 rounded-2xl bg-teal-50/70 p-4 ring-1 ring-teal-100">
-            <span className="text-3xl" aria-hidden="true">{icono(a.categoria)}</span>
+            <span className="text-3xl" aria-hidden="true">{iconoCategoria(p.categoria)}</span>
             <div className="min-w-0 flex-1">
-              <p className="text-xs text-slate-500">{a.categoria} · existencia</p>
-              <p className={`text-3xl font-bold leading-tight tabular-nums ${bajo ? "text-red-600" : "text-slate-900"}`}>
-                {fmt(a.cantidad)} <span className="text-base font-semibold text-slate-500">{a.unidad}</span>
+              <p className="text-xs text-slate-500">{p.categoria} · existencia</p>
+              <p className={`text-3xl font-bold leading-tight tabular-nums ${bajoMinimo ? "text-red-600" : "text-slate-900"}`}>
+                {fmt(existencia)} <span className="text-base font-semibold text-slate-500">{p.unidad}</span>
               </p>
               <p className="text-xs text-slate-500">
-                Mínimo {fmt(a.minimo)} {a.unidad}
-                {bajo ? " · hay que reponer" : ""}
+                Mínimo {fmt(p.minimo)} {p.unidad}
+                {bajoMinimo ? " · hay que reponer" : ""}
               </p>
             </div>
           </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <Boton onClick={() => setModo("entrada")}>+ Entrada</Boton>
-            <Boton variante="secundario" onClick={() => setModo("salida")} disabled={a.cantidad <= 0}>
-              − Salida
-            </Boton>
-          </div>
-
+          <Boton variante="secundario" onClick={() => setSalida(true)} disabled={existencia <= 0}>
+            − Registrar salida (consumo)
+          </Boton>
           <div>
             <h3 className="mb-2 text-sm font-semibold text-slate-900">Movimientos</h3>
-            {a.movimientos.length === 0 ? (
-              <p className="text-sm text-slate-500">Sin movimientos todavía.</p>
+            {movimientos.length === 0 ? (
+              <p className="text-sm text-slate-500">Sin movimientos. Ingresa una factura con este producto.</p>
             ) : (
               <ul className="flex flex-col gap-1.5">
-                {[...a.movimientos]
-                  .reverse()
-                  .slice(0, 30)
-                  .map((m, i) => (
-                    <li key={i} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 text-sm">
-                      <span className="min-w-0">
-                        <span className={`font-semibold ${m.tipo === "entrada" ? "text-emerald-700" : "text-slate-800"}`}>
-                          {m.tipo === "entrada" ? "+" : "−"}
-                          {fmt(m.cantidad)} {a.unidad}
-                        </span>
-                        {m.nota && <span className="text-slate-500"> · {m.nota}</span>}
+                {movimientos.slice(0, 40).map((m, i) => (
+                  <li key={i} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 text-sm">
+                    <span className="min-w-0">
+                      <span className={`font-semibold ${m.tipo === "entrada" ? "text-emerald-700" : "text-slate-800"}`}>
+                        {m.tipo === "entrada" ? "+" : "−"}
+                        {fmt(m.cantidad)} {p.unidad}
                       </span>
-                      <span className="shrink-0 text-xs text-slate-500">{formatoFecha(m.fecha)}</span>
-                    </li>
-                  ))}
+                      <span className="text-slate-500"> · {m.detalle}</span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1">
+                      <span className="text-xs text-slate-500">{formatoFecha(m.fecha)}</span>
+                      {m.salidaId && (
+                        <button
+                          type="button"
+                          onClick={() => quitarSalida(m.salidaId!)}
+                          aria-label="Eliminar salida"
+                          className="rounded-full px-1.5 text-slate-400 hover:text-rose-600"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </span>
+                  </li>
+                ))}
               </ul>
             )}
           </div>
-
-          <button
-            type="button"
-            onClick={eliminar}
-            className="self-center rounded-full px-4 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50"
-          >
-            Eliminar artículo
-          </button>
         </div>
       ) : (
         <form onSubmit={registrar} className="flex flex-col gap-3.5">
           <p className="text-sm text-slate-500">
-            {a.nombre}: hay {fmt(a.cantidad)} {a.unidad}
+            {p.nombre}: hay {fmt(existencia)} {p.unidad}
           </p>
           <div className="grid grid-cols-2 gap-3">
-            <Campo etiqueta={`Cantidad (${a.unidad}) *`}>
+            <Campo etiqueta={`Cantidad (${p.unidad}) *`}>
               <Entrada type="number" inputMode="decimal" min={0} step="any" value={cantidad} onChange={setCantidad} required />
             </Campo>
             <Campo etiqueta="Fecha">
               <Entrada type="date" value={fecha} onChange={setFecha} required />
             </Campo>
           </div>
-          <Campo etiqueta="Nota">
-            <Entrada
-              value={nota}
-              onChange={setNota}
-              placeholder={modo === "entrada" ? "Ej. Compra a proveedor" : "Ej. Lote corral 3"}
-            />
+          <Campo etiqueta="Destino / nota">
+            <Entrada value={nota} onChange={setNota} placeholder="Ej. Lote corral 3" />
           </Campo>
           {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
           <div className="mt-1 grid grid-cols-2 gap-2">
@@ -324,6 +545,79 @@ function DetalleArticulo({ articulo: a, onCerrar }: { articulo: ArticuloBodega; 
           </div>
         </form>
       )}
+    </Hoja>
+  );
+}
+
+/* ───────────────────── Detalle de factura ───────────────────── */
+
+function DetalleFactura({ factura: f, productos, onCerrar }: { factura: Factura; productos: ProductoBodega[]; onCerrar: () => void }) {
+  const eliminar = async () => {
+    // No se permite si ya se consumió parte de lo que entró con esta factura
+    const inventario = calcularInventario();
+    const quedarianNegativos = f.lineas
+      .map((l) => {
+        const item = inventario.find((i) => i.producto.id === l.productoId);
+        return item && item.existencia - l.cantidad < 0 ? item.producto.nombre : null;
+      })
+      .filter(Boolean);
+    if (quedarianNegativos.length) {
+      await avisar({
+        titulo: "No se puede eliminar",
+        mensaje: `Ya se registraron salidas de ${quedarianNegativos.join(", ")}. Elimina primero esas salidas para no dejar existencias negativas.`,
+      });
+      return;
+    }
+    if (
+      !(await confirmar({
+        titulo: `Eliminar factura ${f.numero}`,
+        mensaje: `Las existencias se descontarán${f.movimientoId ? " y se borrará el gasto de Contabilidad" : ""}.`,
+        aceptar: "Eliminar",
+        destructivo: true,
+      }))
+    )
+      return;
+    guardarFacturas(leerFacturas().filter((x) => x.id !== f.id));
+    if (f.movimientoId) guardarMovimientos(leerMovimientos().filter((m) => m.id !== f.movimientoId));
+    onCerrar();
+  };
+
+  return (
+    <Hoja abierta titulo={`Factura ${f.numero}`} onCerrar={onCerrar}>
+      <div className="flex flex-col gap-4">
+        <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm ring-1 ring-slate-100">
+          <p className="text-slate-500">
+            {formatoFecha(f.fecha, true)}
+            {f.proveedor ? ` · ${f.proveedor}` : ""}
+          </p>
+          {f.nota && <p className="mt-1 text-xs italic text-slate-500">{f.nota}</p>}
+        </div>
+        <ul className="divide-y divide-slate-100 rounded-2xl ring-1 ring-slate-100">
+          {f.lineas.map((l, i) => {
+            const p = productos.find((x) => x.id === l.productoId);
+            return (
+              <li key={i} className="flex items-center gap-3 px-3.5 py-3">
+                <span className="text-xl" aria-hidden="true">{p ? iconoCategoria(p.categoria) : "📦"}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-slate-900">{p?.nombre ?? "Producto eliminado"}</p>
+                  <p className="text-xs text-slate-500">
+                    {fmt(l.cantidad)} {p?.unidad ?? ""} × {formatoPesos(l.valorUnitario)}
+                  </p>
+                </div>
+                <span className="shrink-0 text-sm font-semibold text-slate-900 tabular-nums">{formatoPesos(l.cantidad * l.valorUnitario)}</span>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="flex items-center justify-between rounded-2xl bg-teal-50 px-4 py-3 ring-1 ring-teal-100">
+          <span className="text-sm font-medium text-teal-900">Total</span>
+          <span className="text-lg font-bold text-teal-900 tabular-nums">{formatoPesos(totalFactura(f))}</span>
+        </div>
+        {f.movimientoId && <p className="text-center text-xs text-slate-500">Registrada como gasto en Contabilidad.</p>}
+        <button type="button" onClick={eliminar} className="self-center rounded-full px-4 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50">
+          Eliminar factura
+        </button>
+      </div>
     </Hoja>
   );
 }

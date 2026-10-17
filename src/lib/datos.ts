@@ -15,7 +15,10 @@ export const CLAVES = {
   movimientos: "contabilidad-movimientos",
   ajustes: "ajustes",
   lecturas: "monitoreo-lecturas",
-  bodega: "bodega-articulos",
+  bodega: "bodega-articulos", // formato anterior (se migra al catálogo)
+  productos: "bodega-productos",
+  facturas: "bodega-facturas",
+  salidas: "bodega-salidas",
   config: "config-granja",
 } as const;
 
@@ -278,6 +281,130 @@ export function leerArticulos(): ArticuloBodega[] {
   }));
 }
 export const guardarArticulos = (a: ArticuloBodega[]) => escribir(CLAVES.bodega, a);
+
+/* ───────────── Bodega por facturas ───────────── */
+
+/** Producto del catálogo (se define en Ajustes avanzados) */
+export interface ProductoBodega {
+  id: string;
+  nombre: string;
+  categoria: CategoriaBodega;
+  unidad: string;
+  minimo: number;
+}
+export interface LineaFactura {
+  productoId: string;
+  cantidad: number;
+  valorUnitario: number;
+}
+export interface Factura {
+  id: string;
+  numero: string;
+  proveedor?: string;
+  fecha: string;
+  lineas: LineaFactura[];
+  nota?: string;
+  /** id del gasto creado en Contabilidad, si se registró */
+  movimientoId?: string;
+}
+export interface SalidaBodega {
+  id: string;
+  productoId: string;
+  fecha: string;
+  cantidad: number;
+  nota?: string;
+}
+
+export const leerProductos = () => leer<ProductoBodega[]>(CLAVES.productos, []);
+export const guardarProductos = (p: ProductoBodega[]) => escribir(CLAVES.productos, p);
+export function leerFacturas(): Factura[] {
+  return leer<Factura[]>(CLAVES.facturas, []).map((f) => ({
+    ...f,
+    lineas: Array.isArray(f.lineas) ? f.lineas : [],
+  }));
+}
+export const guardarFacturas = (f: Factura[]) => escribir(CLAVES.facturas, f);
+export const leerSalidas = () => leer<SalidaBodega[]>(CLAVES.salidas, []);
+export const guardarSalidas = (s: SalidaBodega[]) => escribir(CLAVES.salidas, s);
+
+export const totalFactura = (f: Factura) =>
+  f.lineas.reduce((s, l) => s + (Number(l.cantidad) || 0) * (Number(l.valorUnitario) || 0), 0);
+
+export interface MovimientoInventario {
+  fecha: string;
+  tipo: "entrada" | "salida";
+  cantidad: number;
+  detalle: string;
+  facturaId?: string;
+  salidaId?: string;
+}
+export interface ExistenciaProducto {
+  producto: ProductoBodega;
+  existencia: number;
+  bajoMinimo: boolean;
+  movimientos: MovimientoInventario[];
+}
+
+/** Existencias calculadas: entradas por facturas menos salidas registradas */
+export function calcularInventario(): ExistenciaProducto[] {
+  const facturas = leerFacturas();
+  const salidas = leerSalidas();
+  return leerProductos().map((producto) => {
+    const movimientos: MovimientoInventario[] = [];
+    for (const f of facturas) {
+      for (const l of f.lineas) {
+        if (l.productoId !== producto.id) continue;
+        movimientos.push({
+          fecha: f.fecha,
+          tipo: "entrada",
+          cantidad: Number(l.cantidad) || 0,
+          detalle: `Factura ${f.numero}${f.proveedor ? ` · ${f.proveedor}` : ""}`,
+          facturaId: f.id,
+        });
+      }
+    }
+    for (const sd of salidas) {
+      if (sd.productoId !== producto.id) continue;
+      movimientos.push({ fecha: sd.fecha, tipo: "salida", cantidad: Number(sd.cantidad) || 0, detalle: sd.nota || "Salida", salidaId: sd.id });
+    }
+    movimientos.sort((a, b) => b.fecha.localeCompare(a.fecha));
+    const existencia = movimientos.reduce((s, m) => s + (m.tipo === "entrada" ? m.cantidad : -m.cantidad), 0);
+    return { producto, existencia, bajoMinimo: existencia <= producto.minimo, movimientos };
+  });
+}
+
+/**
+ * Pasa los artículos del formato anterior de Bodega al catálogo nuevo:
+ * cada artículo se vuelve un producto y su existencia queda como
+ * "saldo inicial". Se ejecuta una sola vez.
+ */
+export function migrarBodegaAnterior(): boolean {
+  if (typeof window === "undefined") return false;
+  if (localStorage.getItem(CLAVES.productos) !== null) return false;
+  const antiguos = leerArticulos();
+  if (antiguos.length === 0) return false;
+  const productos: ProductoBodega[] = antiguos.map((a) => ({
+    id: a.id,
+    nombre: a.nombre,
+    categoria: a.categoria,
+    unidad: a.unidad,
+    minimo: a.minimo,
+  }));
+  const conSaldo = antiguos.filter((a) => a.cantidad > 0);
+  localStorage.setItem(CLAVES.productos, JSON.stringify(productos));
+  if (conSaldo.length) {
+    const factura: Factura = {
+      id: nuevoId(),
+      numero: "SALDO INICIAL",
+      fecha: hoy(),
+      lineas: conSaldo.map((a) => ({ productoId: a.id, cantidad: a.cantidad, valorUnitario: 0 })),
+      nota: "Existencias traídas de la bodega anterior",
+    };
+    localStorage.setItem(CLAVES.facturas, JSON.stringify([...leerFacturas(), factura]));
+  }
+  notificarCambio();
+  return true;
+}
 
 /** Ajustes */
 export const leerAjustes = (): Ajustes => ({
