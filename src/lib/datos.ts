@@ -16,6 +16,7 @@ export const CLAVES = {
   ajustes: "ajustes",
   lecturas: "monitoreo-lecturas",
   bodega: "bodega-articulos",
+  config: "config-granja",
 } as const;
 
 /* ═════════════════════ Tipos ═════════════════════ */

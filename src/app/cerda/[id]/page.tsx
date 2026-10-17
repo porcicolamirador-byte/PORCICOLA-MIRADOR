@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import usePageBackground from "@/hooks/usePageBackground";
 import { cargarLogoJpeg, entregarPdf, generarPdfFicha, type LogoJpeg } from "@/lib/pdfFicha";
 import { confirmar } from "@/components/Dialogo";
+import { leerConfig } from "@/lib/config";
 
 const DIAS_GESTACION = 114;
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -332,8 +333,9 @@ export default function CerdaDetalle() {
         }
       }
       if (tipo === "Destete") {
-        if (diasDesdeParto === null || diasDesdeParto < 21 || diasDesdeParto > 28) {
-          mostrarAviso("El destete debe estar entre 21 y 28 días después del parto");
+        const { desteteMin, desteteMax } = leerConfig();
+        if (diasDesdeParto === null || diasDesdeParto < desteteMin || diasDesdeParto > desteteMax) {
+          mostrarAviso(`El destete debe estar entre ${desteteMin} y ${desteteMax} días después del parto`);
           return;
         }
       }
@@ -364,8 +366,9 @@ export default function CerdaDetalle() {
 
     if (tipo === "Parto") {
       const d = parsearFechaLocal(fecha);
-      const d21 = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 21);
-      const d28 = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 28);
+      const { desteteMin, desteteMax } = leerConfig();
+      const d21 = new Date(d.getFullYear(), d.getMonth(), d.getDate() + desteteMin);
+      const d28 = new Date(d.getFullYear(), d.getMonth(), d.getDate() + desteteMax);
       const f21 = formatearFechaCorta(fechaLocalISO(d21));
       const f28 = formatearFechaCorta(fechaLocalISO(d28));
       nuevo.mensaje = `Destete entre ${f21} y ${f28}`;

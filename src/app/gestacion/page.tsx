@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type TouchEvent } from "react";
 import { useRouter } from "next/navigation";
 import PageShell from "@/components/PageShell";
 import { confirmar } from "@/components/Dialogo";
+import { leerConfig } from "@/lib/config";
 
 const ESTADOS = [
   "Todos",
@@ -146,7 +147,7 @@ export default function Gestacion() {
   function confirmarEliminarCerda() {
     if (confirmDeleteIndex === null) return;
 
-    if (deletePinInput !== "0030") {
+    if (deletePinInput !== leerConfig().claveEliminar) {
       setDeletePinError("Clave incorrecta");
       return;
     }

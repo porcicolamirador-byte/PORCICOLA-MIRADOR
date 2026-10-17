@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import usePageBackground from "@/hooks/usePageBackground";
+import { leerConfig } from "@/lib/config";
 
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 const TIPOS_PARTO = ["Normal", "Asistido", "Distócico", "Cesárea"];
@@ -120,8 +121,9 @@ export default function RegistrarParto() {
     const nMomias = Math.max(0, aNumero(momias) ?? 0);
 
     const d = parsearFechaLocal(fecha);
-    const d21 = fechaLocalISO(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 21));
-    const d28 = fechaLocalISO(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 28));
+    const { desteteMin, desteteMax } = leerConfig();
+    const d21 = fechaLocalISO(new Date(d.getFullYear(), d.getMonth(), d.getDate() + desteteMin));
+    const d28 = fechaLocalISO(new Date(d.getFullYear(), d.getMonth(), d.getDate() + desteteMax));
 
     const nuevo: Registro = {
       tipo: "Parto",

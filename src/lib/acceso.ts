@@ -4,15 +4,14 @@
  * accidente, no como seguridad fuerte (quien tenga el código fuente lo ve).
  */
 
-/** Código para abrir los ajustes avanzados */
-export const CODIGO_AJUSTES = "0030";
+import { leerConfig } from "@/lib/config";
 
 const CLAVE_SESION = "ajustes-avanzados-hasta";
 /** Tiempo que la sección queda abierta tras ingresar el código */
 const DURACION_MS = 15 * 60 * 1000;
 
 export function codigoValido(codigo: string): boolean {
-  return codigo.trim() === CODIGO_AJUSTES;
+  return codigo.trim() === leerConfig().claveAjustes;
 }
 
 export function desbloquearAjustes() {

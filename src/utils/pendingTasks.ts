@@ -1,3 +1,5 @@
+import { leerConfig } from "@/lib/config";
+
 export interface Registro {
   tipo?: string;
   fecha?: string;
@@ -188,7 +190,8 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
       });
     }
 
-    if (diasDesdeParto >= 21 && diasDesdeParto <= 28) {
+    const { desteteMin, desteteMax } = leerConfig();
+    if (diasDesdeParto >= desteteMin && diasDesdeParto <= desteteMax) {
       tareas.push({
         id: cerda.id,
         tipo: 'Destete próximo',
