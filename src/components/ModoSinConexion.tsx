@@ -30,8 +30,8 @@ async function hayConexion(): Promise<boolean> {
 
 /**
  * Registra el service worker (solo en producción) para que la app abra sin
- * internet, y muestra un aviso solo mientras no hay conexión. En cuanto la
- * red regresa, el aviso desaparece.
+ * internet, y muestra un ícono rojo de "sin red" solo mientras no hay
+ * conexión. En cuanto la red regresa, el ícono desaparece.
  */
 export default function ModoSinConexion() {
   const [sinConexion, setSinConexion] = useState(false);
@@ -97,16 +97,33 @@ export default function ModoSinConexion() {
 
   if (!sinConexion) return null;
 
+  // Ícono rojo de "sin red" en la esquina superior derecha
   return (
     <div
       role="status"
-      className="pointer-events-none fixed inset-x-0 z-[80] flex justify-center px-4"
-      style={{ top: "calc(env(safe-area-inset-top) + 0.5rem)" }}
+      aria-label="Sin conexión: local backup"
+      title="Sin conexión: local backup"
+      className="pointer-events-none fixed z-[80] flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-white shadow-md ring-2 ring-white"
+      style={{ top: "calc(env(safe-area-inset-top) + 0.25rem)", right: "0.5rem" }}
     >
-      <span className="inline-flex items-center gap-2 rounded-full bg-slate-900/90 px-3.5 py-1.5 text-xs font-semibold text-white shadow-lg backdrop-blur">
-        <span aria-hidden="true" className="h-2 w-2 rounded-full bg-amber-400" />
-        Sin conexión: local backup
-      </span>
+      <svg
+        viewBox="0 0 24 24"
+        className="h-4 w-4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2.4}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M12 20h.01" />
+        <path d="M8.5 16.43a5 5 0 0 1 7 0" />
+        <path d="M5 12.86a10 10 0 0 1 5.17-2.69" />
+        <path d="M19 12.86a10 10 0 0 0-2-1.52" />
+        <path d="M2 8.82a15 15 0 0 1 4.18-2.64" />
+        <path d="M22 8.82a15 15 0 0 0-11.29-3.76" />
+        <path d="m2 2 20 20" />
+      </svg>
     </div>
   );
 }
