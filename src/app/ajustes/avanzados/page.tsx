@@ -77,6 +77,8 @@ export default function AjustesAvanzadosPage() {
 
       <DiasDestete min={config.desteteMin} max={config.desteteMax} onGuardar={(min, max) => guardar({ desteteMin: min, desteteMax: max })} />
 
+      <Parideras actual={config.parideras} onGuardar={(n) => guardar({ parideras: n })} />
+
       <p className="px-1 text-center text-[11px] text-slate-400">
         La sección se cierra sola a los 15 minutos o al cerrar la app.
       </p>
@@ -297,6 +299,66 @@ function DiasDestete({ min, max, onGuardar }: { min: number; max: number; onGuar
             Guardar
           </Boton>
         </div>
+      </form>
+    </Tarjeta>
+  );
+}
+
+function Parideras({ actual, onGuardar }: { actual: number; onGuardar: (n: number) => void }) {
+  const [valor, setValor] = useState(actual ? String(actual) : "");
+  const [base, setBase] = useState(actual);
+  if (base !== actual) {
+    setBase(actual);
+    setValor(actual ? String(actual) : "");
+  }
+  const n = Number(valor);
+  const valido = valor !== "" && Number.isInteger(n) && n >= 1 && n <= 500;
+
+  const enviar = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!valido) return;
+    onGuardar(n);
+    await avisar({
+      titulo: "Parideras actualizadas",
+      mensaje: `Programación repartirá las inseminaciones para no pasar de ${n} parideras.`,
+    });
+  };
+
+  const cambiar = (d: number) => setValor(String(Math.min(500, Math.max(1, (Number(valor) || 0) + d))));
+  const boton =
+    "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-2xl font-semibold text-slate-700 active:bg-slate-200";
+
+  return (
+    <Tarjeta>
+      <Encabezado
+        icono="🏠"
+        titulo="Parideras"
+        descripcion="Cantidad de parideras de la granja. Cada cerda ocupa una desde 15 días antes del parto hasta el destete."
+      />
+      <form onSubmit={enviar} className="flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <button type="button" className={boton} onClick={() => cambiar(-1)} aria-label="Una menos">
+            −
+          </button>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={500}
+            placeholder="0"
+            aria-label="Número de parideras"
+            value={valor}
+            onChange={(e) => setValor(e.target.value.replace(/\D/g, "").slice(0, 3))}
+            className="h-12 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-center text-xl font-semibold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-200"
+          />
+          <button type="button" className={boton} onClick={() => cambiar(1)} aria-label="Una más">
+            +
+          </button>
+        </div>
+        {!actual && <p className="text-xs text-amber-700">Aún no está configurado: el motor no controla la capacidad.</p>}
+        <Boton type="submit" disabled={!valido || n === actual}>
+          Guardar
+        </Boton>
       </form>
     </Tarjeta>
   );

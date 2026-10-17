@@ -12,8 +12,10 @@ import {
   CONFIRMAR_GESTACION,
   ESTILO,
   REPETICION_CELO,
+  calcularPlan,
   calcularProgramacion,
   type Evento,
+  type PlanProgramacion,
 } from "@/lib/programacion";
 
 function estadoFecha(e: Evento, fechaHoy: string): { texto: string; clase: string } {
@@ -26,70 +28,256 @@ function estadoFecha(e: Evento, fechaHoy: string): { texto: string; clase: strin
   return { texto: `En ${dIni} d`, clase: "bg-slate-100 text-slate-700 ring-slate-200" };
 }
 
-type Vista = "agenda" | "inseminacion" | "partos" | "calculadora";
+type Vista = "cerdas" | "inseminacion" | "agenda" | "calculadora";
+
+const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+const nombreMes = (mes: string) => `${MESES[Number(mes.slice(5, 7)) - 1]} ${mes.slice(0, 4)}`;
+
+const CHIP_ESTADO: Record<string, string> = {
+  Gestación: "bg-sky-50 text-sky-700",
+  Lactancia: "bg-orange-50 text-orange-700",
+  Vacía: "bg-emerald-50 text-emerald-700",
+  "En celo": "bg-pink-50 text-pink-700",
+  "En tratamiento": "bg-amber-50 text-amber-800",
+  "Sin registro": "bg-slate-100 text-slate-600",
+};
+
+/** Texto corto de cuánto falta para una fecha */
+function cuando(fecha: string, fechaHoy: string, hasta?: string) {
+  const d = diasEntre(fechaHoy, fecha);
+  const dFin = hasta ? diasEntre(fechaHoy, hasta) : d;
+  if (dFin < 0) return { texto: `Atrasada ${-dFin} d`, clase: "bg-red-50 text-red-700" };
+  if (d <= 0) return { texto: hasta ? "Ahora" : "Hoy", clase: "bg-emerald-600 text-white" };
+  if (d === 1) return { texto: "Mañana", clase: "bg-amber-50 text-amber-800" };
+  return { texto: `En ${d} d`, clase: "bg-slate-100 text-slate-700" };
+}
 
 export default function ProgramacionPage() {
   const router = useRouter();
   const version = useVersionDatos();
-  const [vista, setVista] = useState<Vista>("agenda");
+  const [vista, setVista] = useState<Vista>("cerdas");
   const fechaHoy = hoy();
 
   const eventos = useMemo(() => (version < 0 ? null : calcularProgramacion(hoy())), [version]);
+  const plan = useMemo(() => (version < 0 ? null : calcularPlan(hoy())), [version]);
 
   const activos = (eventos ?? []).filter((e) => diasEntre(fechaHoy, e.hasta ?? e.fecha) >= -7);
-  const ahora = activos.filter((e) => diasEntre(fechaHoy, e.fecha) <= 0);
-  const proximos7 = activos.filter((e) => {
-    const d = diasEntre(fechaHoy, e.fecha);
-    return d > 0 && d <= 7;
-  });
-  const deInseminacion = activos.filter((e) => ["inseminar", "vigilar", "repeticion", "confirmar"].includes(e.clase));
-  const dePartos = activos.filter((e) => ["maternidad", "parto", "destete"].includes(e.clase));
-  const partos30 = (eventos ?? []).filter((e) => e.clase === "parto" && diasEntre(fechaHoy, e.fecha) >= 0 && diasEntre(fechaHoy, e.fecha) <= 30);
-
-  const lista = vista === "inseminacion" ? deInseminacion : vista === "partos" ? dePartos : activos.filter((e) => diasEntre(fechaHoy, e.fecha) <= 30);
+  const iaSemana = (plan?.tarjetas ?? []).filter((t) => t.ia && !t.ia.sinCupo && diasEntre(fechaHoy, t.ia.recomendada) <= 7).length;
+  const abrir = (id: string) => router.push(`/cerda/${encodeURIComponent(id)}`);
 
   return (
     <ModuloPage titulo="Programación" subtitulo="Motor de ayuda para inseminación y parto" icono="🐖" tono="pink">
       <div className="grid grid-cols-3 gap-2">
-        <Dato titulo="Para hoy" valor={eventos ? ahora.length : "–"} detalle="acciones" />
-        <Dato titulo="Próx. 7 días" valor={eventos ? proximos7.length : "–"} detalle="acciones" />
-        <Dato titulo="Partos 30 d" valor={eventos ? partos30.length : "–"} detalle="estimados" />
+        <Dato titulo="Cerdas" valor={plan ? plan.tarjetas.length : "–"} detalle="en el hato" />
+        <Dato titulo="Inseminar" valor={plan ? iaSemana : "–"} detalle="próx. 7 días" />
+        <Dato
+          titulo="Parideras"
+          valor={plan ? (plan.parideras > 0 ? `${plan.ocupadasHoy}/${plan.parideras}` : plan.ocupadasHoy) : "–"}
+          detalle={plan && plan.parideras > 0 ? "ocupadas hoy" : "ocupadas · sin total"}
+        />
       </div>
 
       <Chips
         opciones={[
-          { valor: "agenda", texto: "Agenda" },
-          { valor: "inseminacion", texto: "💉 Inseminación" },
-          { valor: "partos", texto: "🐷 Partos" },
+          { valor: "cerdas", texto: "🐖 Cerdas" },
+          { valor: "inseminacion", texto: "💉 Plan IA" },
+          { valor: "agenda", texto: "📅 Agenda" },
           { valor: "calculadora", texto: "🧮 Calculadora" },
         ]}
         valor={vista}
         onChange={setVista}
       />
 
-      {vista === "calculadora" ? (
-        <Calculadora />
-      ) : eventos === null ? (
+      {plan === null || eventos === null ? (
         <div className="h-40 animate-pulse rounded-3xl bg-slate-100" />
-      ) : lista.length === 0 ? (
-        <Vacio
-          titulo="Nada programado"
-          texto={
-            vista === "agenda"
-              ? "No hay acciones en los próximos 30 días. Registra celos, inseminaciones y partos en la ficha de cada cerda."
-              : "No hay acciones de este tipo por ahora."
-          }
-        />
+      ) : vista === "cerdas" ? (
+        plan.tarjetas.length === 0 ? (
+          <Vacio titulo="Sin cerdas" texto="Registra cerdas en Gestación para ver su programación." />
+        ) : (
+          <TarjetasCerdas plan={plan} fechaHoy={fechaHoy} onAbrir={abrir} />
+        )
+      ) : vista === "inseminacion" ? (
+        <PlanInseminacion plan={plan} fechaHoy={fechaHoy} onAbrir={abrir} />
+      ) : vista === "calculadora" ? (
+        <Calculadora />
+      ) : activos.length === 0 ? (
+        <Vacio titulo="Nada programado" texto="Registra celos, inseminaciones y partos en la ficha de cada cerda." />
       ) : (
-        <Agenda eventos={lista} fechaHoy={fechaHoy} onAbrir={(id) => router.push(`/cerda/${encodeURIComponent(id)}`)} />
+        <Agenda eventos={activos.filter((e) => diasEntre(fechaHoy, e.fecha) <= 30)} fechaHoy={fechaHoy} onAbrir={abrir} />
       )}
 
       <p className="px-1 text-[11px] leading-relaxed text-slate-400">
-        Cálculos de referencia: repetición de celo 18–24 días tras la IA, confirmación 25–35 días, gestación{" "}
-        {eventos ? leerAjustes().diasGestacion : 114} días, maternidad {ANTES_PARTO_MATERNIDAD} días antes del parto,
-        destete según Ajustes avanzados y celo 3–7 días tras el destete.
+        Cálculos de referencia: celo {CELO_TRAS_DESTETE[0]}–{CELO_TRAS_DESTETE[1]} días tras el destete, repetición de celo{" "}
+        {REPETICION_CELO[0]}–{REPETICION_CELO[1]} días tras la IA, confirmación {CONFIRMAR_GESTACION[0]}–{CONFIRMAR_GESTACION[1]} días,
+        gestación {plan ? leerAjustes().diasGestacion : 114} días, paridera desde {ANTES_PARTO_MATERNIDAD} días antes del parto hasta
+        el destete. Parideras y destete se cambian en Ajustes avanzados.
       </p>
     </ModuloPage>
+  );
+}
+
+/* ───────────── Tarjetas por cerda ───────────── */
+
+function TarjetasCerdas({ plan, fechaHoy, onAbrir }: { plan: PlanProgramacion; fechaHoy: string; onAbrir: (id: string) => void }) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {plan.tarjetas.map((t) => {
+        const fecha = t.ia?.recomendada ?? t.accion.fecha;
+        const chip = t.accion.fecha ? cuando(t.accion.fecha, fechaHoy, t.accion.hasta) : null;
+        return (
+          <button
+            key={t.cerdaId}
+            type="button"
+            onClick={() => onAbrir(t.cerdaId)}
+            className="flex min-w-0 flex-col rounded-2xl bg-white p-3 text-left ring-1 ring-slate-200/80 transition active:scale-[0.98] active:bg-slate-50"
+          >
+            <div className="flex items-start justify-between gap-1">
+              <span className="min-w-0 truncate text-[15px] font-bold text-slate-900">{t.nombre.replace(/^Cerda /, "")}</span>
+              <span className="text-lg leading-none" aria-hidden="true">{t.accion.icono}</span>
+            </div>
+            <span className={`mt-1 self-start rounded-full px-2 py-0.5 text-[10px] font-semibold ${CHIP_ESTADO[t.estado] ?? CHIP_ESTADO["Sin registro"]}`}>
+              {t.estado}
+            </span>
+
+            <div className="mt-2 rounded-xl bg-pink-50/70 px-2 py-1.5">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-pink-700/80">Último celo</p>
+              <p className="text-xs font-semibold text-slate-800">{t.ultimoCelo ? formatoFecha(t.ultimoCelo, true) : "Sin registro"}</p>
+            </div>
+
+            <p className="mt-2 text-xs font-semibold text-slate-800">{t.accion.titulo}</p>
+            <p className="text-[11px] leading-snug text-slate-500">
+              {t.accion.fecha
+                ? `${formatoFecha(t.accion.fecha)}${t.accion.hasta && t.accion.hasta !== t.accion.fecha ? ` – ${formatoFecha(t.accion.hasta)}` : ""}`
+                : t.accion.detalle}
+            </p>
+            {t.ia && t.estado !== "En celo" && (
+              <p className="mt-1 text-[11px] leading-snug text-sky-700">
+                IA {t.ia.sinCupo ? "sin paridera libre" : `sugerida ${formatoFecha(fecha)}`}
+              </p>
+            )}
+            {t.paridera && t.estado === "Gestación" && (
+              <p className="mt-1 text-[11px] leading-snug text-violet-700">Parto {formatoFecha(t.paridera.parto)}</p>
+            )}
+            {chip && (
+              <span className={`mt-2 self-start rounded-full px-2 py-0.5 text-[10px] font-semibold ${chip.clase}`}>{chip.texto}</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ───────────── Plan de inseminación mensual ───────────── */
+
+function PlanInseminacion({ plan, fechaHoy, onAbrir }: { plan: PlanProgramacion; fechaHoy: string; onAbrir: (id: string) => void }) {
+  const candidatas = plan.tarjetas.filter((t) => t.ia);
+  const sinTotal = plan.parideras === 0;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Tarjeta titulo="Capacidad de parideras">
+        {sinTotal ? (
+          <p className="text-sm text-slate-600">
+            Configura cuántas parideras tienes en <b>Ajustes → Ajustes avanzados</b> para que el motor reparta las inseminaciones sin
+            pasarse de la capacidad.
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <Dato titulo="Parideras" valor={plan.parideras} detalle={`${plan.ocupadasHoy} ocupadas hoy`} />
+            <Dato titulo="Meta mensual" valor={`≈ ${plan.capacidadMes}`} detalle="inseminaciones / partos" />
+          </div>
+        )}
+        {!sinTotal && (
+          <p className="mt-2 text-[11px] text-slate-500">
+            Cada cerda ocupa una paridera {plan.diasCicloParidera} días: {ANTES_PARTO_MATERNIDAD} antes del parto más la lactancia.
+          </p>
+        )}
+      </Tarjeta>
+
+      <section>
+        <h2 className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Proyección mensual</h2>
+        <ul className="divide-y divide-slate-100 overflow-hidden rounded-3xl bg-white ring-1 ring-slate-200/80">
+          {plan.meses.map((m) => {
+            const lleno = !sinTotal && m.picoParideras >= plan.parideras;
+            const falta = !sinTotal ? Math.max(0, plan.capacidadMes - m.inseminaciones) : 0;
+            return (
+              <li key={m.mes} className="px-4 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-slate-900">{nombreMes(m.mes)}</p>
+                  <p className="text-xs text-slate-500">
+                    <b className="text-sky-700">{m.inseminaciones}</b> IA · <b className="text-emerald-700">{m.partos}</b> partos
+                  </p>
+                </div>
+                {!sinTotal && (
+                  <>
+                    <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className={`h-full rounded-full ${lleno ? "bg-rose-500" : "bg-violet-500"}`}
+                        style={{ width: `${Math.min(100, (m.picoParideras / plan.parideras) * 100)}%` }}
+                      />
+                    </div>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Parideras: pico {m.picoParideras} de {plan.parideras}
+                      {lleno ? " · llenas" : ""}
+                      {falta > 0 && m.mes >= fechaHoy.slice(0, 7) ? ` · faltan ${falta} IA para la meta` : ""}
+                    </p>
+                  </>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
+      <section>
+        <h2 className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+          Más cercanas a inseminación · {candidatas.length}
+        </h2>
+        {candidatas.length === 0 ? (
+          <Vacio titulo="Sin candidatas" texto="No hay cerdas vacías, en celo o lactando por ahora." />
+        ) : (
+          <ul className="divide-y divide-slate-100 overflow-hidden rounded-3xl bg-white ring-1 ring-slate-200/80">
+            {candidatas.map((t) => {
+              const ia = t.ia!;
+              const chip = cuando(ia.recomendada, fechaHoy);
+              return (
+                <li key={t.cerdaId}>
+                  <button
+                    type="button"
+                    onClick={() => onAbrir(t.cerdaId)}
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-50"
+                  >
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-xl" aria-hidden="true">
+                      {t.accion.icono}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-slate-900">{t.nombre}</span>
+                      <span className="block truncate text-[11px] text-slate-500">
+                        {t.accion.titulo} · ventana {formatoFecha(ia.desde)} – {formatoFecha(ia.hasta)}
+                      </span>
+                      {ia.sinCupo ? (
+                        <span className="block text-[11px] font-medium text-rose-600">Sin paridera libre en los próximos 60 días</span>
+                      ) : (
+                        <span className="block truncate text-[11px] text-slate-600">
+                          IA {formatoFecha(ia.recomendada)} → paridera {formatoFecha(ia.entradaParidera)} → parto {formatoFecha(ia.parto)}
+                        </span>
+                      )}
+                      {ia.corrimiento > 0 && (
+                        <span className="block text-[11px] font-medium text-amber-700">
+                          Corrida {ia.corrimiento} d para tener paridera libre
+                        </span>
+                      )}
+                    </span>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${chip.clase}`}>{chip.texto}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+    </div>
   );
 }
 
@@ -175,7 +363,7 @@ function Calculadora() {
         { icono: "💉", titulo: "Inseminación", desde: fecha },
         { icono: "🔁", titulo: "Revisar repetición de celo", desde: sumarDias(fecha, REPETICION_CELO[0]), hasta: sumarDias(fecha, REPETICION_CELO[1]) },
         { icono: "✅", titulo: "Confirmar gestación", desde: sumarDias(fecha, CONFIRMAR_GESTACION[0]), hasta: sumarDias(fecha, CONFIRMAR_GESTACION[1]) },
-        { icono: "🏠", titulo: "Trasladar a maternidad", desde: sumarDias(parto, -ANTES_PARTO_MATERNIDAD) },
+        { icono: "🏠", titulo: "Entrar a paridera", desde: sumarDias(parto, -ANTES_PARTO_MATERNIDAD) },
         { icono: "🐷", titulo: `Parto estimado (día ${diasGestacion})`, desde: parto, destacado: true },
         { icono: "🍼", titulo: "Destete", desde: sumarDias(parto, desteteMin), hasta: sumarDias(parto, desteteMax) },
         {

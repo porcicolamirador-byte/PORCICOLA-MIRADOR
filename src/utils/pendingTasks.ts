@@ -205,7 +205,7 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
 
   if (regDestete) {
     const diasDesdeDestete = calcularDiasEntre(regDestete.fecha || hoy, hoy);
-    if (diasDesdeDestete >= 3 && diasDesdeDestete <= 7) {
+    if (diasDesdeDestete >= 4 && diasDesdeDestete <= 8) {
       tareas.push({
         id: cerda.id,
         tipo: 'Detección de celo',

@@ -11,6 +11,8 @@ export interface ConfigGranja {
   /** Días después del parto: inicio y fin de la ventana de destete */
   desteteMin: number;
   desteteMax: number;
+  /** Número de parideras (jaulas de maternidad). 0 = sin configurar */
+  parideras: number;
 }
 
 export const CLAVE_CONFIG = "config-granja";
@@ -20,6 +22,7 @@ export const CONFIG_POR_DEFECTO: ConfigGranja = {
   claveEliminar: "0030",
   desteteMin: 21,
   desteteMax: 28,
+  parideras: 0,
 };
 
 const esClave = (v: unknown): v is string => typeof v === "string" && /^\d{4}$/.test(v);
@@ -36,6 +39,10 @@ export function leerConfig(): ConfigGranja {
       claveEliminar: esClave(c.claveEliminar) ? c.claveEliminar : CONFIG_POR_DEFECTO.claveEliminar,
       desteteMin: min,
       desteteMax: max,
+      parideras:
+        typeof c.parideras === "number" && Number.isInteger(c.parideras) && c.parideras >= 0 && c.parideras <= 500
+          ? c.parideras
+          : CONFIG_POR_DEFECTO.parideras,
     };
   } catch {
     return CONFIG_POR_DEFECTO;
