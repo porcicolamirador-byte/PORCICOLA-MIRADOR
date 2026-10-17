@@ -14,6 +14,7 @@ export const TONOS = {
   slate: "bg-slate-200 text-slate-800",
   orange: "bg-orange-100 text-orange-800",
   teal: "bg-teal-100 text-teal-800",
+  pink: "bg-pink-100 text-pink-800",
 } as const;
 
 /**

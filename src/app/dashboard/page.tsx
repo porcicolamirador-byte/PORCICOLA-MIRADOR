@@ -82,6 +82,14 @@ const modulos = [
     tile: "bg-stone-200 text-stone-800",
     card: "bg-white border-stone-300",
   },
+  {
+    nombre: "Programación",
+    descripcion: "Inseminación y partos",
+    ruta: "/programacion",
+    icon: "🐖",
+    tile: "bg-pink-100 text-pink-800",
+    card: "bg-white border-pink-200",
+  },
 ];
 
 function obtenerEstadoActual(historial: unknown[]) {
