@@ -17,6 +17,13 @@
 const VERSION = new URL(self.location.href).searchParams.get("v") || "1";
 const CACHE = `mirador-${VERSION}`;
 const ESPERA_RED_MS = 3000;
+// Archivos JS/CSS que no están guardados: se espera un poco más (pueden pesar)
+const ESPERA_ARCHIVO_MS = 10000;
+// Versiones guardadas: la actual y la anterior (para pantallas que ya estaban
+// abiertas cuando llegó una actualización)
+const VERSIONES_GUARDADAS = 2;
+
+const sinRed = () => self.navigator && self.navigator.onLine === false;
 
 // Pantallas que se guardan al instalar. "/cerda/_" y "/cerda/_/parto" son
 // plantillas que sirven para cualquier cerda cuando no hay conexión.
@@ -84,15 +91,23 @@ async function limpia(res) {
   return new Response(cuerpo, { status: res.status, statusText: res.statusText, headers: res.headers });
 }
 
-async function guardar(cache, url) {
-  try {
-    const res = await limpia(await fetch(url, { cache: "no-store", credentials: "same-origin" }));
-    if (!res.ok || res.type === "opaqueredirect") return null;
-    await cache.put(url, res.clone());
-    return res;
-  } catch {
-    return null;
+/** Guarda una URL. Devuelve la respuesta, false si no existe (4xx) o null si falló la red */
+async function guardar(cache, url, intentos = 3) {
+  for (let i = 0; i < intentos; i++) {
+    try {
+      const res = await limpia(await redConEspera(new Request(url, { cache: "no-store", credentials: "same-origin" }), 15000));
+      if (res.ok && res.type !== "opaqueredirect") {
+        await cache.put(url, res.clone());
+        return res;
+      }
+      // No existe (404…): no se reintenta ni cuenta como descarga fallida
+      if (res.status >= 400 && res.status < 500) return false;
+    } catch {
+      // red caída o lenta: se reintenta
+    }
+    await new Promise((ok) => setTimeout(ok, 800 * (i + 1)));
   }
+  return null;
 }
 
 /** fetch con tiempo límite: si el servidor no responde, se usa la copia guardada */
@@ -117,16 +132,19 @@ function redConEspera(request, ms = ESPERA_RED_MS) {
 async function precargar() {
   const cache = await caches.open(CACHE);
   const pendientes = new Set(ARCHIVOS);
+  const fallidas = [];
 
   for (const ruta of RUTAS) {
     const res = await guardar(cache, ruta);
     if (res) extraerRecursos(await res.text()).forEach((u) => pendientes.add(u));
+    else if (res === null) fallidas.push(ruta);
   }
 
   const css = [];
   await Promise.all(
     [...pendientes].map(async (url) => {
       const res = await guardar(cache, url);
+      if (res === null && url.startsWith("/_next/static/")) fallidas.push(url);
       if (res && url.split("?")[0].endsWith(".css")) css.push(await res.text());
     })
   );
@@ -135,6 +153,17 @@ async function precargar() {
   const extra = new Set();
   css.forEach((t) => extraerRecursos(t).forEach((u) => !pendientes.has(u) && extra.add(u)));
   await Promise.all([...extra].map((u) => guardar(cache, u)));
+
+  // Si la descarga quedó incompleta (se fue la señal a mitad) y el teléfono ya
+  // tiene una versión completa, no se instala esta: se conserva la anterior,
+  // que sigue funcionando sin conexión, y se reintenta en la próxima apertura.
+  if (fallidas.length) {
+    const anteriores = (await caches.keys()).filter((n) => n.startsWith("mirador-") && n !== CACHE);
+    if (anteriores.length) {
+      await caches.delete(CACHE);
+      throw new Error(`Descarga incompleta (${fallidas.length}): se conserva la versión anterior`);
+    }
+  }
 }
 
 self.addEventListener("install", (event) => {
@@ -145,10 +174,13 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
-      const nombres = await caches.keys();
-      await Promise.all(
-        nombres.filter((n) => n.startsWith("mirador-") && n !== CACHE).map((n) => caches.delete(n))
-      );
+      // Se conservan la versión actual y la anterior; las demás se borran
+      const numero = (n) => Number(n.slice("mirador-".length)) || 0;
+      const viejas = (await caches.keys())
+        .filter((n) => n.startsWith("mirador-") && n !== CACHE)
+        .sort((a, b) => numero(b) - numero(a))
+        .slice(VERSIONES_GUARDADAS - 1);
+      await Promise.all(viejas.map((n) => caches.delete(n)));
       await self.clients.claim();
     })()
   );
@@ -165,14 +197,19 @@ async function plantillaCerda(cache, pathname) {
 async function navegar(request, url) {
   const cache = await caches.open(CACHE);
   try {
+    if (sinRed()) throw new Error("sin red");
     const res = await limpia(await redConEspera(request));
+    // Un error del servidor (500, 502…) se trata como si no hubiera conexión
+    if (res.status >= 500) throw new Error(`servidor ${res.status}`);
     if (res.ok) cache.put(url.pathname, res.clone());
     return res;
   } catch {
     const guardada =
       (await cache.match(url.pathname, { ignoreVary: true, ignoreSearch: true })) ||
       (await plantillaCerda(cache, url.pathname)) ||
-      (await cache.match("/dashboard", { ignoreVary: true }));
+      (await caches.match(url.pathname, { ignoreVary: true, ignoreSearch: true })) ||
+      (await cache.match("/dashboard", { ignoreVary: true })) ||
+      (await caches.match("/dashboard", { ignoreVary: true }));
     if (guardada) return guardada;
     return new Response(
       '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
@@ -188,11 +225,12 @@ async function navegar(request, url) {
 async function redPrimero(request) {
   const cache = await caches.open(CACHE);
   try {
+    if (sinRed()) throw new Error("sin red");
     const res = await redConEspera(request);
     if (res.ok && res.type === "basic") cache.put(request, res.clone());
     return res;
   } catch {
-    const guardada = await cache.match(request, { ignoreVary: true });
+    const guardada = (await cache.match(request, { ignoreVary: true })) || (await caches.match(request, { ignoreVary: true }));
     // Sin copia: se devuelve un error y Next.js recarga la pantalla completa,
     // que entonces se sirve desde la caché.
     return guardada || Response.error();
@@ -203,7 +241,9 @@ async function redPrimero(request) {
 async function guardadaYActualizar(event, request) {
   const cache = await caches.open(CACHE);
   const guardada = await cache.match(request, { ignoreVary: true });
-  const red = fetch(request)
+  if (!guardada && sinRed()) return Response.error();
+  // Sin copia guardada, no se espera a una red lenta más de unos segundos
+  const red = (guardada ? fetch(request) : redConEspera(request))
     .then((res) => {
       if (res.ok && res.type === "basic") return cache.put(request, res.clone()).then(() => res);
       return res;
@@ -221,11 +261,17 @@ async function guardadaYActualizar(event, request) {
 /** Primero la copia guardada (archivos con nombre único por versión) */
 async function cachePrimero(request) {
   const cache = await caches.open(CACHE);
-  const guardada = await cache.match(request, { ignoreVary: true });
+  // Los nombres son únicos por versión: sirve la copia de cualquier versión guardada
+  const guardada = (await cache.match(request, { ignoreVary: true })) || (await caches.match(request, { ignoreVary: true }));
   if (guardada) return guardada;
-  const res = await fetch(request);
-  if (res.ok && res.type === "basic") cache.put(request, res.clone());
-  return res;
+  if (sinRed()) return Response.error();
+  try {
+    const res = await redConEspera(request, ESPERA_ARCHIVO_MS);
+    if (res.ok && res.type === "basic") cache.put(request, res.clone());
+    return res;
+  } catch {
+    return Response.error();
+  }
 }
 
 self.addEventListener("fetch", (event) => {

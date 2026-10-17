@@ -52,6 +52,38 @@ export default function ModoSinConexion() {
     });
   }, []);
 
+  // Si una pantalla que ya estaba abierta pide un archivo que no está guardado
+  // (por ejemplo, justo después de una actualización y sin red), Next.js no
+  // puede cambiar de pantalla. En ese caso se recarga la app completa, que el
+  // service worker sirve desde la copia guardada. Solo una vez cada 30 s para
+  // no entrar en un ciclo.
+  useEffect(() => {
+    const esErrorDeCarga = (texto: string) => /ChunkLoadError|Loading (CSS )?chunk|Failed to fetch dynamically imported module|Importing a module script failed/i.test(texto);
+    const recargar = () => {
+      try {
+        const ultima = Number(sessionStorage.getItem("recarga-sin-red") || 0);
+        if (Date.now() - ultima < 30000) return;
+        sessionStorage.setItem("recarga-sin-red", String(Date.now()));
+      } catch {
+        // sin sessionStorage: se recarga igual
+      }
+      window.location.reload();
+    };
+    const alError = (e: ErrorEvent) => {
+      if (esErrorDeCarga(`${e.message} ${e.error?.name ?? ""}`)) recargar();
+    };
+    const alRechazo = (e: PromiseRejectionEvent) => {
+      const r = e.reason as { name?: string; message?: string } | undefined;
+      if (esErrorDeCarga(`${r?.name ?? ""} ${r?.message ?? String(e.reason ?? "")}`)) recargar();
+    };
+    window.addEventListener("error", alError);
+    window.addEventListener("unhandledrejection", alRechazo);
+    return () => {
+      window.removeEventListener("error", alError);
+      window.removeEventListener("unhandledrejection", alRechazo);
+    };
+  }, []);
+
   // Detección de conexión: eventos del navegador + comprobación real
   useEffect(() => {
     let activo = true;
