@@ -935,144 +935,202 @@ export default function Gestacion() {
           </div>
         )}
 
-        {/* FORMULARIO */}
+        {/* FORMULARIO: cuadro centrado con el mismo estilo de la ficha de la cerda */}
         {mostrarFormulario && (
           <div
             role="dialog"
             aria-modal="true"
             aria-label={editIndex !== null ? "Editar cerda" : "Nueva cerda"}
-            className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 sm:items-center sm:p-3"
+            className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+            style={{
+              paddingTop: "calc(env(safe-area-inset-top) + 1rem)",
+              paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)",
+            }}
           >
-            <div
-              className="relative max-h-[92dvh] w-full max-w-sm overflow-y-auto rounded-t-3xl bg-white p-5 text-slate-900 sm:rounded-3xl"
-              style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.25rem)" }}
-            >
-              <h2 className="mb-4 pr-8 text-xl font-bold text-emerald-900">
-                {editIndex !== null ? "Editar cerda" : "Nueva cerda"}
-              </h2>
+            <button
+              type="button"
+              aria-label="Cerrar formulario"
+              onClick={() => setMostrarFormulario(false)}
+              className="form-fondo absolute inset-0 bg-slate-950/45 backdrop-blur-[2px]"
+            />
 
-              <button
-                onClick={() => setMostrarFormulario(false)}
-                aria-label="Cerrar formulario"
-                className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100"
-              >
-                ✕
-              </button>
+            <div className="form-hoja relative flex max-h-full w-full max-w-md flex-col overflow-hidden rounded-[28px] bg-white text-slate-900 shadow-2xl">
+              {/* Encabezado verde con el arete */}
+              <div className="relative overflow-hidden bg-emerald-900 px-5 py-5 text-white">
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 opacity-60"
+                  style={{
+                    backgroundImage:
+                      "repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 10px, transparent 10px 26px)",
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setMostrarFormulario(false)}
+                  aria-label="Cerrar"
+                  className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25"
+                >
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" aria-hidden="true">
+                    <path d="M6 6l12 12M18 6 6 18" />
+                  </svg>
+                </button>
 
-              <div className="space-y-4">
-                {/* ID */}
-                <div>
-                  <label htmlFor="f-id" className="mb-1 block text-sm font-medium text-slate-700">ID</label>
-                  <input
-                    id="f-id"
-                    type="text"
-                    placeholder="Ej: A-102"
-                    value={id}
-                    onChange={(e) => {
-                      setId(e.target.value.toUpperCase());
-                      if (idError) setIdError("");
-                    }}
-                    className={`${inputBase} border uppercase ${idError ? "border-red-500" : "border-slate-300"}`}
-                  />
-                  {idError && <p className="mt-1.5 text-sm text-red-600">{idError}</p>}
-                </div>
-
-                {/* RAZA */}
-                <div>
-                  <label htmlFor="f-raza" className="mb-1 block text-sm font-medium text-slate-700">Raza</label>
-                  <select
-                    id="f-raza"
-                    value={raza}
-                    onChange={(e) => setRaza(e.target.value)}
-                    className={`${inputBase} border border-slate-300`}
-                  >
-                    {RAZAS.map((r) => (
-                      <option key={r} value={r}>{r}</option>
-                    ))}
-                    <option value="OTRA">Otra</option>
-                  </select>
-                </div>
-
-                {/* OTRA RAZA */}
-                {raza === "OTRA" && (
-                  <div>
-                    <input
-                      type="text"
-                      placeholder="Escribe la raza"
-                      value={otraRaza}
-                      onChange={(e) => setOtraRaza(e.target.value)}
-                      aria-label="Otra raza"
-                      className={`${inputBase} border ${razaError ? "border-red-500" : "border-slate-300"}`}
-                    />
-                    {razaError && <p className="mt-1.5 text-sm text-red-600">{razaError}</p>}
+                <div className="relative flex items-center gap-4 pr-10">
+                  <div className="relative flex h-16 min-w-[4.5rem] max-w-[8rem] shrink-0 items-center justify-center rounded-2xl bg-amber-300 px-3 pt-2 shadow-inner">
+                    <span aria-hidden="true" className="absolute left-1/2 top-1.5 h-2 w-2 -translate-x-1/2 rounded-full bg-amber-50/90 ring-1 ring-amber-600/40" />
+                    <span className={`truncate text-2xl font-black tabular-nums ${id ? "text-amber-950" : "text-amber-950/35"}`}>
+                      {id || "ID"}
+                    </span>
                   </div>
-                )}
-
-                {/* PESO */}
-                <div>
-                  <label htmlFor="f-peso" className="mb-1 block text-sm font-medium text-slate-700">Peso (kg)</label>
-                  <input
-                    id="f-peso"
-                    type="tel"
-                    inputMode="decimal"
-                    pattern="[0-9]*[.,]?[0-9]*"
-                    value={peso}
-                    onChange={(e) => {
-                      const nuevo = e.target.value.replace(/[^0-9.,]/g, "");
-                      setPeso(nuevo);
-                      if (pesoError) setPesoError("");
-                    }}
-                    placeholder="Ej: 70.0"
-                    className={`${inputBase} border ${pesoError ? "border-red-500" : "border-slate-300"}`}
-                  />
-                  {pesoError && <p className="mt-1.5 text-sm text-red-600">{pesoError}</p>}
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium uppercase tracking-[0.18em] text-emerald-200/90">Registro de hembra</p>
+                    <p className="mt-0.5 truncate text-xl font-bold">{editIndex !== null ? "Editar cerda" : "Nueva cerda"}</p>
+                    <span className="mt-1.5 inline-flex max-w-full items-center rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-semibold text-white">
+                      <span className="truncate">{(raza === "OTRA" ? otraRaza : raza) || "Raza"}</span>
+                    </span>
+                  </div>
                 </div>
+              </div>
 
-                {/* FECHA */}
-                <div>
-                  <label htmlFor="f-fecha" className="mb-1 block text-sm font-medium text-slate-700">Fecha de llegada</label>
-                  <input
-                    id="f-fecha"
-                    type="date"
-                    value={fecha}
-                    max={fechaLocalISO(new Date())}
-                    onChange={(e) => {
-                      setFecha(e.target.value);
-                      if (fechaError) setFechaError("");
-                    }}
-                    className={`${inputBase} appearance-none border ${fechaError ? "border-red-500" : "border-slate-300"}`}
-                  />
-                  {fechaError && <p className="mt-1.5 text-sm text-red-600">{fechaError}</p>}
+              <div className="flex-1 overflow-y-auto px-5 pb-5 pt-4">
+                <h4 className="mb-1 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Datos generales</h4>
+                <div className="divide-y divide-slate-100 rounded-2xl ring-1 ring-slate-100">
+                  {/* ID */}
+                  <div className="flex items-start gap-3 px-3.5 py-3">
+                    <span aria-hidden="true" className="mt-6 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-base">🏷️</span>
+                    <div className="min-w-0 flex-1">
+                      <label htmlFor="f-id" className="mb-1 block text-sm text-slate-500">Identificación</label>
+                      <input
+                        id="f-id"
+                        type="text"
+                        placeholder="Ej: A-102"
+                        value={id}
+                        onChange={(e) => {
+                          setId(e.target.value.toUpperCase());
+                          if (idError) setIdError("");
+                        }}
+                        className={`${inputBase} border uppercase ${idError ? "border-red-500" : "border-slate-200"}`}
+                      />
+                      {idError && <p className="mt-1.5 text-sm text-red-600">{idError}</p>}
+                    </div>
+                  </div>
+
+                  {/* RAZA */}
+                  <div className="flex items-start gap-3 px-3.5 py-3">
+                    <span aria-hidden="true" className="mt-6 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-base">🧬</span>
+                    <div className="min-w-0 flex-1">
+                      <label htmlFor="f-raza" className="mb-1 block text-sm text-slate-500">Raza</label>
+                      <select
+                        id="f-raza"
+                        value={raza}
+                        onChange={(e) => setRaza(e.target.value)}
+                        className={`${inputBase} border border-slate-200`}
+                      >
+                        {RAZAS.map((r) => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                        <option value="OTRA">Otra</option>
+                      </select>
+                      {raza === "OTRA" && (
+                        <div className="mt-2">
+                          <input
+                            type="text"
+                            placeholder="Escribe la raza"
+                            value={otraRaza}
+                            onChange={(e) => setOtraRaza(e.target.value)}
+                            aria-label="Otra raza"
+                            className={`${inputBase} border ${razaError ? "border-red-500" : "border-slate-200"}`}
+                          />
+                          {razaError && <p className="mt-1.5 text-sm text-red-600">{razaError}</p>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* PESO */}
+                  <div className="flex items-start gap-3 px-3.5 py-3">
+                    <span aria-hidden="true" className="mt-6 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-base">⚖️</span>
+                    <div className="min-w-0 flex-1">
+                      <label htmlFor="f-peso" className="mb-1 block text-sm text-slate-500">Peso de llegada (kg)</label>
+                      <input
+                        id="f-peso"
+                        type="tel"
+                        inputMode="decimal"
+                        pattern="[0-9]*[.,]?[0-9]*"
+                        value={peso}
+                        onChange={(e) => {
+                          const nuevo = e.target.value.replace(/[^0-9.,]/g, "");
+                          setPeso(nuevo);
+                          if (pesoError) setPesoError("");
+                        }}
+                        placeholder="Ej: 70.0"
+                        className={`${inputBase} border ${pesoError ? "border-red-500" : "border-slate-200"}`}
+                      />
+                      {pesoError && <p className="mt-1.5 text-sm text-red-600">{pesoError}</p>}
+                    </div>
+                  </div>
+
+                  {/* FECHA */}
+                  <div className="flex items-start gap-3 px-3.5 py-3">
+                    <span aria-hidden="true" className="mt-6 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-base">📅</span>
+                    <div className="min-w-0 flex-1">
+                      <label htmlFor="f-fecha" className="mb-1 block text-sm text-slate-500">Fecha de llegada</label>
+                      <input
+                        id="f-fecha"
+                        type="date"
+                        value={fecha}
+                        max={fechaLocalISO(new Date())}
+                        onChange={(e) => {
+                          setFecha(e.target.value);
+                          if (fechaError) setFechaError("");
+                        }}
+                        className={`${inputBase} appearance-none border ${fechaError ? "border-red-500" : "border-slate-200"}`}
+                      />
+                      {fechaError && <p className="mt-1.5 text-sm text-red-600">{fechaError}</p>}
+                    </div>
+                  </div>
                 </div>
 
                 {/* CARACTERÍSTICAS */}
-                <div>
-                  <label htmlFor="f-car" className="mb-1 block text-sm font-medium text-slate-700">Características</label>
+                <h4 className="mb-1 mt-5 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Características</h4>
+                <div className="rounded-2xl bg-amber-50/70 p-3 ring-1 ring-amber-100">
+                  <label htmlFor="f-car" className="sr-only">Características</label>
                   <textarea
                     id="f-car"
                     value={caracteristicas}
                     onChange={(e) => setCaracteristicas(e.target.value)}
                     placeholder="Marcas, temperamento, observaciones"
-                    className="h-20 w-full resize-none rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-200"
+                    className="h-20 w-full resize-none rounded-xl border border-amber-100 bg-white/80 px-3 py-2 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-200"
                   />
                 </div>
 
-                <div className="flex flex-col gap-2 pt-1">
+                <div className="mt-5 grid grid-cols-2 gap-2">
                   <button
+                    type="button"
                     onClick={agregarOCrear}
-                    className="w-full rounded-xl bg-emerald-800 py-3 text-base font-bold text-white transition active:scale-[0.98]"
+                    className="rounded-2xl bg-emerald-700 py-3 text-sm font-bold text-white transition hover:bg-emerald-800 active:scale-[0.98]"
                   >
-                    {editIndex !== null ? "Actualizar" : "Agregar"}
+                    {editIndex !== null ? "Actualizar" : "Agregar cerda"}
                   </button>
                   <button
+                    type="button"
                     onClick={() => setMostrarFormulario(false)}
-                    className="w-full rounded-xl py-3 text-base font-medium text-slate-600 hover:bg-slate-100"
+                    className="rounded-2xl bg-slate-100 py-3 text-sm font-bold text-slate-800 transition hover:bg-slate-200 active:scale-[0.98]"
                   >
                     Cancelar
                   </button>
                 </div>
               </div>
             </div>
+
+            <style>{`
+              .form-fondo { animation: form-fade 200ms ease-out both; }
+              .form-hoja { animation: form-entrar 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+              @keyframes form-fade { from { opacity: 0 } to { opacity: 1 } }
+              @keyframes form-entrar { from { transform: scale(0.96); opacity: 0 } to { transform: none; opacity: 1 } }
+              @media (prefers-reduced-motion: reduce) { .form-fondo, .form-hoja { animation: none; } }
+            `}</style>
           </div>
         )}
       </div>
