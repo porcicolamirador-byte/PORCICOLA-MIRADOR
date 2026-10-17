@@ -343,6 +343,8 @@ export interface ExistenciaProducto {
   existencia: number;
   bajoMinimo: boolean;
   movimientos: MovimientoInventario[];
+  /** Valor unitario de la compra más reciente con precio (0 si no hay) */
+  ultimoPrecio: number;
 }
 
 /** Existencias calculadas: entradas por facturas menos salidas registradas */
@@ -351,9 +353,15 @@ export function calcularInventario(): ExistenciaProducto[] {
   const salidas = leerSalidas();
   return leerProductos().map((producto) => {
     const movimientos: MovimientoInventario[] = [];
+    let ultimoPrecio = 0;
+    let fechaPrecio = "";
     for (const f of facturas) {
       for (const l of f.lineas) {
         if (l.productoId !== producto.id) continue;
+        if (Number(l.valorUnitario) > 0 && f.fecha >= fechaPrecio) {
+          ultimoPrecio = Number(l.valorUnitario);
+          fechaPrecio = f.fecha;
+        }
         movimientos.push({
           fecha: f.fecha,
           tipo: "entrada",
@@ -369,7 +377,7 @@ export function calcularInventario(): ExistenciaProducto[] {
     }
     movimientos.sort((a, b) => b.fecha.localeCompare(a.fecha));
     const existencia = movimientos.reduce((s, m) => s + (m.tipo === "entrada" ? m.cantidad : -m.cantidad), 0);
-    return { producto, existencia, bajoMinimo: existencia <= producto.minimo, movimientos };
+    return { producto, existencia, bajoMinimo: existencia <= producto.minimo, movimientos, ultimoPrecio };
   });
 }
 

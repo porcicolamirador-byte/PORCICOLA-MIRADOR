@@ -15,14 +15,43 @@ import {
 } from "@/lib/datos";
 
 export const CATEGORIAS_BODEGA: { valor: CategoriaBodega; icono: string }[] = [
-  { valor: "Alimento", icono: "🌾" },
+  { valor: "Alimento", icono: "" }, // se dibuja como bulto de 40 kg (IconoCategoria)
   { valor: "Medicamentos", icono: "💊" },
   { valor: "Vacunas", icono: "💉" },
   { valor: "Limpieza", icono: "🧴" },
   { valor: "Otros", icono: "🧰" },
 ];
 export const UNIDADES_BODEGA = ["bultos", "kg", "unidades", "frascos", "dosis", "litros", "cajas"];
+/** Emoji de la categoría para textos simples (listas desplegables); el alimento no lleva emoji */
 export const iconoCategoria = (c: CategoriaBodega) => CATEGORIAS_BODEGA.find((x) => x.valor === c)?.icono ?? "📦";
+export const textoCategoria = (c: CategoriaBodega) => {
+  const i = iconoCategoria(c);
+  return i ? `${i} ${c}` : c;
+};
+
+/** Bulto de concentrado de 40 kg (ícono de la categoría Alimento) */
+export function IconoBulto({ className = "h-6 w-6" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+      <path d="M13 8h22v4l2 26a3 3 0 0 1-3 3H14a3 3 0 0 1-3-3l2-26z" fill="#e7c48a" />
+      <path d="M13 8h22v4H13z" fill="#a16207" />
+      <rect x="15" y="20" width="18" height="12" rx="2" fill="#fff" />
+      <text x="24" y="29.5" fontSize="7.5" fontWeight="700" textAnchor="middle" fill="#92400e" fontFamily="Arial, sans-serif">
+        40kg
+      </text>
+    </svg>
+  );
+}
+
+/** Ícono de una categoría: bulto dibujado para Alimento, emoji para las demás */
+export function IconoCategoria({ categoria, className = "h-6 w-6" }: { categoria: CategoriaBodega; className?: string }) {
+  if (categoria === "Alimento") return <IconoBulto className={className} />;
+  return (
+    <span className={`inline-flex items-center justify-center leading-none ${className}`} style={{ fontSize: "1.25em" }} aria-hidden="true">
+      {iconoCategoria(categoria)}
+    </span>
+  );
+}
 
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
@@ -78,7 +107,7 @@ export default function CatalogoProductos() {
         <ul className="divide-y divide-slate-100 rounded-2xl ring-1 ring-slate-100">
           {ordenados.map(({ producto: p, existencia }) => (
             <li key={p.id} className="flex items-center gap-3 px-3.5 py-3">
-              <span className="text-xl" aria-hidden="true">{iconoCategoria(p.categoria)}</span>
+              <IconoCategoria categoria={p.categoria} className="h-7 w-7 shrink-0 text-xl" />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-slate-900">{p.nombre}</p>
                 <p className="truncate text-xs text-slate-500">
@@ -163,7 +192,7 @@ function FormProducto({ producto, onCerrar }: { producto: ProductoBodega | "nuev
             <Selector
               value={categoria}
               onChange={(v) => setCategoria(v as CategoriaBodega)}
-              opciones={CATEGORIAS_BODEGA.map((c) => ({ valor: c.valor, texto: `${c.icono} ${c.valor}` }))}
+              opciones={CATEGORIAS_BODEGA.map((c) => ({ valor: c.valor, texto: textoCategoria(c.valor) }))}
             />
           </Campo>
           <Campo etiqueta="Unidad">

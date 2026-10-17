@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Boton, Campo, Chevron, Chips, Dato, Entrada, Hoja, IconoMas, Insignia, Selector, Vacio } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
-import { iconoCategoria } from "@/components/CatalogoProductos";
+import { CATEGORIAS_BODEGA, IconoCategoria } from "@/components/CatalogoProductos";
 import {
   calcularInventario,
   formatoFecha,
@@ -77,6 +77,9 @@ export default function BodegaPage() {
   const mesActual = hoy().slice(0, 7);
   const compradoMes = (datos?.facturas ?? []).filter((f) => f.fecha.slice(0, 7) === mesActual).reduce((s, f) => s + totalFactura(f), 0);
 
+  const conExistencia = datos?.inventario.filter((i) => i.existencia > 0).length ?? 0;
+  const agotados = datos?.inventario.filter((i) => i.existencia <= 0).length ?? 0;
+  const valorBodega = datos?.inventario.reduce((s, i) => s + Math.max(0, i.existencia) * i.ultimoPrecio, 0) ?? 0;
   const sinCatalogo = datos !== null && datos.productos.length === 0;
   const producto = datos?.inventario.find((i) => i.producto.id === productoSel) ?? null;
   const factura = datos?.facturas.find((f) => f.id === facturaSel) ?? null;
@@ -93,9 +96,14 @@ export default function BodegaPage() {
         </Boton>
       }
     >
-      <div className="grid grid-cols-3 gap-2">
-        <Dato titulo="Productos" valor={datos ? datos.productos.length : "–"} />
-        <Dato titulo="Por reponer" valor={datos ? bajos.length : "–"} />
+      <div className="grid grid-cols-2 gap-2">
+        <Dato
+          titulo="Productos con existencia"
+          valor={datos ? `${conExistencia} / ${datos.productos.length}` : "–"}
+          detalle={agotados ? `${agotados} ${agotados === 1 ? "agotado" : "agotados"}` : "Ninguno agotado"}
+        />
+        <Dato titulo="Por reponer" valor={datos ? bajos.length : "–"} detalle={bajos.length ? "En el mínimo o menos" : "Todo en orden"} />
+        <Dato titulo="Valor en bodega" valor={datos ? formatoPesos(valorBodega) : "–"} detalle="Según el último precio de compra" />
         <Dato titulo="Compras del mes" valor={datos ? formatoPesos(compradoMes) : "–"} />
       </div>
 
@@ -166,34 +174,63 @@ export default function BodegaPage() {
               {vista === "reponer" ? "No hay productos por reponer. 👍" : "Ningún producto coincide con la búsqueda."}
             </p>
           ) : (
-            <ul className="divide-y divide-slate-100 overflow-hidden rounded-3xl bg-white ring-1 ring-slate-200/80">
-              {inventarioVisible.map(({ producto: p, existencia, bajoMinimo }) => (
-                <li key={p.id}>
-                  <button
-                    type="button"
-                    onClick={() => setProductoSel(p.id)}
-                    className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-slate-50 active:bg-slate-100"
-                  >
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-xl" aria-hidden="true">
-                      {iconoCategoria(p.categoria)}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-slate-900">{p.nombre}</span>
-                      <span className="block truncate text-xs text-slate-500">
-                        {p.categoria} · mínimo {fmt(p.minimo)} {p.unidad}
-                      </span>
-                    </span>
-                    <span className="flex shrink-0 flex-col items-end gap-1">
-                      <span className={`text-sm font-bold tabular-nums ${bajoMinimo ? "text-red-600" : "text-slate-900"}`}>
-                        {fmt(existencia)} <span className="text-xs font-medium text-slate-500">{p.unidad}</span>
-                      </span>
-                      {bajoMinimo && <Insignia clase="bg-red-50 text-red-700 ring-red-200">Reponer</Insignia>}
-                    </span>
-                    <Chevron />
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <div className="flex flex-col gap-4">
+              {CATEGORIAS_BODEGA.map(({ valor: cat }) => {
+                const items = inventarioVisible.filter((i) => i.producto.categoria === cat);
+                if (!items.length) return null;
+                return (
+                  <section key={cat}>
+                    <h2 className="mb-2 flex items-center gap-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                      <IconoCategoria categoria={cat} className="h-4 w-4 text-[11px]" />
+                      {cat} · {items.length}
+                    </h2>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {items.map(({ producto: p, existencia, bajoMinimo, ultimoPrecio }) => {
+                        const agotado = existencia <= 0;
+                        const referencia = Math.max(p.minimo * 3, p.minimo + 1, 1);
+                        const nivel = Math.max(0, Math.min(100, (existencia / referencia) * 100));
+                        const colorBarra = agotado || bajoMinimo ? "bg-red-500" : existencia <= p.minimo * 1.5 ? "bg-amber-400" : "bg-emerald-500";
+                        const estado = agotado
+                          ? { t: "Agotado", c: "bg-red-600 text-white ring-red-600" }
+                          : bajoMinimo
+                          ? { t: "Reponer", c: "bg-red-50 text-red-700 ring-red-200" }
+                          : existencia <= p.minimo * 1.5
+                          ? { t: "Bajo", c: "bg-amber-50 text-amber-800 ring-amber-200" }
+                          : { t: "Disponible", c: "bg-emerald-50 text-emerald-700 ring-emerald-200" };
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => setProductoSel(p.id)}
+                            className={`flex flex-col gap-2 rounded-3xl bg-white p-3.5 text-left ring-1 transition active:scale-[0.98] ${
+                              agotado || bajoMinimo ? "ring-red-200" : "ring-slate-200/80"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-teal-50 text-2xl">
+                                <IconoCategoria categoria={p.categoria} className="h-8 w-8 text-2xl" />
+                              </span>
+                              <Insignia clase={estado.c}>{estado.t}</Insignia>
+                            </div>
+                            <p className="line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-snug text-slate-900">{p.nombre}</p>
+                            <p className={`text-2xl font-bold leading-none tabular-nums ${agotado || bajoMinimo ? "text-red-600" : "text-slate-900"}`}>
+                              {fmt(existencia)} <span className="text-xs font-semibold text-slate-500">{p.unidad}</span>
+                            </p>
+                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100" role="img" aria-label={`Nivel ${Math.round(nivel)} %`}>
+                              <div className={`h-full rounded-full ${colorBarra}`} style={{ width: `${Math.max(nivel, agotado ? 0 : 4)}%` }} />
+                            </div>
+                            <p className="text-[11px] text-slate-500">
+                              Mín. {fmt(p.minimo)} {p.unidad}
+                              {ultimoPrecio > 0 && existencia > 0 ? ` · ${formatoPesos(existencia * ultimoPrecio)}` : ""}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
           )}
         </>
       )}
@@ -372,7 +409,7 @@ function NuevaFactura({
                   onChange={(v) => cambiarLinea(l.clave, { productoId: v })}
                   opciones={[
                     { valor: "", texto: "Elige un producto…" },
-                    ...ordenados.map((p) => ({ valor: p.id, texto: `${iconoCategoria(p.categoria)} ${p.nombre} (${p.unidad})` })),
+                    ...ordenados.map((p) => ({ valor: p.id, texto: `${p.nombre} (${p.unidad})` })),
                   ]}
                 />
                 <div className="mt-2 grid grid-cols-2 gap-2">
@@ -473,7 +510,7 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
       {!salida ? (
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-3 rounded-2xl bg-teal-50/70 p-4 ring-1 ring-teal-100">
-            <span className="text-3xl" aria-hidden="true">{iconoCategoria(p.categoria)}</span>
+            <IconoCategoria categoria={p.categoria} className="h-12 w-12 shrink-0 text-3xl" />
             <div className="min-w-0 flex-1">
               <p className="text-xs text-slate-500">{p.categoria} · existencia</p>
               <p className={`text-3xl font-bold leading-tight tabular-nums ${bajoMinimo ? "text-red-600" : "text-slate-900"}`}>
@@ -597,7 +634,11 @@ function DetalleFactura({ factura: f, productos, onCerrar }: { factura: Factura;
             const p = productos.find((x) => x.id === l.productoId);
             return (
               <li key={i} className="flex items-center gap-3 px-3.5 py-3">
-                <span className="text-xl" aria-hidden="true">{p ? iconoCategoria(p.categoria) : "📦"}</span>
+                {p ? (
+                  <IconoCategoria categoria={p.categoria} className="h-7 w-7 shrink-0 text-xl" />
+                ) : (
+                  <span className="text-xl" aria-hidden="true">📦</span>
+                )}
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-slate-900">{p?.nombre ?? "Producto eliminado"}</p>
                   <p className="text-xs text-slate-500">
