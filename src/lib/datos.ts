@@ -81,6 +81,8 @@ export interface Lote {
   alimento: Alimento[];
   activo: boolean;
   fechaSalida?: string;
+  /** Si el lote se creó automáticamente desde un parto */
+  origen?: { cerdaId: string; codigoParto: string };
 }
 
 export type TipoTratamiento = "Tratamiento" | "Vacunación" | "Desparasitación";
@@ -204,9 +206,46 @@ export function leerLotes(): Lote[] {
     alimento: Array.isArray(l.alimento) ? l.alimento : [],
     activo: l.activo !== false,
     fechaSalida: l.fechaSalida,
+    origen:
+      l.origen && typeof l.origen.cerdaId === "string" && typeof l.origen.codigoParto === "string"
+        ? l.origen
+        : undefined,
   }));
 }
 export const guardarLotes = (l: Lote[]) => escribir(CLAVES.lotes, l);
+
+/**
+ * Crea (o actualiza) el lote de engorde de la camada de un parto con los
+ * lechones nacidos vivos. Si ya existe un lote de ese parto, no lo duplica.
+ */
+export function crearLoteDesdeParto(datos: {
+  cerdaId: string;
+  codigoParto: string;
+  fecha: string;
+  vivos: number;
+  pesoPromedio?: number;
+}): Lote | null {
+  const vivos = Math.max(0, Math.floor(Number(datos.vivos) || 0));
+  if (vivos <= 0) return null;
+  const lotes = leerLotes();
+  const existente = lotes.find((l) => l.origen?.codigoParto === datos.codigoParto);
+  if (existente) return existente;
+  const lote: Lote = {
+    id: nuevoId(),
+    nombre: `Camada ${datos.codigoParto}`,
+    fechaIngreso: datos.fecha,
+    cantidadInicial: vivos,
+    vivos,
+    pesoInicial: Number(datos.pesoPromedio) || 0,
+    pesajes: [],
+    mortalidad: [],
+    alimento: [],
+    activo: true,
+    origen: { cerdaId: datos.cerdaId, codigoParto: datos.codigoParto },
+  };
+  guardarLotes([...lotes, lote]);
+  return lote;
+}
 
 /** Tratamientos */
 export const leerTratamientos = () => leer<Tratamiento[]>(CLAVES.tratamientos, []);

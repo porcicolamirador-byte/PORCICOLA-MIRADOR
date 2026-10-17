@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import usePageBackground from "@/hooks/usePageBackground";
 import { leerConfig } from "@/lib/config";
+import { crearLoteDesdeParto } from "@/lib/datos";
 
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 const TIPOS_PARTO = ["Normal", "Asistido", "Distócico", "Cesárea"];
@@ -147,6 +148,14 @@ export default function RegistrarParto() {
     };
 
     localStorage.setItem(`historial-${id}`, JSON.stringify([nuevo, ...historial]));
+    // La camada pasa automáticamente a Engorde como un lote nuevo
+    crearLoteDesdeParto({
+      cerdaId: id,
+      codigoParto,
+      fecha,
+      vivos: nVivos,
+      pesoPromedio: aNumero(pesoPromedio) ?? undefined,
+    });
     // La ficha de la cerda abre el resumen de este parto al volver
     localStorage.setItem("last-new-registro", JSON.stringify({ cerdaId: id }));
     volver();
@@ -228,6 +237,12 @@ export default function RegistrarParto() {
             <p className="mt-2 text-xs text-slate-500">
               Total nacidos: <b>{(aNumero(vivos) ?? 0) + (aNumero(muertos) ?? 0) + (aNumero(momias) ?? 0)}</b>
             </p>
+            {(aNumero(vivos) ?? 0) > 0 && (
+              <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-100">
+                🐷 Al guardar se creará en <b>Engorde</b> el lote <b>Camada {codigoParto}</b> con{" "}
+                <b>{aNumero(vivos)}</b> {aNumero(vivos) === 1 ? "lechón" : "lechones"}.
+              </p>
+            )}
             <div className="mt-3 grid grid-cols-2 gap-3">
               <Campo etiqueta="Peso promedio (kg)">
                 <input type="tel" inputMode="decimal" value={pesoPromedio} placeholder="Ej: 1.4"

@@ -92,7 +92,12 @@ export default function EngordePage() {
                   className="w-full rounded-3xl bg-white p-4 text-left ring-1 ring-slate-200/80 transition hover:shadow-md active:scale-[0.99]"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <p className="truncate font-semibold text-slate-900">{l.nombre}</p>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-slate-900">{l.nombre}</p>
+                      {l.origen && (
+                        <p className="truncate text-xs text-slate-500">🐖 De la cerda {l.origen.cerdaId} · parto automático</p>
+                      )}
+                    </div>
                     <span className="text-xs text-slate-500">Día {r.dias}</span>
                   </div>
                   <div className="mt-3 grid grid-cols-3 gap-2 text-center">
@@ -258,6 +263,11 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
     <Hoja abierta titulo={titulos[accion]} onCerrar={accion === "resumen" ? onCerrar : limpiar}>
       {accion === "resumen" ? (
         <div className="flex flex-col gap-4">
+          {lote.origen && (
+            <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-100">
+              Lote creado automáticamente con la camada del parto {lote.origen.codigoParto} (cerda {lote.origen.cerdaId}).
+            </p>
+          )}
           <p className="text-sm text-slate-500">
             Ingresó el {formatoFecha(lote.fechaIngreso, true)} · {r.dias} días
             {!lote.activo && lote.fechaSalida ? ` · cerrado el ${formatoFecha(lote.fechaSalida, true)}` : ""}
