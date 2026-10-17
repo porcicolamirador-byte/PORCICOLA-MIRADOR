@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Boton, Campo, Chevron, Chips, Dato, Entrada, Hoja, IconoMas, Insignia, Selector, Vacio } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
+import DialogoClave from "@/components/DialogoClave";
+import { leerConfig } from "@/lib/config";
 import Modal from "@/components/Modal";
 import { CATEGORIAS_BODEGA, IconoCategoria } from "@/components/CatalogoProductos";
 import {
@@ -52,6 +54,7 @@ export default function BodegaPage() {
   const [vista, setVista] = useState<Vista>("inventario");
   const [busqueda, setBusqueda] = useState("");
   const [nuevaFactura, setNuevaFactura] = useState(false);
+  const [pedirClave, setPedirClave] = useState(false);
   const [productoSel, setProductoSel] = useState<string | null>(null);
   const [facturaSel, setFacturaSel] = useState<string | null>(null);
 
@@ -92,7 +95,7 @@ export default function BodegaPage() {
       icono="📦"
       tono="teal"
       accion={
-        <Boton onClick={() => setNuevaFactura(true)} className="px-3.5" disabled={sinCatalogo}>
+        <Boton onClick={() => setPedirClave(true)} className="px-3.5" disabled={sinCatalogo}>
           <IconoMas /> Factura
         </Boton>
       }
@@ -141,7 +144,7 @@ export default function BodegaPage() {
               <Vacio
                 titulo="Sin facturas"
                 texto="Ingresa la factura de cada compra para que las existencias se actualicen solas."
-                accion={<Boton onClick={() => setNuevaFactura(true)}>Ingresar factura</Boton>}
+                accion={<Boton onClick={() => setPedirClave(true)}>Ingresar factura</Boton>}
               />
             ) : (
               <ul className="divide-y divide-slate-100 overflow-hidden rounded-3xl bg-white ring-1 ring-slate-200/80">
@@ -242,6 +245,19 @@ export default function BodegaPage() {
       </p>
 
       {datos && (
+        <DialogoClave
+          abierto={pedirClave}
+          titulo="Clave de facturas"
+          mensaje="Ingresa el código para cargar una factura."
+          aceptar="Continuar"
+          onValidar={(codigo) => {
+            if (codigo !== leerConfig().claveFacturas) return false;
+            setPedirClave(false);
+            setNuevaFactura(true);
+            return true;
+          }}
+          onCerrar={() => setPedirClave(false)}
+        />
         <NuevaFactura
           abierta={nuevaFactura}
           productos={datos.productos}

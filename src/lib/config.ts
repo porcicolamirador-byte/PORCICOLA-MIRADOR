@@ -8,6 +8,8 @@ export interface ConfigGranja {
   claveAjustes: string;
   /** Clave para eliminar una cerda en Gestación */
   claveEliminar: string;
+  /** Clave para cargar una factura en Bodega */
+  claveFacturas: string;
   /** Días después del parto: inicio y fin de la ventana de destete */
   desteteMin: number;
   desteteMax: number;
@@ -20,6 +22,7 @@ export const CLAVE_CONFIG = "config-granja";
 export const CONFIG_POR_DEFECTO: ConfigGranja = {
   claveAjustes: "0030",
   claveEliminar: "0030",
+  claveFacturas: "0030",
   desteteMin: 21,
   desteteMax: 28,
   parideras: 0,
@@ -37,6 +40,7 @@ export function leerConfig(): ConfigGranja {
     return {
       claveAjustes: esClave(c.claveAjustes) ? c.claveAjustes : CONFIG_POR_DEFECTO.claveAjustes,
       claveEliminar: esClave(c.claveEliminar) ? c.claveEliminar : CONFIG_POR_DEFECTO.claveEliminar,
+      claveFacturas: esClave(c.claveFacturas) ? c.claveFacturas : CONFIG_POR_DEFECTO.claveFacturas,
       desteteMin: min,
       desteteMax: max,
       parideras:

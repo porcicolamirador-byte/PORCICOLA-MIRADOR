@@ -73,6 +73,14 @@ export default function AjustesAvanzadosPage() {
         onGuardar={(clave) => guardar({ claveEliminar: clave })}
       />
 
+      <CambiarClave
+        titulo="Clave de facturas"
+        descripcion="Se pide en Bodega para cargar una factura."
+        icono="🧾"
+        actual={config.claveFacturas}
+        onGuardar={(clave) => guardar({ claveFacturas: clave })}
+      />
+
       <CatalogoProductos />
 
       <DiasDestete min={config.desteteMin} max={config.desteteMax} onGuardar={(min, max) => guardar({ desteteMin: min, desteteMax: max })} />
