@@ -47,7 +47,7 @@ export default function ModoSinConexion() {
     >
       <span className="inline-flex items-center gap-2 rounded-full bg-slate-900/90 px-3.5 py-1.5 text-xs font-semibold text-white shadow-lg backdrop-blur">
         <span aria-hidden="true" className="h-2 w-2 rounded-full bg-amber-400" />
-        Sin conexión · tus datos se guardan en este teléfono
+        Sin conexión: local backup
       </span>
     </div>
   );
