@@ -3,6 +3,7 @@
 import { useMemo, type ReactNode } from "react";
 import ModuloPage from "@/components/ModuloPage";
 import { Dato, Tarjeta } from "@/components/ui";
+import { BarrasHorizontales, BarrasVerticales } from "@/components/Graficas";
 import {
   diasEntre,
   estadoDeCerda,
@@ -27,6 +28,29 @@ const ESTADOS: { estado: EstadoCerda; color: string }[] = [
   { estado: "Sin registro", color: "#94a3b8" },
 ];
 
+const AZUL = "#2a78d6";
+const NARANJA = "#eb6834";
+const MESES_CORTOS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+const MESES_LARGOS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+/** Últimos n meses ("AAAA-MM"), del más antiguo al actual */
+function ultimosMeses(fecha: string, n: number): string[] {
+  const [a, m] = fecha.split("-").map(Number);
+  return Array.from({ length: n }, (_, i) => {
+    const d = new Date(a, m - 1 - (n - 1 - i), 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
+}
+const etiquetaMes = (mes: string) => MESES_CORTOS[Number(mes.slice(5, 7)) - 1];
+const detalleMes = (mes: string) => `${MESES_LARGOS[Number(mes.slice(5, 7)) - 1]} ${mes.slice(0, 4)}`;
+
+const pesosCompactos = (n: number) =>
+  n >= 1_000_000
+    ? `$${(n / 1_000_000).toLocaleString("es-CO", { maximumFractionDigits: 1 })} M`
+    : n >= 1000
+      ? `$${Math.round(n / 1000).toLocaleString("es-CO")} mil`
+      : `$${Math.round(n).toLocaleString("es-CO")}`;
+
 const uno = (n: number) => (Number.isFinite(n) ? n.toFixed(1) : "–");
 
 export default function IndicadoresPage() {
@@ -48,6 +72,16 @@ export default function IndicadoresPage() {
     let inseminaciones = 0;
     let abortos = 0;
     const intervalos: number[] = [];
+    const meses = ultimosMeses(fecha, 6);
+    const porMes = () => Object.fromEntries(meses.map((m) => [m, 0])) as Record<string, number>;
+    const partosMes = porMes();
+    const vivosMes = porMes();
+    const destetadosMes = porMes();
+    const insemMes = porMes();
+    const sumar = (t: Record<string, number>, f: string, v: number) => {
+      const k = f.slice(0, 7);
+      if (k in t) t[k] += v;
+    };
 
     for (const cerda of leerCerdas()) {
       const h = leerHistorial(cerda.id);
@@ -57,6 +91,14 @@ export default function IndicadoresPage() {
         if (estado in conteo) conteo[estado] += 1;
       }
       const anio = h.filter(enAnio);
+      for (const r of h) {
+        if (!r.fecha) continue;
+        if (r.tipo === "Parto") {
+          sumar(partosMes, r.fecha, 1);
+          sumar(vivosMes, r.fecha, Number(r.vivos) || 0);
+        } else if (r.tipo === "Destete") sumar(destetadosMes, r.fecha, Number(r.destetados) || 0);
+        else if (r.tipo === "Inseminación") sumar(insemMes, r.fecha, 1);
+      }
       for (const r of anio) {
         if (r.tipo === "Parto") {
           partos += 1;
@@ -98,11 +140,25 @@ export default function IndicadoresPage() {
     }
 
     const mes = fecha.slice(0, 7);
-    const movs = leerMovimientos().filter((m) => m.fecha.slice(0, 7) === mes);
+    const todos = leerMovimientos();
+    const ingresosMes = porMes();
+    const gastosMes = porMes();
+    for (const m of todos) sumar(m.tipo === "ingreso" ? ingresosMes : gastosMes, m.fecha ?? "", Number(m.monto) || 0);
+    const movs = todos.filter((m) => m.fecha.slice(0, 7) === mes);
     const ingresos = movs.filter((m) => m.tipo === "ingreso").reduce((s, m) => s + m.monto, 0);
     const gastos = movs.filter((m) => m.tipo === "gasto").reduce((s, m) => s + m.monto, 0);
 
+    const grupo = (...tablas: Record<string, number>[]) =>
+      meses.map((m) => ({ etiqueta: etiquetaMes(m), detalle: detalleMes(m), valores: tablas.map((t) => t[m]) }));
+
+    const pesoActual = (l: (typeof lotes)[number]) =>
+      [...l.pesajes].sort((a, b) => b.fecha.localeCompare(a.fecha))[0]?.pesoPromedio ?? l.pesoInicial;
+
     return {
+      graficaPartos: grupo(partosMes, insemMes),
+      graficaLechones: grupo(vivosMes, destetadosMes),
+      graficaEconomia: grupo(ingresosMes, gastosMes),
+      lotesGrafica: activos.map((l) => ({ nombre: l.nombre, vivos: l.vivos, peso: pesoActual(l) || 0 })),
       activas,
       conteo,
       partos,
@@ -132,24 +188,29 @@ export default function IndicadoresPage() {
             {ind.activas === 0 ? (
               <p className="text-sm text-slate-500">Registra cerdas en Gestación para ver su distribución.</p>
             ) : (
-              <>
-                <div className="flex h-3 w-full gap-[2px] overflow-hidden rounded-full" role="img"
-                  aria-label={ESTADOS.map((e) => `${e.estado}: ${ind.conteo[e.estado]}`).join(", ")}>
-                  {ESTADOS.filter((e) => ind.conteo[e.estado] > 0).map((e) => (
-                    <div key={e.estado} className="h-full" style={{ width: `${(ind.conteo[e.estado] / ind.activas) * 100}%`, backgroundColor: e.color }} />
-                  ))}
-                </div>
-                <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
-                  {ESTADOS.filter((e) => ind.conteo[e.estado] > 0).map((e) => (
-                    <li key={e.estado} className="flex items-center gap-2 text-sm">
-                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: e.color }} />
-                      <span className="flex-1 truncate text-slate-600">{e.estado}</span>
-                      <span className="font-semibold tabular-nums">{ind.conteo[e.estado]}</span>
-                    </li>
-                  ))}
-                </ul>
-              </>
+              <BarrasHorizontales
+                total={ind.activas}
+                filas={ESTADOS.filter((e) => ind.conteo[e.estado] > 0).map((e) => ({
+                  nombre: e.estado,
+                  valor: ind.conteo[e.estado],
+                  color: e.color,
+                }))}
+              />
             )}
+          </Tarjeta>
+
+          <Tarjeta titulo="Partos e inseminaciones" accion={<span className="text-xs text-slate-500">6 meses</span>}>
+            <BarrasVerticales
+              grupos={ind.graficaPartos}
+              series={[{ nombre: "Partos", color: AZUL }, { nombre: "Inseminaciones", color: NARANJA }]}
+            />
+          </Tarjeta>
+
+          <Tarjeta titulo="Lechones" accion={<span className="text-xs text-slate-500">6 meses</span>}>
+            <BarrasVerticales
+              grupos={ind.graficaLechones}
+              series={[{ nombre: "Nacidos vivos", color: AZUL }, { nombre: "Destetados", color: NARANJA }]}
+            />
           </Tarjeta>
 
           <Seccion titulo="Reproducción">
@@ -166,6 +227,27 @@ export default function IndicadoresPage() {
             <Dato titulo="Ganancia diaria" valor={Number.isFinite(ind.gdp) ? `${Math.round(ind.gdp)} g` : "–"} detalle="promedio por animal" />
             <Dato titulo="Mortalidad engorde" valor={Number.isFinite(ind.mortalidadEngorde) ? `${uno(ind.mortalidadEngorde)} %` : "–"} detalle="todos los lotes" />
           </Seccion>
+
+          {ind.lotesGrafica.length > 0 && (
+            <Tarjeta titulo="Lotes de engorde activos">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-500">Animales por lote</p>
+              <BarrasHorizontales
+                filas={ind.lotesGrafica.map((l) => ({ nombre: l.nombre, valor: l.vivos, color: AZUL }))}
+              />
+              <p className="mb-2 mt-5 text-xs font-medium uppercase tracking-wider text-slate-500">Peso promedio actual (kg)</p>
+              <BarrasHorizontales
+                filas={ind.lotesGrafica.map((l) => ({ nombre: l.nombre, valor: l.peso, color: NARANJA }))}
+              />
+            </Tarjeta>
+          )}
+
+          <Tarjeta titulo="Ingresos y gastos" accion={<span className="text-xs text-slate-500">6 meses</span>}>
+            <BarrasVerticales
+              grupos={ind.graficaEconomia}
+              formato={pesosCompactos}
+              series={[{ nombre: "Ingresos", color: AZUL }, { nombre: "Gastos", color: NARANJA }]}
+            />
+          </Tarjeta>
 
           <Seccion titulo="Economía · este mes">
             <Dato titulo="Ingresos" valor={formatoPesos(ind.ingresos)} />
