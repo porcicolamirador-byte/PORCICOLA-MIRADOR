@@ -35,12 +35,28 @@ const modulos = [
     card: "bg-white border-amber-200",
   },
   {
+    nombre: "Monitoreo",
+    descripcion: "Temperatura y humedad",
+    ruta: "/monitoreo",
+    icon: "🌡️",
+    tile: "bg-orange-100 text-orange-800",
+    card: "bg-white border-orange-200",
+  },
+  {
     nombre: "Tratamientos",
     descripcion: "Salud y medicamentos",
     ruta: "/tratamientos",
     icon: "🩺",
     tile: "bg-rose-100 text-rose-800",
     card: "bg-white border-rose-200",
+  },
+  {
+    nombre: "Bodega",
+    descripcion: "Inventario de insumos",
+    ruta: "/bodega",
+    icon: "📦",
+    tile: "bg-teal-100 text-teal-800",
+    card: "bg-white border-teal-200",
   },
   {
     nombre: "Bioseguridad",

@@ -12,6 +12,8 @@ export const TONOS = {
   violet: "bg-violet-100 text-violet-800",
   stone: "bg-stone-200 text-stone-800",
   slate: "bg-slate-200 text-slate-800",
+  orange: "bg-orange-100 text-orange-800",
+  teal: "bg-teal-100 text-teal-800",
 } as const;
 
 /**

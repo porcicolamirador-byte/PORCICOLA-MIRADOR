@@ -14,6 +14,8 @@ export const CLAVES = {
   bioVisitas: "bioseguridad-visitas",
   movimientos: "contabilidad-movimientos",
   ajustes: "ajustes",
+  lecturas: "monitoreo-lecturas",
+  bodega: "bodega-articulos",
 } as const;
 
 /* ═════════════════════ Tipos ═════════════════════ */
@@ -112,6 +114,33 @@ export interface Movimiento {
   monto: number;
 }
 
+export type ZonaMonitoreo = "Maternidad" | "Gestación" | "Precebo" | "Engorde";
+export interface Lectura {
+  id: string;
+  fecha: string; // YYYY-MM-DD
+  hora: string; // HH:MM
+  zona: ZonaMonitoreo;
+  temperatura: number; // °C
+  humedad?: number; // %
+}
+
+export type CategoriaBodega = "Alimento" | "Medicamentos" | "Vacunas" | "Limpieza" | "Otros";
+export interface MovimientoBodega {
+  fecha: string;
+  tipo: "entrada" | "salida";
+  cantidad: number;
+  nota?: string;
+}
+export interface ArticuloBodega {
+  id: string;
+  nombre: string;
+  categoria: CategoriaBodega;
+  unidad: string;
+  cantidad: number;
+  minimo: number;
+  movimientos: MovimientoBodega[];
+}
+
 export interface Ajustes {
   nombreGranja: string;
   responsable: string;
@@ -191,6 +220,24 @@ export const guardarVisitas = (v: Visita[]) => escribir(CLAVES.bioVisitas, v);
 /** Contabilidad */
 export const leerMovimientos = () => leer<Movimiento[]>(CLAVES.movimientos, []);
 export const guardarMovimientos = (m: Movimiento[]) => escribir(CLAVES.movimientos, m);
+
+/** Monitoreo ambiental */
+export const leerLecturas = () => leer<Lectura[]>(CLAVES.lecturas, []);
+export const guardarLecturas = (l: Lectura[]) => escribir(CLAVES.lecturas, l);
+
+/** Bodega */
+export function leerArticulos(): ArticuloBodega[] {
+  return leer<Partial<ArticuloBodega>[]>(CLAVES.bodega, []).map((a) => ({
+    id: a.id ?? nuevoId(),
+    nombre: a.nombre ?? "Artículo",
+    categoria: a.categoria ?? "Otros",
+    unidad: a.unidad ?? "unidades",
+    cantidad: Number(a.cantidad) || 0,
+    minimo: Number(a.minimo) || 0,
+    movimientos: Array.isArray(a.movimientos) ? a.movimientos : [],
+  }));
+}
+export const guardarArticulos = (a: ArticuloBodega[]) => escribir(CLAVES.bodega, a);
 
 /** Ajustes */
 export const leerAjustes = (): Ajustes => ({
