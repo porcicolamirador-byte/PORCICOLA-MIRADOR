@@ -29,6 +29,11 @@ import {
   type ExistenciaProducto,
   type Factura,
   type ProductoBodega,
+  eliminarSalida,
+  kgDeCantidad,
+  leerCorrales,
+  leerLotes,
+  registrarConsumoLote,
 } from "@/lib/datos";
 
 const num = (v: string) => {
@@ -507,12 +512,18 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
   const [cantidad, setCantidad] = useState("");
   const [fecha, setFecha] = useState(hoy());
   const [nota, setNota] = useState("");
+  const [destino, setDestino] = useState("");
   const [error, setError] = useState("");
+  const libre = leerConfig().permitirSinInventario;
+  // Lotes de engorde activos: destino del consumo (solo los que ya tienen corral)
+  const lotes = salida ? leerLotes().filter((l) => l.activo) : [];
+  const corrales = salida ? leerCorrales() : [];
 
   const volver = () => {
     setSalida(false);
     setCantidad("");
     setNota("");
+    setDestino("");
     setFecha(hoy());
     setError("");
   };
@@ -521,14 +532,20 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
     e.preventDefault();
     const n = num(cantidad);
     if (n <= 0) return setError("Escribe una cantidad mayor que cero.");
-    if (n > existencia) return setError(`Solo hay ${fmt(existencia)} ${p.unidad} en bodega.`);
-    guardarSalidas([...leerSalidas(), { id: nuevoId(), productoId: p.id, fecha, cantidad: n, nota: nota.trim() || undefined }]);
+    if (!libre && n > existencia) return setError(`Solo hay ${fmt(existencia)} ${p.unidad} en bodega.`);
+    if (!destino) return setError("Elige el destino del consumo.");
+    if (destino === "otro") {
+      guardarSalidas([...leerSalidas(), { id: nuevoId(), productoId: p.id, fecha, cantidad: n, nota: nota.trim() || undefined }]);
+    } else {
+      // Consumo de un lote: queda también en el alimento del lote
+      registrarConsumoLote({ loteId: destino, productoId: p.id, cantidad: n, fecha });
+    }
     volver();
   };
 
   const quitarSalida = async (salidaId: string) => {
-    if (!(await confirmar({ titulo: "Eliminar salida", mensaje: "La cantidad volverá a sumar a la existencia.", aceptar: "Eliminar", destructivo: true }))) return;
-    guardarSalidas(leerSalidas().filter((s) => s.id !== salidaId));
+    if (!(await confirmar({ titulo: "Eliminar salida", mensaje: "La cantidad volverá a sumar a la existencia. Si fue consumo de un lote, también se quita de su alimento.", aceptar: "Eliminar", destructivo: true }))) return;
+    eliminarSalida(salidaId);
   };
 
   return (
@@ -548,7 +565,7 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
               </p>
             </div>
           </div>
-          <Boton variante="secundario" onClick={() => setSalida(true)} disabled={existencia <= 0}>
+          <Boton variante="secundario" onClick={() => setSalida(true)} disabled={!libre && existencia <= 0}>
             − Registrar salida (consumo)
           </Boton>
           <div>
@@ -598,13 +615,44 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
               <Entrada type="date" value={fecha} onChange={setFecha} required />
             </Campo>
           </div>
-          <Campo etiqueta="Destino / nota">
-            <Entrada value={nota} onChange={setNota} placeholder="Ej. Lote corral 3" />
+          <Campo etiqueta="Destino *">
+            <Selector
+              value={destino}
+              onChange={(v) => {
+                setDestino(v);
+                setError("");
+              }}
+              opciones={[
+                { valor: "", texto: "Selecciona el lote" },
+                ...lotes.map((l) => {
+                  const c = corrales.find((x) => x.id === l.corralId);
+                  return {
+                    valor: l.id,
+                    texto: c ? `${l.nombre} · corral ${c.codigo} · ${l.vivos} animales` : `${l.nombre} · sin corral asignado`,
+                    deshabilitado: !c,
+                  };
+                }),
+                { valor: "otro", texto: "Otro consumo (sin lote)" },
+              ]}
+            />
           </Campo>
+          {lotes.length > 0 && lotes.every((l) => !corrales.some((c) => c.id === l.corralId)) && (
+            <p className="text-xs text-slate-500">Para elegir un lote, primero asígnale su corral en Engorde.</p>
+          )}
+          {destino === "otro" && (
+            <Campo etiqueta="Nota">
+              <Entrada value={nota} onChange={setNota} placeholder="Ej. cerdas de gestación" />
+            </Campo>
+          )}
+          {destino && destino !== "otro" && num(cantidad) > 0 && kgDeCantidad(num(cantidad), p.unidad) > 0 && (
+            <p className="text-xs text-slate-500">
+              Se registrarán {fmt(kgDeCantidad(num(cantidad), p.unidad))} kg de alimento en el lote.
+            </p>
+          )}
           {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
           <div className="mt-1 grid grid-cols-2 gap-2">
             <Boton variante="secundario" onClick={volver}>Cancelar</Boton>
-            <Boton type="submit">Guardar</Boton>
+            <Boton type="submit" disabled={!destino}>Guardar</Boton>
           </div>
         </form>
       )}

@@ -323,6 +323,8 @@ export interface SalidaBodega {
   fecha: string;
   cantidad: number;
   nota?: string;
+  /** Lote de engorde que consumió el producto */
+  loteId?: string;
 }
 
 /* ═════════════════════ Corrales ═════════════════════ */
@@ -411,6 +413,68 @@ export function calcularInventario(): ExistenciaProducto[] {
  * cada artículo se vuelve un producto y su existencia queda como
  * "saldo inicial". Se ejecuta una sola vez.
  */
+/** Kilos que trae cada bulto de alimento */
+export const KG_POR_BULTO = 40;
+export const kgDeCantidad = (cantidad: number, unidad: string) =>
+  unidad === "bultos" ? cantidad * KG_POR_BULTO : unidad === "kg" ? cantidad : 0;
+
+/**
+ * Consumo de un producto de bodega por un lote de engorde: crea la salida en
+ * Bodega y el registro de alimento en el lote (enlazados por salidaId).
+ */
+export function registrarConsumoLote(datos: { loteId: string; productoId: string; cantidad: number; fecha: string }) {
+  const item = calcularInventario().find((i) => i.producto.id === datos.productoId);
+  const lote = leerLotes().find((l) => l.id === datos.loteId);
+  if (!item || !lote) return false;
+  const p = item.producto;
+  const corral = lote.corralId ? leerCorrales().find((c) => c.id === lote.corralId) : undefined;
+  const salidaId = nuevoId();
+  guardarSalidas([
+    ...leerSalidas(),
+    {
+      id: salidaId,
+      productoId: p.id,
+      fecha: datos.fecha,
+      cantidad: datos.cantidad,
+      nota: `${lote.nombre}${corral ? ` · corral ${corral.codigo}` : ""}`,
+      loteId: lote.id,
+    },
+  ]);
+  const costo = item.ultimoPrecio ? Math.round(item.ultimoPrecio * datos.cantidad) : 0;
+  guardarLotes(
+    leerLotes().map((l) =>
+      l.id === lote.id
+        ? {
+            ...l,
+            alimento: [
+              ...l.alimento,
+              {
+                fecha: datos.fecha,
+                kg: kgDeCantidad(datos.cantidad, p.unidad),
+                costo: costo || undefined,
+                productoId: p.id,
+                producto: p.nombre,
+                cantidad: datos.cantidad,
+                unidad: p.unidad,
+                salidaId,
+              },
+            ],
+          }
+        : l,
+    ),
+  );
+  return true;
+}
+
+/** Elimina una salida de Bodega y, si era consumo de un lote, también su registro de alimento */
+export function eliminarSalida(salidaId: string) {
+  guardarSalidas(leerSalidas().filter((s) => s.id !== salidaId));
+  const lotes = leerLotes();
+  if (lotes.some((l) => l.alimento.some((a) => a.salidaId === salidaId))) {
+    guardarLotes(lotes.map((l) => ({ ...l, alimento: l.alimento.filter((a) => a.salidaId !== salidaId) })));
+  }
+}
+
 export function migrarBodegaAnterior(): boolean {
   if (typeof window === "undefined") return false;
   if (localStorage.getItem(CLAVES.productos) !== null) return false;

@@ -10,7 +10,8 @@ import {
   guardarLotes,
   hoy,
   calcularInventario,
-  guardarSalidas,
+  kgDeCantidad,
+  registrarConsumoLote,
   leerCorrales,
   leerSalidas,
   leerLotes,
@@ -132,8 +133,6 @@ function Mini({ titulo, valor }: { titulo: string; valor: string }) {
   );
 }
 
-/** Kilos que trae cada bulto de alimento */
-const KG_POR_BULTO = 40;
 const fmtCantidad = (n: number) => n.toLocaleString("es-CO", { maximumFractionDigits: 2 });
 
 function actualizarLote(id: string, cambio: (l: Lote) => Lote) {
@@ -262,7 +261,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   // Ajuste oculto: permite usar productos sin existencia (el inventario queda negativo)
   const sinLimite = accion === "alimento" && leerConfig().permitirSinInventario;
   const excede = !!elegido && !sinLimite && cantidadNum > elegido.existencia;
-  const kgDe = (cantidad: number, unidad: string) => (unidad === "bultos" ? cantidad * KG_POR_BULTO : unidad === "kg" ? cantidad : 0);
+  const kgDe = kgDeCantidad;
 
   const limpiar = () => {
     setValor("");
@@ -298,20 +297,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
       const actual = calcularInventario().find((p) => p.producto.id === productoId);
       const libre = leerConfig().permitirSinInventario;
       if (!actual || (!libre && (actual.existencia <= 0 || n > actual.existencia))) return;
-      const p = actual.producto;
-      const salidaId = nuevoId();
-      guardarSalidas([
-        ...leerSalidas(),
-        { id: salidaId, productoId: p.id, fecha, cantidad: n, nota: `${lote.nombre}${corral ? ` · corral ${corral.codigo}` : ""}` },
-      ]);
-      const costo = actual.ultimoPrecio ? Math.round(actual.ultimoPrecio * n) : 0;
-      actualizarLote(lote.id, (l) => ({
-        ...l,
-        alimento: [
-          ...l.alimento,
-          { fecha, kg: kgDe(n, p.unidad), costo: costo || undefined, productoId: p.id, producto: p.nombre, cantidad: n, unidad: p.unidad, salidaId },
-        ],
-      }));
+      registrarConsumoLote({ loteId: lote.id, productoId: actual.producto.id, cantidad: n, fecha });
     }
     limpiar();
   };
