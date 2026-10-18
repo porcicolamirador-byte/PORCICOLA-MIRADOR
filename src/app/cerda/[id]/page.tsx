@@ -574,7 +574,7 @@ export default function CerdaDetalle() {
       {selectedRegistro && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setSelectedRegistro(null)}>
           <div className="relative w-full max-w-lg rounded-2xl bg-white p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => setSelectedRegistro(null)} className="absolute right-4 top-4 text-slate-500 hover:text-slate-900">✕</button>
+            <button onClick={() => setSelectedRegistro(null)} aria-label="Cerrar" className="absolute right-2 top-2 z-20 flex h-11 w-11 touch-manipulation items-center justify-center rounded-full text-slate-500 hover:text-slate-900 active:bg-slate-100">✕</button>
             <h3 className="text-lg font-bold text-black">Resumen del parto</h3>
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-700 sm:grid-cols-3">
               <div className="rounded-lg bg-emerald-50 p-2"><b>Lote</b><p>{selectedRegistro.codigoParto || "-"}</p></div>
@@ -1081,7 +1081,7 @@ export default function CerdaDetalle() {
                 type="button"
                 onClick={() => setMostrarInfo(false)}
                 aria-label="Cerrar"
-                className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25"
+                className="absolute right-3 top-3 z-20 flex h-11 w-11 touch-manipulation items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25 active:bg-white/30"
               >
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" aria-hidden="true">
                   <path d="M6 6l12 12M18 6 6 18" />

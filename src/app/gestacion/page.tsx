@@ -997,14 +997,14 @@ export default function Gestacion() {
                   type="button"
                   onClick={() => setMostrarFormulario(false)}
                   aria-label="Cerrar"
-                  className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25"
+                  className="absolute right-3 top-3 z-20 flex h-11 w-11 touch-manipulation items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25 active:bg-white/30"
                 >
                   <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" aria-hidden="true">
                     <path d="M6 6l12 12M18 6 6 18" />
                   </svg>
                 </button>
 
-                <div className="relative flex items-center gap-4 pr-10">
+                <div className="relative flex items-center gap-4 pr-12">
                   <div className="relative flex h-16 min-w-[4.5rem] max-w-[8rem] shrink-0 items-center justify-center rounded-2xl bg-amber-300 px-3 pt-2 shadow-inner">
                     <span aria-hidden="true" className="absolute left-1/2 top-1.5 h-2 w-2 -translate-x-1/2 rounded-full bg-amber-50/90 ring-1 ring-amber-600/40" />
                     <span className={`truncate text-2xl font-black tabular-nums ${id ? "text-amber-950" : "text-amber-950/35"}`}>
