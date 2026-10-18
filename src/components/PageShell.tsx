@@ -43,14 +43,16 @@ export default function PageShell({
 
   const isDark = useMemo(() => isColorDark(bgColor), [bgColor]);
   const textColor = isDark ? "text-white" : "text-slate-900";
-  const backgroundColor = bgColor;
+  // Páginas blancas: usan el fondo del tema (blanco o negro en modo oscuro)
+  const blanca = !bgColor || ["#ffffff", "#fff", "white"].includes(bgColor.toLowerCase());
+  const backgroundColor = blanca ? "var(--page-bg, #ffffff)" : bgColor;
 
   return (
     <main
       className={`min-h-screen px-4 pt-4 pb-24 sm:px-6 ${textColor} ${className}`}
       style={{
         backgroundColor,
-        color: isDark ? "#ffffff" : "#111827",
+        color: blanca ? "var(--page-fg, #111827)" : isDark ? "#ffffff" : "#111827",
         // El contenido no queda debajo de la isla dinámica / notch
         paddingTop: "calc(env(safe-area-inset-top) + 1rem)",
       }}

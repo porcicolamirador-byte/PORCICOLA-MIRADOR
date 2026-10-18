@@ -56,7 +56,7 @@ export default function Header({
 
   return (
     <header
-      className={`flex items-start justify-between gap-4 p-4 rounded-2xl border ${borderColor}`}
+      className={`encabezado flex items-start justify-between gap-4 p-4 rounded-2xl border ${borderColor}`}
       style={getHeaderBgStyle(isDark)}
     >
       <div className="flex items-center gap-3">

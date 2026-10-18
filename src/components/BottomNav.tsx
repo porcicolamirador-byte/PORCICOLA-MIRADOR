@@ -99,7 +99,7 @@ export default function BottomNav() {
       style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)", transform: "translateZ(0)" }}
     >
       {/* Módulo rectangular fijo que contiene las cuatro secciones */}
-      <ul className="pointer-events-auto mx-auto grid w-full max-w-md grid-cols-4 rounded-[20px] border border-[#e9edef] bg-white px-1.5 py-2 shadow-[0_10px_30px_-12px_rgba(17,27,33,0.28),0_2px_6px_-2px_rgba(17,27,33,0.08)]">
+      <ul className="barra-inferior pointer-events-auto mx-auto grid w-full max-w-md grid-cols-4 rounded-[20px] border border-[#e9edef] bg-white px-1.5 py-2 shadow-[0_10px_30px_-12px_rgba(17,27,33,0.28),0_2px_6px_-2px_rgba(17,27,33,0.08)]">
         {TABS.map(({ nombre, ruta, Icono, conPendientes }) => {
           const activa = pathname === ruta;
           const globo = conPendientes && pendientes > 0 ? (pendientes > 99 ? "99+" : String(pendientes)) : null;
@@ -110,12 +110,12 @@ export default function BottomNav() {
                 onClick={() => router.push(ruta)}
                 aria-current={activa ? "page" : undefined}
                 aria-label={globo ? `${nombre}, ${globo} tareas pendientes` : nombre}
-                className="flex w-full flex-col items-center gap-1 rounded-xl py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+                className={`${activa ? "pestana-activa" : "pestana-inactiva"} flex w-full flex-col items-center gap-1 rounded-xl py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600`}
                 style={{ color: activa ? ACTIVO : INACTIVO, WebkitTapHighlightColor: "transparent" }}
               >
                 <span
                   className="relative flex h-8 w-16 items-center justify-center rounded-full"
-                  style={{ backgroundColor: activa ? PILDORA : "transparent" }}
+                  style={{ backgroundColor: activa ? "var(--nav-pildora, #d8fdd2)" : "transparent" }}
                 >
                   <Icono lleno={activa} />
                   {globo && (

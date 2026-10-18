@@ -6,7 +6,7 @@
 
 export const CLAVE_TEMA = "tema";
 export const FONDO_CLARO = "#ffffff";
-export const FONDO_OSCURO = "#0b141a";
+export const FONDO_OSCURO = "#000000";
 export const EVENTO_TEMA = "tema-cambio";
 
 export function esOscuro(): boolean {
