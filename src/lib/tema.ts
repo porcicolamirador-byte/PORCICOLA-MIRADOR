@@ -39,8 +39,10 @@ export function aplicarTema(oscuro: boolean) {
   root.style.setProperty("--page-fg", oscuro ? "#f2f2f7" : "#111827");
   document.body.style.backgroundColor = fondo;
   document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((m) => (m.content = fondo));
+  // Teclado, selectores de fecha y menús del iPhone en el mismo modo
+  document.querySelectorAll<HTMLMetaElement>('meta[name="color-scheme"]').forEach((m) => (m.content = oscuro ? "dark" : "light"));
   window.dispatchEvent(new Event(EVENTO_TEMA));
 }
 
 /** Script que corre antes de pintar (se inserta en el <head>) */
-export const SCRIPT_TEMA = `(function(){try{var t=null;try{t=sessionStorage.getItem("${CLAVE_TEMA}");localStorage.removeItem("${CLAVE_TEMA}")}catch(e){}if(t!=="claro"){var r=document.documentElement;r.classList.add("oscuro");r.style.backgroundColor="${FONDO_OSCURO}";r.style.setProperty("--page-bg","${FONDO_OSCURO}");r.style.setProperty("--page-fg","#f2f2f7");var m=document.querySelectorAll('meta[name="theme-color"]');for(var i=0;i<m.length;i++)m[i].content="${FONDO_OSCURO}";}}catch(e){}})();`;
+export const SCRIPT_TEMA = `(function(){try{var t=null;try{t=sessionStorage.getItem("${CLAVE_TEMA}");localStorage.removeItem("${CLAVE_TEMA}")}catch(e){}if(t!=="claro"){var r=document.documentElement;r.classList.add("oscuro");r.style.backgroundColor="${FONDO_OSCURO}";r.style.setProperty("--page-bg","${FONDO_OSCURO}");r.style.setProperty("--page-fg","#f2f2f7");var m=document.querySelectorAll('meta[name="theme-color"]');for(var i=0;i<m.length;i++)m[i].content="${FONDO_OSCURO}";var c=document.querySelectorAll('meta[name="color-scheme"]');for(var j=0;j<c.length;j++)c[j].content="dark";}else{var c2=document.querySelectorAll('meta[name="color-scheme"]');for(var k=0;k<c2.length;k++)c2[k].content="light";}}catch(e){}})();`;

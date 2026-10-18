@@ -265,3 +265,14 @@ html.oscuro .logo-circulo {
 }
 html.oscuro .logo-circulo img { width: 180px; }
 html.oscuro .logo-caja { background-color: #ffffff !important; }
+
+/* Campos al escribir: en claro se ponen blancos; en oscuro, gris oscuro */
+html.oscuro .focus\:bg-white:focus,
+html.oscuro .focus-within\:bg-white:focus-within { background-color: #2c2c2e; }
+html.oscuro input,
+html.oscuro textarea,
+html.oscuro select { caret-color: #25d366; }
+html.oscuro input:-webkit-autofill {
+  -webkit-text-fill-color: #f2f2f7;
+  -webkit-box-shadow: 0 0 0 1000px #2c2c2e inset;
+}

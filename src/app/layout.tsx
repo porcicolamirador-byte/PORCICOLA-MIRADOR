@@ -37,7 +37,8 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   // Color inicial de la zona de la isla dinámica; cada página lo actualiza.
   themeColor: "#ffffff",
-  colorScheme: "only light",
+  // El modo oscuro cambia esta etiqueta a "dark" (teclado y selectores del iPhone)
+  colorScheme: "light dark",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
