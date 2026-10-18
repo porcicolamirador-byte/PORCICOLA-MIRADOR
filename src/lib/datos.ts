@@ -20,6 +20,7 @@ export const CLAVES = {
   facturas: "bodega-facturas",
   salidas: "bodega-salidas",
   config: "config-granja",
+  corrales: "corrales",
 } as const;
 
 /* ═════════════════════ Tipos ═════════════════════ */
@@ -314,6 +315,21 @@ export interface SalidaBodega {
   cantidad: number;
   nota?: string;
 }
+
+/* ═════════════════════ Corrales ═════════════════════ */
+
+export type ZonaCorral = "Gestación" | "Maternidad" | "Precebo" | "Engorde" | "Cuarentena" | "Otro";
+export interface Corral {
+  id: string;
+  /** Identificación visible del corral, p. ej. "G-01" */
+  codigo: string;
+  zona: ZonaCorral;
+  /** Animales que caben (opcional) */
+  capacidad?: number;
+  nota?: string;
+}
+export const leerCorrales = () => leer<Corral[]>(CLAVES.corrales, []);
+export const guardarCorrales = (c: Corral[]) => escribir(CLAVES.corrales, c);
 
 export const leerProductos = () => leer<ProductoBodega[]>(CLAVES.productos, []);
 export const guardarProductos = (p: ProductoBodega[]) => escribir(CLAVES.productos, p);

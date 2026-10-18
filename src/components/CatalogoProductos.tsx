@@ -1,7 +1,8 @@
 "use client";
 
+import Modal from "@/components/Modal";
 import { useEffect, useMemo, useState, type FormEvent, Fragment } from "react";
-import { Boton, Campo, Entrada, Hoja, IconoMas, Selector, Tarjeta } from "@/components/ui";
+import { Boton, Campo, Entrada, IconoMas, Selector, Tarjeta } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
 import {
   calcularInventario,
@@ -192,7 +193,14 @@ function FormProducto({ producto, onCerrar }: { producto: ProductoBodega | "nuev
   };
 
   return (
-    <Hoja abierta={producto !== null} titulo={producto === "nuevo" ? "Nuevo producto" : "Editar producto"} onCerrar={onCerrar}>
+    <Modal
+      abierta={producto !== null}
+      etiqueta="Bodega"
+      titulo={producto === "nuevo" ? "Nuevo producto" : "Editar producto"}
+      subtitulo={nombre.trim() || undefined}
+      icono={<IconoCategoria categoria={categoria} className="h-9 w-9 text-3xl" />}
+      onCerrar={onCerrar}
+    >
       <form onSubmit={guardar} className="flex flex-col gap-3.5">
         <Campo etiqueta="Nombre *">
           <Entrada value={nombre} onChange={setNombre} placeholder="Ej. Concentrado levante 40 kg" required />
@@ -217,6 +225,6 @@ function FormProducto({ producto, onCerrar }: { producto: ProductoBodega | "nuev
           Guardar producto
         </Boton>
       </form>
-    </Hoja>
+    </Modal>
   );
 }

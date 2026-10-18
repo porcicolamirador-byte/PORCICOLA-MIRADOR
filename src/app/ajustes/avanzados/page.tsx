@@ -7,8 +7,9 @@ import { Boton } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
 import { ajustesDesbloqueados, bloquearAjustes } from "@/lib/acceso";
 import { CONFIG_POR_DEFECTO, guardarConfig, leerConfig, type ConfigGranja } from "@/lib/config";
-import { leerProductos, notificarCambio, useVersionDatos } from "@/lib/datos";
+import { leerCorrales, leerProductos, notificarCambio, useVersionDatos } from "@/lib/datos";
 import CatalogoProductos from "@/components/CatalogoProductos";
+import CatalogoCorrales from "@/components/CatalogoCorrales";
 
 /**
  * Sección oculta de ajustes: solo se abre después de ingresar el código
@@ -22,6 +23,7 @@ export default function AjustesAvanzadosPage() {
   const alternar = (id: string) => setAbierto((a) => (a === id ? null : id));
   const version = useVersionDatos();
   const productos = version < 0 ? 0 : leerProductos().length;
+  const corrales = version < 0 ? 0 : leerCorrales().length;
 
   useEffect(() => {
     const ok = ajustesDesbloqueados();
@@ -109,6 +111,15 @@ export default function AjustesAvanzadosPage() {
           onAlternar={() => alternar("parideras")}
         >
           <Parideras actual={config.parideras} onGuardar={(n) => guardar({ parideras: n })} />
+        </Desplegable>
+        <Desplegable
+          icono="🏚️"
+          titulo="Corrales"
+          resumen={corrales ? String(corrales) : "Ninguno"}
+          abierto={abierto === "corrales"}
+          onAlternar={() => alternar("corrales")}
+        >
+          <CatalogoCorrales />
         </Desplegable>
       </Grupo>
 
