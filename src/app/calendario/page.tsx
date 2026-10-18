@@ -280,6 +280,33 @@ export default function CalendarioPage() {
         </div>
       </section>
 
+      {/* Detalle del día elegido */}
+      <section>
+        <h2 className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+          {formatoFecha(seleccion, true)} · {delDia.length ? `${delDia.length} ${delDia.length === 1 ? "evento" : "eventos"}` : "sin eventos"}
+        </h2>
+        {delDia.length > 0 && (
+          <ul className="divide-y divide-slate-100 overflow-hidden rounded-3xl bg-white ring-1 ring-slate-200/80">
+            {delDia.map((e, i) => (
+              <li key={i}>
+                <button
+                  type="button"
+                  onClick={() => router.push(`/cerda/${encodeURIComponent(e.cerdaId)}`)}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-50"
+                >
+                  <span className={`h-3 w-3 shrink-0 rounded-full ${ESTILO[e.tipo].punto}`} aria-hidden="true" />
+                  <span className="min-w-0 flex-1">
+                    <span className={`block text-xs font-semibold ${ESTILO[e.tipo].texto}`}>{ESTILO[e.tipo].etiqueta}</span>
+                    <span className="block truncate text-sm font-semibold text-slate-900">{e.nombre}</span>
+                    <span className="block truncate text-xs text-slate-500">{e.detalle}</span>
+                  </span>
+                  <Chevron />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
       {/* Resumen del mes */}
       <section className="rounded-3xl bg-white p-4 ring-1 ring-slate-200/80">
         <h2 className="text-[15px] font-bold text-slate-900">Resumen de {MESES[mes].toLowerCase()}</h2>
@@ -336,34 +363,6 @@ export default function CalendarioPage() {
               </SeccionDesplegable>
             </div>
           </>
-        )}
-      </section>
-
-      {/* Detalle del día elegido */}
-      <section>
-        <h2 className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-          {formatoFecha(seleccion, true)} · {delDia.length ? `${delDia.length} ${delDia.length === 1 ? "evento" : "eventos"}` : "sin eventos"}
-        </h2>
-        {delDia.length > 0 && (
-          <ul className="divide-y divide-slate-100 overflow-hidden rounded-3xl bg-white ring-1 ring-slate-200/80">
-            {delDia.map((e, i) => (
-              <li key={i}>
-                <button
-                  type="button"
-                  onClick={() => router.push(`/cerda/${encodeURIComponent(e.cerdaId)}`)}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-50"
-                >
-                  <span className={`h-3 w-3 shrink-0 rounded-full ${ESTILO[e.tipo].punto}`} aria-hidden="true" />
-                  <span className="min-w-0 flex-1">
-                    <span className={`block text-xs font-semibold ${ESTILO[e.tipo].texto}`}>{ESTILO[e.tipo].etiqueta}</span>
-                    <span className="block truncate text-sm font-semibold text-slate-900">{e.nombre}</span>
-                    <span className="block truncate text-xs text-slate-500">{e.detalle}</span>
-                  </span>
-                  <Chevron />
-                </button>
-              </li>
-            ))}
-          </ul>
         )}
       </section>
     </ModuloPage>
