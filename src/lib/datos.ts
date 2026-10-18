@@ -78,6 +78,8 @@ export interface Alimento {
   cantidad?: number;
   unidad?: string;
   salidaId?: string;
+  /** Hora del consumo (HH:MM) */
+  hora?: string;
 }
 export interface Lote {
   id: string;
@@ -322,6 +324,8 @@ export interface SalidaBodega {
   productoId: string;
   fecha: string;
   cantidad: number;
+  /** Hora de la salida (HH:MM) */
+  hora?: string;
   nota?: string;
   /** Lote de engorde que consumió el producto */
   loteId?: string;
@@ -359,6 +363,7 @@ export const totalFactura = (f: Factura) =>
 
 export interface MovimientoInventario {
   fecha: string;
+  hora?: string;
   tipo: "entrada" | "salida";
   cantidad: number;
   detalle: string;
@@ -400,9 +405,9 @@ export function calcularInventario(): ExistenciaProducto[] {
     }
     for (const sd of salidas) {
       if (sd.productoId !== producto.id) continue;
-      movimientos.push({ fecha: sd.fecha, tipo: "salida", cantidad: Number(sd.cantidad) || 0, detalle: sd.nota || "Salida", salidaId: sd.id });
+      movimientos.push({ fecha: sd.fecha, hora: sd.hora, tipo: "salida", cantidad: Number(sd.cantidad) || 0, detalle: sd.nota || "Salida", salidaId: sd.id });
     }
-    movimientos.sort((a, b) => b.fecha.localeCompare(a.fecha));
+    movimientos.sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.hora ?? "").localeCompare(a.hora ?? ""));
     const existencia = movimientos.reduce((s, m) => s + (m.tipo === "entrada" ? m.cantidad : -m.cantidad), 0);
     return { producto, existencia, bajoMinimo: existencia <= producto.minimo, movimientos, ultimoPrecio };
   });
@@ -422,7 +427,8 @@ export const kgDeCantidad = (cantidad: number, unidad: string) =>
  * Consumo de un producto de bodega por un lote de engorde: crea la salida en
  * Bodega y el registro de alimento en el lote (enlazados por salidaId).
  */
-export function registrarConsumoLote(datos: { loteId: string; productoId: string; cantidad: number; fecha: string }) {
+export function registrarConsumoLote(datos: { loteId: string; productoId: string; cantidad: number; fecha: string; hora?: string }) {
+  const hora = datos.hora || horaActual();
   const item = calcularInventario().find((i) => i.producto.id === datos.productoId);
   const lote = leerLotes().find((l) => l.id === datos.loteId);
   if (!item || !lote) return false;
@@ -435,6 +441,7 @@ export function registrarConsumoLote(datos: { loteId: string; productoId: string
       id: salidaId,
       productoId: p.id,
       fecha: datos.fecha,
+      hora,
       cantidad: datos.cantidad,
       nota: `${lote.nombre}${corral ? ` · corral ${corral.codigo}` : ""}`,
       loteId: lote.id,
@@ -450,6 +457,7 @@ export function registrarConsumoLote(datos: { loteId: string; productoId: string
               ...l.alimento,
               {
                 fecha: datos.fecha,
+                hora,
                 kg: kgDeCantidad(datos.cantidad, p.unidad),
                 costo: costo || undefined,
                 productoId: p.id,
@@ -569,6 +577,19 @@ export function hoy(): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const dia = String(d.getDate()).padStart(2, "0");
   return `${d.getFullYear()}-${m}-${dia}`;
+}
+
+/** Hora local actual en formato HH:MM (24 h) */
+export function horaActual(): string {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/** Muestra "14:05" como "2:05 p. m." */
+export function formatoHora(hora?: string): string {
+  if (!hora || !/^\d{1,2}:\d{2}$/.test(hora)) return "";
+  const [h, m] = hora.split(":").map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "a. m." : "p. m."}`;
 }
 
 export function sumarDias(fecha: string, dias: number): string {

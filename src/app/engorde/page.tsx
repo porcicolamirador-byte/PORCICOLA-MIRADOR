@@ -10,6 +10,8 @@ import {
   guardarLotes,
   hoy,
   calcularInventario,
+  formatoHora,
+  horaActual,
   kgDeCantidad,
   registrarConsumoLote,
   leerCorrales,
@@ -241,6 +243,7 @@ function TarjetaCorral({ corral, onCambiar }: { corral?: Corral; onCambiar?: () 
 function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   const [accion, setAccion] = useState<Accion>("resumen");
   const [fecha, setFecha] = useState(hoy());
+  const [hora, setHora] = useState(horaActual());
   const [valor, setValor] = useState("");
   const [extra, setExtra] = useState("");
   const [productoId, setProductoId] = useState("");
@@ -268,6 +271,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
     setExtra("");
     setProductoId("");
     setFecha(hoy());
+    setHora(horaActual());
     setCorralSel(lote.corralId ?? "");
     setAccion("resumen");
   };
@@ -297,7 +301,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
       const actual = calcularInventario().find((p) => p.producto.id === productoId);
       const libre = leerConfig().permitirSinInventario;
       if (!actual || (!libre && (actual.existencia <= 0 || n > actual.existencia))) return;
-      registrarConsumoLote({ loteId: lote.id, productoId: actual.producto.id, cantidad: n, fecha });
+      registrarConsumoLote({ loteId: lote.id, productoId: actual.producto.id, cantidad: n, fecha, hora });
     }
     limpiar();
   };
@@ -377,20 +381,24 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
               <h3 className="mb-2 text-sm font-semibold text-slate-900">Registros</h3>
               <ul className="flex flex-col gap-1.5 text-sm">
                 {[
-                  ...lote.pesajes.map((p) => ({ f: p.fecha, t: `Pesaje: ${p.pesoPromedio} kg promedio` })),
+                  ...lote.pesajes.map((p) => ({ f: p.fecha, h: "", t: `Pesaje: ${p.pesoPromedio} kg promedio` })),
                   ...lote.alimento.map((a) => ({
                     f: a.fecha,
+                    h: a.hora ?? "",
                     t: a.producto
                       ? `Alimento: ${fmtCantidad(a.cantidad ?? 0)} ${a.unidad ?? ""} ${a.producto}${a.kg ? ` (${fmtCantidad(a.kg)} kg)` : ""}`
                       : `Alimento: ${a.kg} kg${a.costo ? ` · ${formatoPesos(a.costo)}` : ""}`,
                   })),
-                  ...lote.mortalidad.map((m) => ({ f: m.fecha, t: `Muerte: ${m.cantidad}${m.causa ? ` · ${m.causa}` : ""}` })),
+                  ...lote.mortalidad.map((m) => ({ f: m.fecha, h: "", t: `Muerte: ${m.cantidad}${m.causa ? ` · ${m.causa}` : ""}` })),
                 ]
-                  .sort((a, b) => b.f.localeCompare(a.f))
+                  .sort((a, b) => b.f.localeCompare(a.f) || b.h.localeCompare(a.h))
                   .map((x, i) => (
                     <li key={i} className="flex justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2">
                       <span className="text-slate-700">{x.t}</span>
-                      <span className="shrink-0 text-xs text-slate-500">{formatoFecha(x.f)}</span>
+                      <span className="shrink-0 text-right text-xs leading-tight text-slate-500">
+                        {formatoFecha(x.f)}
+                        {x.h && <span className="block text-[10px]">{formatoHora(x.h)}</span>}
+                      </span>
                     </li>
                   ))}
               </ul>
@@ -426,6 +434,15 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
               </Campo>
 
             )
+          ) : accion === "alimento" ? (
+            <div className="grid grid-cols-2 gap-3">
+              <Campo etiqueta="Fecha">
+                <Entrada type="date" value={fecha} onChange={setFecha} required />
+              </Campo>
+              <Campo etiqueta="Hora">
+                <Entrada type="time" value={hora} onChange={setHora} required />
+              </Campo>
+            </div>
           ) : (
           <Campo etiqueta="Fecha">
             <Entrada type="date" value={fecha} onChange={setFecha} required />

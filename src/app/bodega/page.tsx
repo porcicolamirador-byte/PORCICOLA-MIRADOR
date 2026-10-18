@@ -34,6 +34,8 @@ import {
   leerCorrales,
   leerLotes,
   registrarConsumoLote,
+  formatoHora,
+  horaActual,
 } from "@/lib/datos";
 
 const num = (v: string) => {
@@ -511,6 +513,7 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
   const [salida, setSalida] = useState(false);
   const [cantidad, setCantidad] = useState("");
   const [fecha, setFecha] = useState(hoy());
+  const [hora, setHora] = useState(horaActual());
   const [nota, setNota] = useState("");
   const [destino, setDestino] = useState("");
   const [error, setError] = useState("");
@@ -524,6 +527,7 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
     setCantidad("");
     setNota("");
     setDestino("");
+    setHora(horaActual());
     setFecha(hoy());
     setError("");
   };
@@ -535,10 +539,10 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
     if (!libre && n > existencia) return setError(`Solo hay ${fmt(existencia)} ${p.unidad} en bodega.`);
     if (!destino) return setError("Elige el destino del consumo.");
     if (destino === "otro") {
-      guardarSalidas([...leerSalidas(), { id: nuevoId(), productoId: p.id, fecha, cantidad: n, nota: nota.trim() || undefined }]);
+      guardarSalidas([...leerSalidas(), { id: nuevoId(), productoId: p.id, fecha, hora, cantidad: n, nota: nota.trim() || undefined }]);
     } else {
       // Consumo de un lote: queda también en el alimento del lote
-      registrarConsumoLote({ loteId: destino, productoId: p.id, cantidad: n, fecha });
+      registrarConsumoLote({ loteId: destino, productoId: p.id, cantidad: n, fecha, hora });
     }
     volver();
   };
@@ -584,7 +588,10 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
                       <span className="text-slate-500"> · {m.detalle}</span>
                     </span>
                     <span className="flex shrink-0 items-center gap-1">
-                      <span className="text-xs text-slate-500">{formatoFecha(m.fecha)}</span>
+                      <span className="text-right text-xs leading-tight text-slate-500">
+                        {formatoFecha(m.fecha)}
+                        {m.hora && <span className="block text-[10px]">{formatoHora(m.hora)}</span>}
+                      </span>
                       {m.salidaId && (
                         <button
                           type="button"
@@ -607,12 +614,15 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
           <p className="text-sm text-slate-500">
             {p.nombre}: hay {fmt(existencia)} {p.unidad}
           </p>
+          <Campo etiqueta={`Cantidad (${p.unidad}) *`}>
+            <Entrada type="number" inputMode="decimal" min={0} step="any" value={cantidad} onChange={setCantidad} required />
+          </Campo>
           <div className="grid grid-cols-2 gap-3">
-            <Campo etiqueta={`Cantidad (${p.unidad}) *`}>
-              <Entrada type="number" inputMode="decimal" min={0} step="any" value={cantidad} onChange={setCantidad} required />
-            </Campo>
             <Campo etiqueta="Fecha">
               <Entrada type="date" value={fecha} onChange={setFecha} required />
+            </Campo>
+            <Campo etiqueta="Hora">
+              <Entrada type="time" value={hora} onChange={setHora} required />
             </Campo>
           </div>
           <Campo etiqueta="Destino *">
