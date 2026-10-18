@@ -6,7 +6,15 @@ import ModuloPage from "@/components/ModuloPage";
 import { Boton } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
 import { ajustesDesbloqueados, bloquearAjustes } from "@/lib/acceso";
-import { CONFIG_POR_DEFECTO, guardarConfig, leerConfig, type ConfigGranja } from "@/lib/config";
+import {
+  ALIMENTACION_POR_DEFECTO,
+  CONFIG_POR_DEFECTO,
+  ETAPAS_ALIMENTACION,
+  guardarConfig,
+  leerConfig,
+  type AlimentacionEstandar,
+  type ConfigGranja,
+} from "@/lib/config";
 import { leerCorrales, leerProductos, notificarCambio, useVersionDatos } from "@/lib/datos";
 import CatalogoProductos from "@/components/CatalogoProductos";
 import CatalogoCorrales from "@/components/CatalogoCorrales";
@@ -111,6 +119,15 @@ export default function AjustesAvanzadosPage() {
           onAlternar={() => alternar("parideras")}
         >
           <Parideras actual={config.parideras} onGuardar={(n) => guardar({ parideras: n })} />
+        </Desplegable>
+        <Desplegable
+          icono="🥣"
+          titulo="Alimentación estándar"
+          resumen={`${ETAPAS_ALIMENTACION.length} etapas`}
+          abierto={abierto === "alimentacion"}
+          onAlternar={() => alternar("alimentacion")}
+        >
+          <Alimentacion actual={config.alimentacion} onGuardar={(a) => guardar({ alimentacion: a })} />
         </Desplegable>
         <Desplegable
           icono="🏚️"
@@ -457,5 +474,68 @@ function Parideras({ actual, onGuardar }: { actual: number; onGuardar: (n: numbe
         </Boton>
       </form>
     </>
+  );
+}
+
+function Alimentacion({ actual, onGuardar }: { actual: AlimentacionEstandar; onGuardar: (a: AlimentacionEstandar) => void }) {
+  const aTexto = (a: AlimentacionEstandar) =>
+    Object.fromEntries(ETAPAS_ALIMENTACION.map(({ clave }) => [clave, String(a[clave]).replace(".", ",")])) as Record<keyof AlimentacionEstandar, string>;
+  const [valores, setValores] = useState(aTexto(actual));
+  const [base, setBase] = useState(actual);
+  if (base !== actual) {
+    setBase(actual);
+    setValores(aTexto(actual));
+  }
+
+  const numeros = Object.fromEntries(
+    ETAPAS_ALIMENTACION.map(({ clave }) => [clave, Number((valores[clave] || "0").replace(",", "."))]),
+  ) as unknown as AlimentacionEstandar;
+  const valido = ETAPAS_ALIMENTACION.every(({ clave }) => Number.isFinite(numeros[clave]) && numeros[clave] >= 0 && numeros[clave] <= 10000);
+  const sinCambios = ETAPAS_ALIMENTACION.every(({ clave }) => numeros[clave] === actual[clave]);
+  const total = ETAPAS_ALIMENTACION.reduce((s, { clave }) => s + (Number.isFinite(numeros[clave]) ? numeros[clave] : 0), 0);
+
+  const enviar = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!valido) return;
+    onGuardar(numeros);
+    await avisar({ titulo: "Alimentación actualizada", mensaje: "Se guardaron los kilos estándar de cada etapa." });
+  };
+
+  return (
+    <form onSubmit={enviar} className="flex flex-col gap-3">
+      <p className="text-xs leading-relaxed text-slate-500">Kilos de alimento por cerdo en cada etapa.</p>
+      <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-100">
+        {ETAPAS_ALIMENTACION.map(({ clave, nombre }) => (
+          <li key={clave}>
+            <label className="flex items-center gap-3 px-3.5 py-2">
+              <span className="min-w-0 flex-1 text-sm text-slate-800">{nombre}</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={valores[clave]}
+                onChange={(e) => setValores((v) => ({ ...v, [clave]: e.target.value.replace(/[^\d.,]/g, "").slice(0, 7) }))}
+                onFocus={(e) => e.target.select()}
+                aria-label={`${nombre} en kilos`}
+                className="h-10 w-20 shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-2 text-right text-base font-semibold tabular-nums text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-200"
+              />
+              <span className="w-5 shrink-0 text-xs text-slate-500">kg</span>
+            </label>
+          </li>
+        ))}
+        <li className="flex items-center justify-between bg-slate-50 px-3.5 py-2.5 text-sm">
+          <span className="font-medium text-slate-600">Total por cerdo</span>
+          <span className="font-bold tabular-nums text-slate-900">{total.toLocaleString("es-CO", { maximumFractionDigits: 1 })} kg</span>
+        </li>
+      </ul>
+      {!valido && <p className="text-sm font-medium text-rose-600">Escribe kilos válidos (números entre 0 y 10.000).</p>}
+      <div className="grid grid-cols-2 gap-2">
+        <Boton variante="secundario" onClick={() => setValores(aTexto(ALIMENTACION_POR_DEFECTO))}>
+          Valores por defecto
+        </Boton>
+        <Boton type="submit" disabled={!valido || sinCambios}>
+          Guardar
+        </Boton>
+      </div>
+    </form>
   );
 }

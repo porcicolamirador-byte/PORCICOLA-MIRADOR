@@ -3,6 +3,31 @@
  * claves y rango de días para el destete. Se guarda en este dispositivo.
  */
 
+/** Alimentación estándar: kilos de alimento por cerdo en cada etapa */
+export interface AlimentacionEstandar {
+  preiniciador: number;
+  preiniciadorCerdos: number;
+  iniciacionCerdos: number;
+  levante: number;
+  engorde: number;
+}
+
+export const ETAPAS_ALIMENTACION: { clave: keyof AlimentacionEstandar; nombre: string }[] = [
+  { clave: "preiniciador", nombre: "Preiniciador" },
+  { clave: "preiniciadorCerdos", nombre: "Preiniciador cerdos" },
+  { clave: "iniciacionCerdos", nombre: "Iniciación cerdos" },
+  { clave: "levante", nombre: "Etapa levante" },
+  { clave: "engorde", nombre: "Etapa engorde" },
+];
+
+export const ALIMENTACION_POR_DEFECTO: AlimentacionEstandar = {
+  preiniciador: 0,
+  preiniciadorCerdos: 10,
+  iniciacionCerdos: 20,
+  levante: 100,
+  engorde: 100,
+};
+
 export interface ConfigGranja {
   /** Código para abrir los ajustes avanzados */
   claveAjustes: string;
@@ -15,6 +40,8 @@ export interface ConfigGranja {
   desteteMax: number;
   /** Número de parideras (jaulas de maternidad). 0 = sin configurar */
   parideras: number;
+  /** Kilos de alimento por cerdo en cada etapa */
+  alimentacion: AlimentacionEstandar;
 }
 
 export const CLAVE_CONFIG = "config-granja";
@@ -26,10 +53,23 @@ export const CONFIG_POR_DEFECTO: ConfigGranja = {
   desteteMin: 21,
   desteteMax: 28,
   parideras: 0,
+  alimentacion: ALIMENTACION_POR_DEFECTO,
 };
 
 const esClave = (v: unknown): v is string => typeof v === "string" && /^\d{4}$/.test(v);
 const esDia = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 90;
+
+const esKilos = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 10000;
+
+function leerAlimentacion(a: unknown): AlimentacionEstandar {
+  const o = (a && typeof a === "object" ? a : {}) as Partial<Record<keyof AlimentacionEstandar, unknown>>;
+  const r = { ...ALIMENTACION_POR_DEFECTO };
+  for (const { clave } of ETAPAS_ALIMENTACION) {
+    const v = o[clave];
+    if (esKilos(v)) r[clave] = v;
+  }
+  return r;
+}
 
 export function leerConfig(): ConfigGranja {
   if (typeof window === "undefined") return CONFIG_POR_DEFECTO;
@@ -47,6 +87,7 @@ export function leerConfig(): ConfigGranja {
         typeof c.parideras === "number" && Number.isInteger(c.parideras) && c.parideras >= 0 && c.parideras <= 500
           ? c.parideras
           : CONFIG_POR_DEFECTO.parideras,
+      alimentacion: leerAlimentacion(c.alimentacion),
     };
   } catch {
     return CONFIG_POR_DEFECTO;
