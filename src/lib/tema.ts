@@ -1,6 +1,7 @@
 /*
- * Modo oscuro (estilo WhatsApp), activo por defecto. Si se elige el modo
- * claro, la preferencia se guarda en este teléfono
+ * Modo oscuro (estilo WhatsApp): la app SIEMPRE abre en oscuro. El modo claro
+ * se activa desde Ajustes solo mientras la app sigue abierta (sessionStorage);
+ * al cerrarla y volver a entrar, vuelve el modo oscuro. La clase va
  * y se aplica con la clase "oscuro" en <html>. Un script en el layout la
  * aplica antes de pintar la pantalla para que no se vea un destello blanco.
  */
@@ -16,8 +17,8 @@ export function esOscuro(): boolean {
 
 export function temaGuardado(): "oscuro" | "claro" {
   try {
-    // Por defecto oscuro: solo es claro si se eligió así en Ajustes
-    return localStorage.getItem(CLAVE_TEMA) === "claro" ? "claro" : "oscuro";
+    // Siempre oscuro, salvo que en esta sesión se haya activado el modo claro
+    return sessionStorage.getItem(CLAVE_TEMA) === "claro" ? "claro" : "oscuro";
   } catch {
     return "oscuro";
   }
@@ -26,7 +27,9 @@ export function temaGuardado(): "oscuro" | "claro" {
 /** Activa o desactiva el modo oscuro y avisa a la app */
 export function aplicarTema(oscuro: boolean) {
   try {
-    localStorage.setItem(CLAVE_TEMA, oscuro ? "oscuro" : "claro");
+    if (oscuro) sessionStorage.removeItem(CLAVE_TEMA);
+    else sessionStorage.setItem(CLAVE_TEMA, "claro");
+    localStorage.removeItem(CLAVE_TEMA); // preferencia antigua: ya no se usa
   } catch {}
   const root = document.documentElement;
   root.classList.toggle("oscuro", oscuro);
@@ -40,4 +43,4 @@ export function aplicarTema(oscuro: boolean) {
 }
 
 /** Script que corre antes de pintar (se inserta en el <head>) */
-export const SCRIPT_TEMA = `(function(){try{var t=null;try{t=localStorage.getItem("${CLAVE_TEMA}")}catch(e){}if(t!=="claro"){var r=document.documentElement;r.classList.add("oscuro");r.style.backgroundColor="${FONDO_OSCURO}";r.style.setProperty("--page-bg","${FONDO_OSCURO}");r.style.setProperty("--page-fg","#f2f2f7");var m=document.querySelectorAll('meta[name="theme-color"]');for(var i=0;i<m.length;i++)m[i].content="${FONDO_OSCURO}";}}catch(e){}})();`;
+export const SCRIPT_TEMA = `(function(){try{var t=null;try{t=sessionStorage.getItem("${CLAVE_TEMA}");localStorage.removeItem("${CLAVE_TEMA}")}catch(e){}if(t!=="claro"){var r=document.documentElement;r.classList.add("oscuro");r.style.backgroundColor="${FONDO_OSCURO}";r.style.setProperty("--page-bg","${FONDO_OSCURO}");r.style.setProperty("--page-fg","#f2f2f7");var m=document.querySelectorAll('meta[name="theme-color"]');for(var i=0;i<m.length;i++)m[i].content="${FONDO_OSCURO}";}}catch(e){}})();`;
