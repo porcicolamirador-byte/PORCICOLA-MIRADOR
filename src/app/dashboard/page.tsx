@@ -342,22 +342,24 @@ export default function Dashboard() {
           type="button"
           onClick={() => router.push('/tareas')}
           style={{ bottom: "calc(env(safe-area-inset-bottom) + 6.5rem)" }}
-          className={`fixed right-4 z-50 flex h-16 w-16 items-center justify-center rounded-full text-white shadow-2xl transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
+          className={`fixed right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-2xl transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
             hayCriticas
               ? 'bg-rose-600 hover:bg-rose-700 focus-visible:ring-rose-600'
               : 'bg-emerald-600 hover:bg-emerald-700 focus-visible:ring-emerald-600'
           }`}
           aria-label={`Ver alertas pendientes: ${pendientes}${hayCriticas ? ", hay urgentes" : ""}`}
         >
-          {/* El anillo solo late cuando hay algo urgente */}
-          {hayCriticas && (
+          {/* Anillo que late: rojo e intenso si hay algo urgente; verde y suave si no */}
+          {hayCriticas ? (
             <span
               aria-hidden="true"
               className="pointer-events-none absolute inset-0 rounded-full bg-rose-500/50 motion-safe:animate-ping"
             />
+          ) : (
+            <span aria-hidden="true" className="latido-suave pointer-events-none absolute inset-0 rounded-full bg-emerald-400/30" />
           )}
-          <span className="relative text-2xl">🕣</span>
-          <span className="pointer-events-none absolute -right-1 top-1 flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-white px-1.5 text-[11px] font-bold text-slate-900 shadow-sm">
+          <span className="relative text-xl">🕣</span>
+          <span className="pointer-events-none absolute -right-1 top-0.5 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-slate-900 shadow-sm">
             {pendientes}
           </span>
         </button>
