@@ -308,7 +308,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
 
           {lote.activo && (
             <div className="flex flex-col gap-2">
-              <Boton onClick={() => setAccion("alimento")} className="w-full py-3">
+              <Boton onClick={() => setAccion("alimento")} disabled={!corral} className="w-full py-3">
                 Registrar alimento
               </Boton>
               <div className="grid grid-cols-3 gap-2">
@@ -318,7 +318,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                 <Boton variante="suave" onClick={() => setAccion("pesaje")} disabled={!corral}>Pesaje</Boton>
                 <Boton variante="suave" onClick={() => setAccion("muerte")} disabled={!corral}>Muerte</Boton>
               </div>
-              {!corral && <p className="text-center text-xs text-slate-500">Elige el corral del lote para habilitar pesaje y muerte.</p>}
+              {!corral && <p className="text-center text-xs text-slate-500">Elige el corral del lote para habilitar alimento, pesaje y muerte.</p>}
             </div>
           )}
 
