@@ -227,19 +227,24 @@ export default function CalendarioPage() {
                 type="button"
                 onClick={() => setSeleccion(fecha)}
                 aria-label={`${dia} de ${MESES[mes]}${tipos.length ? `: ${tipos.map((t) => ESTILO[t].etiqueta).join(", ")}` : ""}`}
-                className={`relative flex aspect-square flex-col items-center justify-center rounded-xl text-sm font-semibold tabular-nums transition active:scale-95 ${
-                  principal ? ESTILO[principal].celda : esHoy ? "bg-slate-100 text-slate-900" : "text-slate-800"
-                } ${elegido ? "ring-2 ring-slate-900 ring-offset-1" : ""}`}
+                className="relative flex aspect-square items-center justify-center rounded-xl transition active:scale-95"
               >
-                {dia}
+                {/* Marca más pequeña que la celda: círculo con el color del evento */}
+                <span
+                  className={`flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-semibold tabular-nums ${
+                    principal ? ESTILO[principal].celda : esHoy ? "bg-slate-100 text-slate-900" : "text-slate-800"
+                  } ${elegido ? "ring-2 ring-slate-900 ring-offset-1" : ""}`}
+                >
+                  {dia}
+                </span>
                 {tipos.length > 1 && (
-                  <span className="absolute bottom-1 flex gap-0.5" aria-hidden="true">
+                  <span className="absolute bottom-0.5 flex gap-0.5" aria-hidden="true">
                     {tipos.slice(1).map((t) => (
-                      <span key={t} className={`h-1.5 w-1.5 rounded-full ring-1 ring-white ${ESTILO[t].punto}`} />
+                      <span key={t} className={`h-1.5 w-1.5 rounded-full ${ESTILO[t].punto}`} />
                     ))}
                   </span>
                 )}
-                {esHoy && !principal && <span className="absolute bottom-1 h-1 w-1 rounded-full bg-emerald-600" aria-hidden="true" />}
+                {esHoy && !principal && <span className="absolute bottom-0.5 h-1 w-1 rounded-full bg-emerald-600" aria-hidden="true" />}
               </button>
             );
           })}
