@@ -1,5 +1,6 @@
 /*
- * Modo oscuro (estilo WhatsApp). La preferencia se guarda en este teléfono
+ * Modo oscuro (estilo WhatsApp), activo por defecto. Si se elige el modo
+ * claro, la preferencia se guarda en este teléfono
  * y se aplica con la clase "oscuro" en <html>. Un script en el layout la
  * aplica antes de pintar la pantalla para que no se vea un destello blanco.
  */
@@ -15,9 +16,10 @@ export function esOscuro(): boolean {
 
 export function temaGuardado(): "oscuro" | "claro" {
   try {
-    return localStorage.getItem(CLAVE_TEMA) === "oscuro" ? "oscuro" : "claro";
+    // Por defecto oscuro: solo es claro si se eligió así en Ajustes
+    return localStorage.getItem(CLAVE_TEMA) === "claro" ? "claro" : "oscuro";
   } catch {
-    return "claro";
+    return "oscuro";
   }
 }
 
@@ -38,4 +40,4 @@ export function aplicarTema(oscuro: boolean) {
 }
 
 /** Script que corre antes de pintar (se inserta en el <head>) */
-export const SCRIPT_TEMA = `(function(){try{if(localStorage.getItem("${CLAVE_TEMA}")==="oscuro"){var r=document.documentElement;r.classList.add("oscuro");r.style.backgroundColor="${FONDO_OSCURO}";r.style.setProperty("--page-bg","${FONDO_OSCURO}");r.style.setProperty("--page-fg","#f2f2f7");var m=document.querySelectorAll('meta[name="theme-color"]');for(var i=0;i<m.length;i++)m[i].content="${FONDO_OSCURO}";}}catch(e){}})();`;
+export const SCRIPT_TEMA = `(function(){try{var t=null;try{t=localStorage.getItem("${CLAVE_TEMA}")}catch(e){}if(t!=="claro"){var r=document.documentElement;r.classList.add("oscuro");r.style.backgroundColor="${FONDO_OSCURO}";r.style.setProperty("--page-bg","${FONDO_OSCURO}");r.style.setProperty("--page-fg","#f2f2f7");var m=document.querySelectorAll('meta[name="theme-color"]');for(var i=0;i<m.length;i++)m[i].content="${FONDO_OSCURO}";}}catch(e){}})();`;

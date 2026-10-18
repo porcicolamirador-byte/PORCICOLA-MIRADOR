@@ -129,7 +129,7 @@ export default function AjustesPage() {
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold text-slate-900">Modo oscuro</span>
-          <span className="block text-xs text-slate-500">{oscuro ? "Activado" : "Desactivado"}</span>
+          <span className="block text-xs text-slate-500">{oscuro ? "Activado · apágalo para usar el modo claro" : "Modo claro activo"}</span>
         </span>
         <Interruptor
           activo={oscuro}
