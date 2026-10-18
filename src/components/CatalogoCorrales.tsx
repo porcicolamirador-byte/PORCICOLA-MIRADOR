@@ -6,15 +6,14 @@ import { Boton, Campo, Entrada, IconoMas, Selector } from "@/components/ui";
 import { confirmar } from "@/components/Dialogo";
 import { guardarCorrales, leerCorrales, nuevoId, useVersionDatos, type Corral, type ZonaCorral } from "@/lib/datos";
 
-export const ZONAS_CORRAL: { valor: ZonaCorral; icono: string; prefijo: string }[] = [
-  { valor: "Gestación", icono: "🤰", prefijo: "G" },
-  { valor: "Maternidad", icono: "🍼", prefijo: "M" },
-  { valor: "Precebo", icono: "🐽", prefijo: "P" },
-  { valor: "Engorde", icono: "🐖", prefijo: "E" },
-  { valor: "Cuarentena", icono: "🩺", prefijo: "C" },
-  { valor: "Otro", icono: "🏚️", prefijo: "O" },
+export const ZONAS_CORRAL: { valor: ZonaCorral; prefijo: string }[] = [
+  { valor: "Gestación", prefijo: "G" },
+  { valor: "Maternidad", prefijo: "M" },
+  { valor: "Precebo", prefijo: "P" },
+  { valor: "Engorde", prefijo: "E" },
+  { valor: "Cuarentena", prefijo: "C" },
+  { valor: "Otro", prefijo: "O" },
 ];
-const iconoZona = (z: ZonaCorral) => ZONAS_CORRAL.find((x) => x.valor === z)?.icono ?? "🏚️";
 
 /** Siguiente código libre para una zona: G-01, G-02… */
 function sugerirCodigo(zona: ZonaCorral, corrales: Corral[]) {
@@ -65,7 +64,7 @@ export default function CatalogoCorrales() {
           {grupos.map((g) => (
             <div key={g.valor}>
               <p className="mb-1 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                {g.icono} {g.valor} · {g.items.length}
+                {g.valor} · {g.items.length}
               </p>
               <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-100">
                 {g.items.map((c) => (
@@ -158,7 +157,6 @@ function FormCorral({ corral, onCerrar }: { corral: Corral | "nuevo" | null; onC
       etiqueta="Corrales"
       titulo={corral === "nuevo" ? "Nuevo corral" : "Editar corral"}
       subtitulo={codigo.trim() ? codigo.trim().toUpperCase() : undefined}
-      icono={iconoZona(zona)}
       onCerrar={onCerrar}
     >
       <form onSubmit={guardar} className="flex flex-col gap-3.5">
@@ -176,7 +174,7 @@ function FormCorral({ corral, onCerrar }: { corral: Corral | "nuevo" | null; onC
             />
           </Campo>
           <Campo etiqueta="Zona">
-            <Selector value={zona} onChange={(v) => cambiarZona(v as ZonaCorral)} opciones={ZONAS_CORRAL.map((z) => ({ valor: z.valor, texto: `${z.icono} ${z.valor}` }))} />
+            <Selector value={zona} onChange={(v) => cambiarZona(v as ZonaCorral)} opciones={ZONAS_CORRAL.map((z) => ({ valor: z.valor, texto: z.valor }))} />
           </Campo>
         </div>
         <Campo etiqueta="Capacidad (animales)">
