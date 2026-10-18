@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { leerCerdas, useVersionDatos } from "@/lib/datos";
 import { calcularTareasPendientes } from "@/utils/pendingTasks";
@@ -84,10 +84,6 @@ export default function BottomNav() {
   const router = useRouter();
   const pathname = usePathname() ?? "";
   const version = useVersionDatos();
-  const barra = useRef<HTMLUListElement>(null);
-  // Arrastre estilo iOS: la burbuja sigue el dedo y al soltar se abre la pestaña de abajo
-  const [arrastre, setArrastre] = useState<{ x: number; indice: number } | null>(null);
-  const medida = useRef({ izquierda: 0, ancho: 0, relleno: 6 });
 
   const pendientes = useMemo(
     () => (version < 0 ? 0 : calcularTareasPendientes(leerCerdas()).length),
@@ -96,43 +92,6 @@ export default function BottomNav() {
 
   if (pathname !== "/dashboard") return null;
 
-  const indiceActivo = Math.max(0, TABS.findIndex((t) => t.ruta === pathname));
-
-  const medir = () => {
-    const r = barra.current?.getBoundingClientRect();
-    if (!r) return;
-    const relleno = 6;
-    medida.current = { izquierda: r.left + relleno, ancho: (r.width - relleno * 2) / TABS.length, relleno };
-  };
-  const indiceEn = (x: number) => {
-    const { izquierda, ancho } = medida.current;
-    return Math.min(TABS.length - 1, Math.max(0, Math.floor((x - izquierda) / (ancho || 1))));
-  };
-
-  const alPresionar = (e: PointerEvent<HTMLUListElement>) => {
-    if (e.pointerType === "mouse" && e.button !== 0) return;
-    medir();
-    barra.current?.setPointerCapture(e.pointerId);
-    setArrastre({ x: e.clientX, indice: indiceEn(e.clientX) });
-  };
-  const alMover = (e: PointerEvent<HTMLUListElement>) => {
-    if (!arrastre) return;
-    setArrastre({ x: e.clientX, indice: indiceEn(e.clientX) });
-  };
-  const alSoltar = (e: PointerEvent<HTMLUListElement>) => {
-    if (!arrastre) return;
-    const destino = TABS[indiceEn(e.clientX)];
-    setArrastre(null);
-    if (destino && destino.ruta !== pathname) router.push(destino.ruta);
-  };
-
-  // Posición de la burbuja: sobre la pestaña activa, o siguiendo el dedo
-  const { ancho, izquierda, relleno } = medida.current;
-  const burbujaX = arrastre && ancho
-    ? Math.min(Math.max(arrastre.x - izquierda - ancho / 2, 0), ancho * (TABS.length - 1)) + relleno
-    : null;
-  const resaltado = arrastre ? arrastre.indice : indiceActivo;
-
   return (
     <nav
       aria-label="Navegación principal"
@@ -140,53 +99,25 @@ export default function BottomNav() {
       style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)", transform: "translateZ(0)" }}
     >
       {/* Módulo rectangular fijo que contiene las cuatro secciones */}
-      <ul
-        ref={barra}
-        onPointerDown={alPresionar}
-        onPointerMove={alMover}
-        onPointerUp={alSoltar}
-        onPointerCancel={() => setArrastre(null)}
-        onContextMenu={(e) => e.preventDefault()}
-        className="barra-inferior pointer-events-auto relative mx-auto grid w-full max-w-md select-none grid-cols-4 rounded-[20px] border border-[#e9edef] bg-white px-1.5 py-2 shadow-[0_10px_30px_-12px_rgba(17,27,33,0.28),0_2px_6px_-2px_rgba(17,27,33,0.08)]"
-        style={{ touchAction: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
-      >
-        {/* Burbuja: en reposo marca la pestaña activa; al arrastrar se agranda y sigue el dedo */}
-        <span
-          aria-hidden="true"
-          className={`burbuja-nav pointer-events-none absolute top-1 bottom-1 rounded-[16px] ${arrastre ? "arrastrando" : ""}`}
-          style={{
-            left: 0,
-            width: `calc((100% - 12px) / ${TABS.length})`,
-            transform: `translateX(${burbujaX !== null ? `${burbujaX}px` : `calc(6px + ${indiceActivo} * 100%)`}) scale(${arrastre ? 1.12 : 1})`,
-            transition: arrastre
-              ? "transform 90ms linear, background-color 200ms, box-shadow 200ms"
-              : "transform 420ms cubic-bezier(0.34, 1.56, 0.64, 1), background-color 200ms, box-shadow 200ms",
-          }}
-        />
-        {TABS.map(({ nombre, ruta, Icono, conPendientes }, i) => {
+      <ul className="barra-inferior pointer-events-auto mx-auto grid w-full max-w-md grid-cols-4 rounded-[20px] border border-[#e9edef] bg-white px-1.5 py-2 shadow-[0_10px_30px_-12px_rgba(17,27,33,0.28),0_2px_6px_-2px_rgba(17,27,33,0.08)]">
+        {TABS.map(({ nombre, ruta, Icono, conPendientes }) => {
           const activa = pathname === ruta;
-          const encima = i === resaltado;
           const globo = conPendientes && pendientes > 0 ? (pendientes > 99 ? "99+" : String(pendientes)) : null;
           return (
-            <li key={nombre} className="relative z-10">
+            <li key={nombre}>
               <button
                 type="button"
-                // El toque y el arrastre se manejan en la barra; esto queda para teclado
-                onClick={(e) => {
-                  if (e.detail === 0) router.push(ruta);
-                }}
+                onClick={() => router.push(ruta)}
                 aria-current={activa ? "page" : undefined}
                 aria-label={globo ? `${nombre}, ${globo} tareas pendientes` : nombre}
-                className={`${encima ? "pestana-activa" : "pestana-inactiva"} flex w-full flex-col items-center gap-1 rounded-xl py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600`}
-                style={{
-                  color: encima ? ACTIVO : INACTIVO,
-                  WebkitTapHighlightColor: "transparent",
-                  transform: arrastre && encima ? "scale(1.12)" : "scale(1)",
-                  transition: "transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1), color 150ms",
-                }}
+                className={`${activa ? "pestana-activa" : "pestana-inactiva"} flex w-full flex-col items-center gap-1 rounded-xl py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600`}
+                style={{ color: activa ? ACTIVO : INACTIVO, WebkitTapHighlightColor: "transparent" }}
               >
-                <span className="relative flex h-8 w-16 items-center justify-center rounded-full">
-                  <Icono lleno={encima} />
+                <span
+                  className="relative flex h-8 w-16 items-center justify-center rounded-full"
+                  style={{ backgroundColor: activa ? "var(--nav-pildora, #d8fdd2)" : "transparent" }}
+                >
+                  <Icono lleno={activa} />
                   {globo && (
                     <span
                       className="absolute -top-1 left-[38px] flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[11px] font-bold leading-none text-white tabular-nums"
@@ -196,28 +127,12 @@ export default function BottomNav() {
                     </span>
                   )}
                 </span>
-                <span className={`text-[12px] leading-none ${encima ? "font-semibold" : "font-medium"}`}>{nombre}</span>
+                <span className={`text-[12px] leading-none ${activa ? "font-semibold" : "font-medium"}`}>{nombre}</span>
               </button>
             </li>
           );
         })}
       </ul>
-      <style>{`
-        .burbuja-nav { background-color: var(--nav-pildora, #d8fdd2); }
-        .burbuja-nav.arrastrando {
-          background-color: rgb(216 253 210 / 0.75);
-          box-shadow: 0 8px 24px -8px rgb(17 27 33 / 0.35), inset 0 0 0 1px rgb(255 255 255 / 0.6);
-          backdrop-filter: blur(6px) saturate(1.6);
-          -webkit-backdrop-filter: blur(6px) saturate(1.6);
-        }
-        html.oscuro .burbuja-nav.arrastrando {
-          background-color: rgb(72 72 74 / 0.8);
-          box-shadow: 0 8px 24px -8px rgb(0 0 0 / 0.6), inset 0 0 0 1px rgb(255 255 255 / 0.12);
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .burbuja-nav { transition: none !important; }
-        }
-      `}</style>
     </nav>
   );
 }
