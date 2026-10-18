@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import ModuloPage from "@/components/ModuloPage";
-import { Boton, Campo, Chips, Dato, Entrada, IconoMas, Vacio } from "@/components/ui";
+import { Boton, Campo, Chips, Dato, Entrada, IconoMas, Selector, Vacio } from "@/components/ui";
 import {
   diasEntre,
   formatoFecha,
@@ -10,6 +10,7 @@ import {
   guardarLotes,
   guardarMovimientos,
   hoy,
+  leerCorrales,
   leerLotes,
   leerMovimientos,
   nuevoId,
@@ -188,9 +189,9 @@ function NuevoLote({ abierta, onCerrar }: { abierta: boolean; onCerrar: () => vo
   );
 }
 
-type Accion = "resumen" | "pesaje" | "muerte" | "alimento";
+type Accion = "resumen" | "pesaje" | "muerte" | "alimento" | "corral";
 
-const ICONOS_ACCION: Record<Accion, string> = { resumen: "🐖", pesaje: "⚖️", muerte: "⚠️", alimento: "🥣" };
+const ICONOS_ACCION: Record<Accion, string> = { resumen: "🐖", pesaje: "⚖️", muerte: "⚠️", alimento: "🥣", corral: "🏚️" };
 
 function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   const [accion, setAccion] = useState<Accion>("resumen");
@@ -198,17 +199,26 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   const [valor, setValor] = useState("");
   const [extra, setExtra] = useState("");
   const [comoGasto, setComoGasto] = useState(true);
+  const [corralSel, setCorralSel] = useState(lote.corralId ?? "");
   const r = resumenLote(lote);
+  const corrales = leerCorrales().sort((a, b) => a.codigo.localeCompare(b.codigo, "es", { numeric: true }));
+  const corral = corrales.find((c) => c.id === lote.corralId);
 
   const limpiar = () => {
     setValor("");
     setExtra("");
     setFecha(hoy());
+    setCorralSel(lote.corralId ?? "");
     setAccion("resumen");
   };
 
   const guardar = (e: FormEvent) => {
     e.preventDefault();
+    if (accion === "corral") {
+      if (!corralSel) return;
+      actualizarLote(lote.id, (l) => ({ ...l, corralId: corralSel }));
+      return limpiar();
+    }
     const n = Number(valor) || 0;
     if (n <= 0) return;
     if (accion === "pesaje") {
@@ -260,6 +270,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
     pesaje: "Registrar pesaje",
     muerte: "Registrar muerte",
     alimento: "Registrar alimento",
+    corral: "Corral del lote",
   };
 
   return (
@@ -296,10 +307,18 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
           </div>
 
           {lote.activo && (
-            <div className="grid grid-cols-3 gap-2">
-              <Boton variante="suave" onClick={() => setAccion("pesaje")}>Pesaje</Boton>
-              <Boton variante="suave" onClick={() => setAccion("alimento")}>Alimento</Boton>
-              <Boton variante="suave" onClick={() => setAccion("muerte")}>Muerte</Boton>
+            <div className="flex flex-col gap-2">
+              <Boton onClick={() => setAccion("alimento")} className="w-full py-3">
+                Registrar alimento
+              </Boton>
+              <div className="grid grid-cols-3 gap-2">
+                <Boton variante="suave" onClick={() => setAccion("corral")} className={corral ? "" : "ring-2 ring-emerald-600"}>
+                  <span className="truncate">{corral ? corral.codigo : "Corral"}</span>
+                </Boton>
+                <Boton variante="suave" onClick={() => setAccion("pesaje")} disabled={!corral}>Pesaje</Boton>
+                <Boton variante="suave" onClick={() => setAccion("muerte")} disabled={!corral}>Muerte</Boton>
+              </div>
+              {!corral && <p className="text-center text-xs text-slate-500">Elige el corral del lote para habilitar pesaje y muerte.</p>}
             </div>
           )}
 
@@ -337,9 +356,28 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
         </div>
       ) : (
         <form onSubmit={guardar} className="flex flex-col gap-3.5">
+          {accion === "corral" ? (
+            corrales.length === 0 ? (
+              <p className="rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-900 ring-1 ring-amber-100">
+                Aún no hay corrales. Créalos en Ajustes → Ajustes avanzados → Corrales.
+              </p>
+            ) : (
+              <Campo etiqueta="Corral donde están los lechones">
+                <Selector
+                  value={corralSel}
+                  onChange={setCorralSel}
+                  opciones={[
+                    { valor: "", texto: "Selecciona un corral" },
+                    ...corrales.map((c) => ({ valor: c.id, texto: `${c.codigo} · ${c.zona}${c.capacidad ? ` · cap. ${c.capacidad}` : ""}` })),
+                  ]}
+                />
+              </Campo>
+            )
+          ) : (
           <Campo etiqueta="Fecha">
             <Entrada type="date" value={fecha} onChange={setFecha} required />
           </Campo>
+          )}
           {accion === "pesaje" && (
             <Campo etiqueta="Peso promedio por animal (kg)">
               <Entrada type="number" inputMode="decimal" min={0} step="any" value={valor} onChange={setValor} required />
@@ -378,7 +416,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
           )}
           <div className="mt-1 grid grid-cols-2 gap-2">
             <Boton variante="secundario" onClick={limpiar}>Cancelar</Boton>
-            <Boton type="submit">Guardar</Boton>
+            <Boton type="submit" disabled={accion === "corral" && (!corralSel || corrales.length === 0)}>Guardar</Boton>
           </div>
         </form>
       )}

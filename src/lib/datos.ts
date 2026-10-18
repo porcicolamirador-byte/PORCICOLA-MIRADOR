@@ -85,6 +85,8 @@ export interface Lote {
   alimento: Alimento[];
   activo: boolean;
   fechaSalida?: string;
+  /** Corral donde están los animales (id de los corrales de Ajustes) */
+  corralId?: string;
   /** Si el lote se creó automáticamente desde un parto */
   origen?: { cerdaId: string; codigoParto: string };
 }
