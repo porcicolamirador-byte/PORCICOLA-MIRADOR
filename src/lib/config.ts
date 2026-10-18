@@ -5,7 +5,6 @@
 
 /** Alimentación estándar: kilos de alimento por cerdo en cada etapa */
 export interface AlimentacionEstandar {
-  preiniciador: number;
   preiniciadorCerdos: number;
   iniciacionCerdos: number;
   levante: number;
@@ -13,7 +12,6 @@ export interface AlimentacionEstandar {
 }
 
 export const ETAPAS_ALIMENTACION: { clave: keyof AlimentacionEstandar; nombre: string }[] = [
-  { clave: "preiniciador", nombre: "Preiniciador" },
   { clave: "preiniciadorCerdos", nombre: "Preiniciador cerdos" },
   { clave: "iniciacionCerdos", nombre: "Iniciación cerdos" },
   { clave: "levante", nombre: "Etapa levante" },
@@ -21,7 +19,6 @@ export const ETAPAS_ALIMENTACION: { clave: keyof AlimentacionEstandar; nombre: s
 ];
 
 export const ALIMENTACION_POR_DEFECTO: AlimentacionEstandar = {
-  preiniciador: 0,
   preiniciadorCerdos: 10,
   iniciacionCerdos: 20,
   levante: 100,
