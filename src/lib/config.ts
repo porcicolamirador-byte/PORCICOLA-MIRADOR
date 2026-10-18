@@ -39,6 +39,8 @@ export interface ConfigGranja {
   parideras: number;
   /** Kilos de alimento por cerdo en cada etapa */
   alimentacion: AlimentacionEstandar;
+  /** Permite usar productos de bodega sin existencia (el inventario puede quedar negativo) */
+  permitirSinInventario: boolean;
 }
 
 export const CLAVE_CONFIG = "config-granja";
@@ -51,6 +53,7 @@ export const CONFIG_POR_DEFECTO: ConfigGranja = {
   desteteMax: 28,
   parideras: 0,
   alimentacion: ALIMENTACION_POR_DEFECTO,
+  permitirSinInventario: false,
 };
 
 const esClave = (v: unknown): v is string => typeof v === "string" && /^\d{4}$/.test(v);
@@ -85,6 +88,7 @@ export function leerConfig(): ConfigGranja {
           ? c.parideras
           : CONFIG_POR_DEFECTO.parideras,
       alimentacion: leerAlimentacion(c.alimentacion),
+      permitirSinInventario: c.permitirSinInventario === true,
     };
   } catch {
     return CONFIG_POR_DEFECTO;

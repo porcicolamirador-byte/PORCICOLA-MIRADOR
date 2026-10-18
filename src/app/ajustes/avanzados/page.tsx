@@ -141,6 +141,20 @@ export default function AjustesAvanzadosPage() {
       </Grupo>
 
       <Grupo titulo="Bodega">
+        <li>
+          <label className="flex w-full cursor-pointer items-center gap-3 px-4 py-3">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-base" aria-hidden="true">
+              📉
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-medium text-slate-900">Usar productos sin inventario</span>
+              <span className="block text-xs text-slate-500">
+                {config.permitirSinInventario ? "Activado: el inventario puede quedar en negativo" : "Desactivado: solo productos con existencia"}
+              </span>
+            </span>
+            <Interruptor activo={config.permitirSinInventario} onCambiar={(v) => guardar({ permitirSinInventario: v })} />
+          </label>
+        </li>
         <Desplegable icono="📦" titulo="Productos de bodega" resumen={`${productos}`} abierto={abierto === "productos"} onAlternar={() => alternar("productos")}>
           <CatalogoProductos incrustado />
         </Desplegable>
@@ -537,5 +551,28 @@ function Alimentacion({ actual, onGuardar }: { actual: AlimentacionEstandar; onG
         </Boton>
       </div>
     </form>
+  );
+}
+
+/** Interruptor tipo iPhone */
+function Interruptor({ activo, onCambiar }: { activo: boolean; onCambiar: (v: boolean) => void }) {
+  return (
+    <span className="relative inline-flex shrink-0">
+      <input
+        type="checkbox"
+        role="switch"
+        checked={activo}
+        onChange={(e) => onCambiar(e.target.checked)}
+        className="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
+      />
+      <span
+        aria-hidden="true"
+        className={`flex h-[31px] w-[51px] items-center rounded-full p-[2px] transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-emerald-300 ${
+          activo ? "bg-emerald-600" : "bg-slate-300"
+        }`}
+      >
+        <span className={`h-[27px] w-[27px] rounded-full bg-white shadow transition-transform ${activo ? "translate-x-5" : ""}`} />
+      </span>
+    </span>
   );
 }

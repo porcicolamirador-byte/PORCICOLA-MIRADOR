@@ -21,6 +21,7 @@ import {
 } from "@/lib/datos";
 import { confirmar } from "@/components/Dialogo";
 import Modal from "@/components/Modal";
+import { leerConfig } from "@/lib/config";
 
 /** Indicadores calculados de un lote */
 function resumenLote(l: Lote) {
@@ -258,6 +259,9 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   );
   const elegido = productos.find((p) => p.producto.id === productoId);
   const cantidadNum = Number(valor.replace(",", ".")) || 0;
+  // Ajuste oculto: permite usar productos sin existencia (el inventario queda negativo)
+  const sinLimite = accion === "alimento" && leerConfig().permitirSinInventario;
+  const excede = !!elegido && !sinLimite && cantidadNum > elegido.existencia;
   const kgDe = (cantidad: number, unidad: string) => (unidad === "bultos" ? cantidad * KG_POR_BULTO : unidad === "kg" ? cantidad : 0);
 
   const limpiar = () => {
@@ -292,7 +296,8 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
     } else if (accion === "alimento") {
       // Se descuenta de la bodega: queda como salida del producto elegido
       const actual = calcularInventario().find((p) => p.producto.id === productoId);
-      if (!actual || actual.existencia <= 0 || n > actual.existencia) return;
+      const libre = leerConfig().permitirSinInventario;
+      if (!actual || (!libre && (actual.existencia <= 0 || n > actual.existencia))) return;
       const p = actual.producto;
       const salidaId = nuevoId();
       guardarSalidas([
@@ -474,7 +479,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                       ...productos.map((p) => ({
                         valor: p.producto.id,
                         texto: `${p.producto.nombre} · ${p.existencia > 0 ? `hay ${fmtCantidad(p.existencia)} ${p.producto.unidad}` : "sin existencia"}`,
-                        deshabilitado: p.existencia <= 0,
+                        deshabilitado: !sinLimite && p.existencia <= 0,
                       })),
                     ]}
                   />
@@ -487,16 +492,16 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                     step="any"
                     value={valor}
                     onChange={setValor}
-                    placeholder={elegido ? `Máximo ${fmtCantidad(elegido.existencia)}` : "Primero elige el producto"}
+                    placeholder={elegido ? (sinLimite ? "Cantidad" : `Máximo ${fmtCantidad(elegido.existencia)}`) : "Primero elige el producto"}
                     required
                   />
                 </Campo>
-                {elegido && cantidadNum > elegido.existencia && (
+                {excede && elegido && (
                   <p className="text-sm font-medium text-rose-600">
                     Solo hay {fmtCantidad(elegido.existencia)} {elegido.producto.unidad} en bodega.
                   </p>
                 )}
-                {elegido && cantidadNum > 0 && cantidadNum <= elegido.existencia && (
+                {elegido && cantidadNum > 0 && !excede && (
                   <p className="text-xs text-slate-500">
                     Quedarán {fmtCantidad(elegido.existencia - cantidadNum)} {elegido.producto.unidad} en bodega
                     {kgDe(cantidadNum, elegido.producto.unidad) ? ` · ${fmtCantidad(kgDe(cantidadNum, elegido.producto.unidad))} kg para el lote` : ""}.
@@ -510,7 +515,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
               type="submit"
               disabled={
                 (accion === "corral" && (!corralSel || corrales.length === 0)) ||
-                (accion === "alimento" && (!elegido || cantidadNum <= 0 || cantidadNum > elegido.existencia))
+                (accion === "alimento" && (!elegido || cantidadNum <= 0 || excede))
               }
             >
               Guardar
