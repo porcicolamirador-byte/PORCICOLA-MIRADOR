@@ -3,7 +3,8 @@
 import { useMemo, useRef, useState, type TouchEvent } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
-import { Chevron, SeccionDesplegable } from "@/components/ui";
+import { Chevron } from "@/components/ui";
+import { BarrasHorizontales } from "@/components/Graficas";
 import {
   estadoDeCerda,
   formatoFecha,
@@ -35,6 +36,8 @@ const ESTILO: Record<Tipo, { punto: string; celda: string; etiqueta: string; tex
   destete: { punto: "bg-amber-400", celda: "bg-amber-400 text-amber-950", etiqueta: `Destete (día ${DIAS_DESTETE})`, texto: "text-amber-700" },
 };
 const ORDEN: Tipo[] = ["parto", "estimado", "destete"];
+/** Mismos colores de las marcas del calendario (verde, azul y amarillo) */
+const COLOR_BARRA: Record<Tipo, string> = { parto: "#10b981", estimado: "#3b82f6", destete: "#fbbf24" };
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 const DIAS_SEMANA = ["L", "M", "M", "J", "V", "S", "D"];
@@ -156,10 +159,6 @@ export default function CalendarioPage() {
     .flatMap(([f, l]) => [...l].sort((a, b) => ORDEN.indexOf(a.tipo) - ORDEN.indexOf(b.tipo)).map((e) => ({ ...e, fecha: f })));
   const delMes = delMesConFecha;
   const cuenta = (t: Tipo) => delMes.filter((e) => e.tipo === t).length;
-  const nacidos = delMes.reduce((s, e) => s + (e.tipo === "parto" ? e.vivos ?? 0 : 0), 0);
-  const cerdasDelMes = new Set(delMes.map((e) => e.cerdaId)).size;
-  const proximo = delMesConFecha.find((e) => e.fecha >= fechaHoy && e.tipo !== "parto");
-  const diasHasta = (f: string) => Math.round((new Date(`${f}T00:00:00`).getTime() - new Date(`${fechaHoy}T00:00:00`).getTime()) / 86400000);
 
   const delDia = (eventos.get(seleccion) ?? []).sort((a, b) => ORDEN.indexOf(a.tipo) - ORDEN.indexOf(b.tipo));
 
@@ -307,63 +306,18 @@ export default function CalendarioPage() {
           </ul>
         )}
       </section>
-      {/* Resumen del mes */}
+      {/* Resumen del mes: barras horizontales con los mismos colores del calendario */}
       <section className="rounded-3xl bg-white p-4 ring-1 ring-slate-200/80">
-        <h2 className="text-[15px] font-bold text-slate-900">Resumen de {MESES[mes].toLowerCase()}</h2>
-        {delMes.length === 0 ? (
-          <p className="mt-1 text-sm text-slate-500">No hay partos ni destetes en este mes.</p>
-        ) : (
-          <>
-            <p className="mt-1 text-sm leading-relaxed text-slate-600">
-              {cuenta("parto") > 0 && (
-                <>
-                  <b className="text-emerald-700">{cuenta("parto")}</b> {cuenta("parto") === 1 ? "parto registrado" : "partos registrados"}
-                  {nacidos > 0 && <> con <b className="text-slate-900">{nacidos}</b> lechones nacidos vivos</>}.{" "}
-                </>
-              )}
-              {cuenta("estimado") > 0 && (
-                <>
-                  <b className="text-blue-700">{cuenta("estimado")}</b> {cuenta("estimado") === 1 ? "parto estimado" : "partos estimados"}.{" "}
-                </>
-              )}
-              {cuenta("destete") > 0 && (
-                <>
-                  <b className="text-amber-700">{cuenta("destete")}</b> {cuenta("destete") === 1 ? "destete" : "destetes"} al día {DIAS_DESTETE}.{" "}
-                </>
-              )}
-              {cerdasDelMes} {cerdasDelMes === 1 ? "cerda" : "cerdas"} con eventos.
-            </p>
-            {proximo && (
-              <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                Próximo: <b className={ESTILO[proximo.tipo].texto}>{ESTILO[proximo.tipo].etiqueta.toLowerCase()}</b> de {proximo.nombre} el{" "}
-                {formatoFecha(proximo.fecha)}
-                {diasHasta(proximo.fecha) === 0 ? " (hoy)" : diasHasta(proximo.fecha) === 1 ? " (mañana)" : ` (en ${diasHasta(proximo.fecha)} días)`}
-              </p>
-            )}
-            <div className="mt-3">
-              <SeccionDesplegable titulo="Eventos del mes" cantidad={delMes.length}>
-                <ul className="flex flex-col gap-1">
-                  {delMesConFecha.map((e, i) => (
-                    <li key={i}>
-                      <button
-                        type="button"
-                        onClick={() => setSeleccion(e.fecha)}
-                        className="flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left active:bg-slate-50"
-                      >
-                        <span className="w-12 shrink-0 text-xs font-semibold tabular-nums text-slate-500">{formatoFecha(e.fecha)}</span>
-                        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${ESTILO[e.tipo].punto}`} aria-hidden="true" />
-                        <span className="min-w-0 flex-1 truncate text-sm text-slate-800">{e.nombre}</span>
-                        <span className={`shrink-0 text-[11px] font-medium ${ESTILO[e.tipo].texto}`}>
-                          {e.tipo === "parto" ? (e.vivos ? `${e.vivos} vivos` : "Parto") : e.tipo === "estimado" ? "Estimado" : "Destete"}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </SeccionDesplegable>
-            </div>
-          </>
-        )}
+        <div className="mb-3 flex items-baseline justify-between gap-2">
+          <h2 className="text-[15px] font-bold text-slate-900">Resumen de {MESES[mes].toLowerCase()}</h2>
+          <span className="text-xs text-slate-500">
+            {delMes.length} {delMes.length === 1 ? "evento" : "eventos"}
+          </span>
+        </div>
+        <BarrasHorizontales
+          filas={ORDEN.map((t) => ({ nombre: ESTILO[t].etiqueta, valor: cuenta(t), color: COLOR_BARRA[t] }))}
+          formato={(n) => String(Math.round(n))}
+        />
       </section>
     </ModuloPage>
   );
