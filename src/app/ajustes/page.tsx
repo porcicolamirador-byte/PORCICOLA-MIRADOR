@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, useState, type ChangeEvent } from "react";
+import { useRef, useState, type ChangeEvent, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Boton, Chevron, Tarjeta } from "@/components/ui";
 import DialogoClave from "@/components/DialogoClave";
 import { codigoValido, desbloquearAjustes } from "@/lib/acceso";
+import { faceIdActivo, verificarFaceId } from "@/lib/faceid";
 import {
   clavesDeLaApp,
   hoy,
@@ -24,6 +25,19 @@ export default function AjustesPage() {
   const archivo = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const [pedirCodigo, setPedirCodigo] = useState(false);
+
+  const [conFaceId, setConFaceId] = useState(false);
+  useEffect(() => setConFaceId(faceIdActivo()), []);
+
+  // Con Face ID activo se pide el rostro; si falla o se cancela, se pide el código
+  const entrar = () => {
+    if (!faceIdActivo()) return setPedirCodigo(true);
+    verificarFaceId().then((ok) => {
+      if (!ok) return setPedirCodigo(true);
+      desbloquearAjustes();
+      router.push("/ajustes/avanzados");
+    });
+  };
 
   const validarCodigo = (codigo: string) => {
     if (!codigoValido(codigo)) return false;
@@ -111,7 +125,7 @@ export default function AjustesPage() {
       {/* Módulo que abre la sección oculta (pide código) */}
       <button
         type="button"
-        onClick={() => setPedirCodigo(true)}
+        onClick={entrar}
         className="flex w-full items-center gap-3 rounded-3xl bg-white p-4 text-left ring-1 ring-slate-200/80 transition hover:shadow-md active:scale-[0.99]"
       >
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-200 text-slate-800" aria-hidden="true">
@@ -122,7 +136,7 @@ export default function AjustesPage() {
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold text-slate-900">Ajustes</span>
-          <span className="block text-xs text-slate-500">Requiere código de confirmación</span>
+          <span className="block text-xs text-slate-500">{conFaceId ? "Entra con Face ID o con el código" : "Requiere código de confirmación"}</span>
         </span>
         <Chevron />
       </button>

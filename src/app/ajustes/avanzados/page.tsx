@@ -18,6 +18,7 @@ import {
 import { leerCorrales, leerProductos, notificarCambio, useVersionDatos } from "@/lib/datos";
 import CatalogoProductos from "@/components/CatalogoProductos";
 import CatalogoCorrales from "@/components/CatalogoCorrales";
+import { activarFaceId, desactivarFaceId, faceIdActivo, faceIdDisponible } from "@/lib/faceid";
 
 /**
  * Sección oculta de ajustes: solo se abre después de ingresar el código
@@ -32,6 +33,43 @@ export default function AjustesAvanzadosPage() {
   const version = useVersionDatos();
   const productos = version < 0 ? 0 : leerProductos().length;
   const corrales = version < 0 ? 0 : leerCorrales().length;
+  const [faceId, setFaceId] = useState<{ disponible: boolean; activo: boolean; ofrecer: boolean }>({ disponible: false, activo: false, ofrecer: false });
+
+  useEffect(() => {
+    faceIdDisponible().then((disponible) => {
+      let ofrecido = false;
+      try {
+        ofrecido = localStorage.getItem("faceid-ofrecido") === "1";
+      } catch {}
+      setFaceId({ disponible, activo: faceIdActivo(), ofrecer: disponible && !faceIdActivo() && !ofrecido });
+    });
+  }, []);
+
+  const noOfrecerMas = () => {
+    try {
+      localStorage.setItem("faceid-ofrecido", "1");
+    } catch {}
+    setFaceId((f) => ({ ...f, ofrecer: false }));
+  };
+
+  // Se llama directamente desde el toque: el iPhone muestra Face ID
+  const encenderFaceId = () => {
+    activarFaceId().then(async (ok) => {
+      if (ok) {
+        noOfrecerMas();
+        setFaceId((f) => ({ ...f, activo: true }));
+        await avisar({ titulo: "Face ID activado", mensaje: "La próxima vez entrarás a los ajustes con tu rostro. El código sigue funcionando." });
+      } else {
+        await avisar({ titulo: "No se activó Face ID", mensaje: "Se canceló o el teléfono no lo permitió. Puedes seguir entrando con el código." });
+      }
+    });
+  };
+
+  const apagarFaceId = async () => {
+    if (!(await confirmar({ titulo: "Desactivar Face ID", mensaje: "Para entrar a los ajustes se pedirá solo el código.", aceptar: "Desactivar" }))) return;
+    desactivarFaceId();
+    setFaceId((f) => ({ ...f, activo: false }));
+  };
 
   useEffect(() => {
     const ok = ajustesDesbloqueados();
@@ -71,6 +109,38 @@ export default function AjustesAvanzadosPage() {
         </Boton>
       }
     >
+      {faceId.ofrecer && (
+        <div className="rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
+          <p className="text-[15px] font-semibold text-emerald-950">¿Entrar con Face ID la próxima vez?</p>
+          <p className="mt-0.5 text-xs text-emerald-900/80">Así no tendrás que escribir el código cada vez. Si Face ID falla, se pedirá el código.</p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Boton variante="secundario" onClick={noOfrecerMas}>
+              Ahora no
+            </Boton>
+            <Boton onClick={encenderFaceId}>Activar Face ID</Boton>
+          </div>
+        </div>
+      )}
+
+      <Grupo titulo="Acceso">
+        <li>
+          <label className={`flex w-full items-center gap-3 px-4 py-3 ${faceId.disponible ? "cursor-pointer" : "opacity-50"}`}>
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-base" aria-hidden="true">
+              🙂
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-medium text-slate-900">Entrar con Face ID</span>
+              <span className="block text-xs text-slate-500">
+                {!faceId.disponible ? "No disponible en este teléfono" : faceId.activo ? "Activado en este teléfono" : "Desactivado: se pide el código"}
+              </span>
+            </span>
+            {faceId.disponible && (
+              <Interruptor activo={faceId.activo} onCambiar={(v) => (v ? encenderFaceId() : apagarFaceId())} />
+            )}
+          </label>
+        </li>
+      </Grupo>
+
       <Grupo titulo="Claves">
         <Desplegable icono="🔐" titulo="Clave de ajustes" resumen="4 dígitos" abierto={abierto === "ajustes"} onAlternar={() => alternar("ajustes")}>
           <CambiarClave
