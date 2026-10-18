@@ -72,6 +72,12 @@ export interface Alimento {
   fecha: string;
   kg: number;
   costo?: number;
+  /** Producto de bodega del que salió (si se registró desde el inventario) */
+  productoId?: string;
+  producto?: string;
+  cantidad?: number;
+  unidad?: string;
+  salidaId?: string;
 }
 export interface Lote {
   id: string;

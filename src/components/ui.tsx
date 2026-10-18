@@ -162,12 +162,12 @@ export function Selector({
 }: {
   value: string;
   onChange: (v: string) => void;
-  opciones: { valor: string; texto: string }[];
+  opciones: { valor: string; texto: string; deshabilitado?: boolean }[];
 }) {
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)} className={claseCampo}>
       {opciones.map((o) => (
-        <option key={o.valor} value={o.valor}>
+        <option key={o.valor} value={o.valor} disabled={o.deshabilitado}>
           {o.texto}
         </option>
       ))}

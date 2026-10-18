@@ -8,11 +8,12 @@ import {
   formatoFecha,
   formatoPesos,
   guardarLotes,
-  guardarMovimientos,
   hoy,
+  calcularInventario,
+  guardarSalidas,
   leerCorrales,
+  leerSalidas,
   leerLotes,
-  leerMovimientos,
   nuevoId,
   useVersionDatos,
   type Corral,
@@ -130,6 +131,10 @@ function Mini({ titulo, valor }: { titulo: string; valor: string }) {
   );
 }
 
+/** Kilos que trae cada bulto de alimento */
+const KG_POR_BULTO = 40;
+const fmtCantidad = (n: number) => n.toLocaleString("es-CO", { maximumFractionDigits: 2 });
+
 function actualizarLote(id: string, cambio: (l: Lote) => Lote) {
   guardarLotes(leerLotes().map((l) => (l.id === id ? cambio(l) : l)));
 }
@@ -238,15 +243,27 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   const [fecha, setFecha] = useState(hoy());
   const [valor, setValor] = useState("");
   const [extra, setExtra] = useState("");
-  const [comoGasto, setComoGasto] = useState(true);
+  const [productoId, setProductoId] = useState("");
   const [corralSel, setCorralSel] = useState(lote.corralId ?? "");
   const r = resumenLote(lote);
   const corrales = leerCorrales().sort((a, b) => a.codigo.localeCompare(b.codigo, "es", { numeric: true }));
   const corral = corrales.find((c) => c.id === lote.corralId);
+  // Productos de bodega: los que tienen existencia primero; sin existencia aparecen desactivados
+  const inventario = accion === "alimento" ? calcularInventario() : [];
+  const productos = [...inventario].sort(
+    (a, b) =>
+      Number(b.existencia > 0) - Number(a.existencia > 0) ||
+      Number(b.producto.categoria === "Alimento") - Number(a.producto.categoria === "Alimento") ||
+      a.producto.nombre.localeCompare(b.producto.nombre, "es"),
+  );
+  const elegido = productos.find((p) => p.producto.id === productoId);
+  const cantidadNum = Number(valor.replace(",", ".")) || 0;
+  const kgDe = (cantidad: number, unidad: string) => (unidad === "bultos" ? cantidad * KG_POR_BULTO : unidad === "kg" ? cantidad : 0);
 
   const limpiar = () => {
     setValor("");
     setExtra("");
+    setProductoId("");
     setFecha(hoy());
     setCorralSel(lote.corralId ?? "");
     setAccion("resumen");
@@ -273,24 +290,23 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
         mortalidad: [...l.mortalidad, { fecha, cantidad, causa: extra.trim() || undefined }],
       }));
     } else if (accion === "alimento") {
-      const costo = Number(extra) || 0;
+      // Se descuenta de la bodega: queda como salida del producto elegido
+      const actual = calcularInventario().find((p) => p.producto.id === productoId);
+      if (!actual || actual.existencia <= 0 || n > actual.existencia) return;
+      const p = actual.producto;
+      const salidaId = nuevoId();
+      guardarSalidas([
+        ...leerSalidas(),
+        { id: salidaId, productoId: p.id, fecha, cantidad: n, nota: `${lote.nombre}${corral ? ` · corral ${corral.codigo}` : ""}` },
+      ]);
+      const costo = actual.ultimoPrecio ? Math.round(actual.ultimoPrecio * n) : 0;
       actualizarLote(lote.id, (l) => ({
         ...l,
-        alimento: [...l.alimento, { fecha, kg: n, costo: costo || undefined }],
+        alimento: [
+          ...l.alimento,
+          { fecha, kg: kgDe(n, p.unidad), costo: costo || undefined, productoId: p.id, producto: p.nombre, cantidad: n, unidad: p.unidad, salidaId },
+        ],
       }));
-      if (costo > 0 && comoGasto) {
-        guardarMovimientos([
-          ...leerMovimientos(),
-          {
-            id: nuevoId(),
-            fecha,
-            tipo: "gasto",
-            categoria: "Alimento",
-            descripcion: `${n} kg – ${lote.nombre}`,
-            monto: costo,
-          },
-        ]);
-      }
     }
     limpiar();
   };
@@ -373,7 +389,9 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                   ...lote.pesajes.map((p) => ({ f: p.fecha, t: `Pesaje: ${p.pesoPromedio} kg promedio` })),
                   ...lote.alimento.map((a) => ({
                     f: a.fecha,
-                    t: `Alimento: ${a.kg} kg${a.costo ? ` · ${formatoPesos(a.costo)}` : ""}`,
+                    t: a.producto
+                      ? `Alimento: ${fmtCantidad(a.cantidad ?? 0)} ${a.unidad ?? ""} ${a.producto}${a.kg ? ` (${fmtCantidad(a.kg)} kg)` : ""}`
+                      : `Alimento: ${a.kg} kg${a.costo ? ` · ${formatoPesos(a.costo)}` : ""}`,
                   })),
                   ...lote.mortalidad.map((m) => ({ f: m.fecha, t: `Muerte: ${m.cantidad}${m.causa ? ` · ${m.causa}` : ""}` })),
                 ]
@@ -437,30 +455,66 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
               </Campo>
             </>
           )}
-          {accion === "alimento" && (
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                <Campo etiqueta="Kilos de alimento">
-                  <Entrada type="number" inputMode="decimal" min={0} step="any" value={valor} onChange={setValor} required />
+          {accion === "alimento" &&
+            (productos.length === 0 ? (
+              <p className="rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-900 ring-1 ring-amber-100">
+                No hay productos en bodega. Créalos en Ajustes avanzados y carga una factura en Bodega.
+              </p>
+            ) : (
+              <>
+                <Campo etiqueta="Producto de bodega">
+                  <Selector
+                    value={productoId}
+                    onChange={(v) => {
+                      setProductoId(v);
+                      setValor("");
+                    }}
+                    opciones={[
+                      { valor: "", texto: "Selecciona un producto" },
+                      ...productos.map((p) => ({
+                        valor: p.producto.id,
+                        texto: `${p.producto.nombre} · ${p.existencia > 0 ? `hay ${fmtCantidad(p.existencia)} ${p.producto.unidad}` : "sin existencia"}`,
+                        deshabilitado: p.existencia <= 0,
+                      })),
+                    ]}
+                  />
                 </Campo>
-                <Campo etiqueta="Costo total ($)">
-                  <Entrada type="number" inputMode="numeric" min={0} value={extra} onChange={setExtra} />
+                <Campo etiqueta={elegido ? `Cantidad (${elegido.producto.unidad})` : "Cantidad"}>
+                  <Entrada
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step="any"
+                    value={valor}
+                    onChange={setValor}
+                    placeholder={elegido ? `Máximo ${fmtCantidad(elegido.existencia)}` : "Primero elige el producto"}
+                    required
+                  />
                 </Campo>
-              </div>
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={comoGasto}
-                  onChange={(e) => setComoGasto(e.target.checked)}
-                  className="h-5 w-5 accent-emerald-700"
-                />
-                Registrar el costo como gasto en Contabilidad
-              </label>
-            </>
-          )}
+                {elegido && cantidadNum > elegido.existencia && (
+                  <p className="text-sm font-medium text-rose-600">
+                    Solo hay {fmtCantidad(elegido.existencia)} {elegido.producto.unidad} en bodega.
+                  </p>
+                )}
+                {elegido && cantidadNum > 0 && cantidadNum <= elegido.existencia && (
+                  <p className="text-xs text-slate-500">
+                    Quedarán {fmtCantidad(elegido.existencia - cantidadNum)} {elegido.producto.unidad} en bodega
+                    {kgDe(cantidadNum, elegido.producto.unidad) ? ` · ${fmtCantidad(kgDe(cantidadNum, elegido.producto.unidad))} kg para el lote` : ""}.
+                  </p>
+                )}
+              </>
+            ))}
           <div className="mt-1 grid grid-cols-2 gap-2">
             <Boton variante="secundario" onClick={limpiar}>Cancelar</Boton>
-            <Boton type="submit" disabled={accion === "corral" && (!corralSel || corrales.length === 0)}>Guardar</Boton>
+            <Boton
+              type="submit"
+              disabled={
+                (accion === "corral" && (!corralSel || corrales.length === 0)) ||
+                (accion === "alimento" && (!elegido || cantidadNum <= 0 || cantidadNum > elegido.existencia))
+              }
+            >
+              Guardar
+            </Boton>
           </div>
         </form>
       )}
