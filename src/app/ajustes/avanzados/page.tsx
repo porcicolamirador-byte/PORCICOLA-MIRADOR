@@ -3,11 +3,11 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
-import { Boton, Tarjeta } from "@/components/ui";
+import { Boton } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
 import { ajustesDesbloqueados, bloquearAjustes } from "@/lib/acceso";
 import { CONFIG_POR_DEFECTO, guardarConfig, leerConfig, type ConfigGranja } from "@/lib/config";
-import { notificarCambio } from "@/lib/datos";
+import { leerProductos, notificarCambio, useVersionDatos } from "@/lib/datos";
 import CatalogoProductos from "@/components/CatalogoProductos";
 
 /**
@@ -18,6 +18,10 @@ export default function AjustesAvanzadosPage() {
   const router = useRouter();
   const [permitido, setPermitido] = useState<boolean | null>(null);
   const [config, setConfig] = useState<ConfigGranja>(CONFIG_POR_DEFECTO);
+  const [abierto, setAbierto] = useState<string | null>(null);
+  const alternar = (id: string) => setAbierto((a) => (a === id ? null : id));
+  const version = useVersionDatos();
+  const productos = version < 0 ? 0 : leerProductos().length;
 
   useEffect(() => {
     const ok = ajustesDesbloqueados();
@@ -57,35 +61,62 @@ export default function AjustesAvanzadosPage() {
         </Boton>
       }
     >
-      <CambiarClave
-        titulo="Clave de ajustes"
-        descripcion="Es el código que se pide para abrir esta sección."
-        icono="🔐"
-        actual={config.claveAjustes}
-        onGuardar={(clave) => guardar({ claveAjustes: clave })}
-      />
+      <Grupo titulo="Claves">
+        <Desplegable icono="🔐" titulo="Clave de ajustes" resumen="4 dígitos" abierto={abierto === "ajustes"} onAlternar={() => alternar("ajustes")}>
+          <CambiarClave
+            titulo="Clave de ajustes"
+            descripcion="Es el código que se pide para abrir esta sección."
+            icono="🔐"
+            actual={config.claveAjustes}
+            onGuardar={(clave) => guardar({ claveAjustes: clave })}
+          />
+        </Desplegable>
+        <Desplegable icono="🗑️" titulo="Clave de eliminación" resumen="Gestación" abierto={abierto === "eliminar"} onAlternar={() => alternar("eliminar")}>
+          <CambiarClave
+            titulo="Clave de eliminación"
+            descripcion="Se pide en Gestación para eliminar una cerda."
+            icono="🗑️"
+            actual={config.claveEliminar}
+            onGuardar={(clave) => guardar({ claveEliminar: clave })}
+          />
+        </Desplegable>
+        <Desplegable icono="🧾" titulo="Clave de facturas" resumen="Bodega" abierto={abierto === "facturas"} onAlternar={() => alternar("facturas")}>
+          <CambiarClave
+            titulo="Clave de facturas"
+            descripcion="Se pide en Bodega para cargar una factura."
+            icono="🧾"
+            actual={config.claveFacturas}
+            onGuardar={(clave) => guardar({ claveFacturas: clave })}
+          />
+        </Desplegable>
+      </Grupo>
 
-      <CambiarClave
-        titulo="Clave de eliminación"
-        descripcion="Se pide en Gestación para eliminar una cerda."
-        icono="🗑️"
-        actual={config.claveEliminar}
-        onGuardar={(clave) => guardar({ claveEliminar: clave })}
-      />
+      <Grupo titulo="Granja">
+        <Desplegable
+          icono="🍼"
+          titulo="Días de destete"
+          resumen={`${config.desteteMin} a ${config.desteteMax} d`}
+          abierto={abierto === "destete"}
+          onAlternar={() => alternar("destete")}
+        >
+          <DiasDestete min={config.desteteMin} max={config.desteteMax} onGuardar={(min, max) => guardar({ desteteMin: min, desteteMax: max })} />
+        </Desplegable>
+        <Desplegable
+          icono="🏠"
+          titulo="Parideras"
+          resumen={config.parideras ? String(config.parideras) : "Sin definir"}
+          abierto={abierto === "parideras"}
+          onAlternar={() => alternar("parideras")}
+        >
+          <Parideras actual={config.parideras} onGuardar={(n) => guardar({ parideras: n })} />
+        </Desplegable>
+      </Grupo>
 
-      <CambiarClave
-        titulo="Clave de facturas"
-        descripcion="Se pide en Bodega para cargar una factura."
-        icono="🧾"
-        actual={config.claveFacturas}
-        onGuardar={(clave) => guardar({ claveFacturas: clave })}
-      />
-
-      <CatalogoProductos />
-
-      <DiasDestete min={config.desteteMin} max={config.desteteMax} onGuardar={(min, max) => guardar({ desteteMin: min, desteteMax: max })} />
-
-      <Parideras actual={config.parideras} onGuardar={(n) => guardar({ parideras: n })} />
+      <Grupo titulo="Bodega">
+        <Desplegable icono="📦" titulo="Productos de bodega" resumen={`${productos}`} abierto={abierto === "productos"} onAlternar={() => alternar("productos")}>
+          <CatalogoProductos incrustado />
+        </Desplegable>
+      </Grupo>
 
       <p className="px-1 text-center text-[11px] text-slate-400">
         La sección se cierra sola a los 15 minutos o al cerrar la app.
@@ -97,19 +128,65 @@ export default function AjustesAvanzadosPage() {
 /* ───────────────────────── Componentes ───────────────────────── */
 
 const claseCampo =
-  "h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-center text-xl tracking-[0.5em] text-slate-900 outline-none placeholder:text-slate-300 placeholder:tracking-[0.5em] focus:bg-white focus:ring-2 focus:ring-emerald-200";
+  "h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-center text-xl tracking-[0.5em] text-slate-900 outline-none placeholder:text-slate-300 placeholder:tracking-[0.5em] focus:bg-white focus:ring-2 focus:ring-emerald-200";
 
-function Encabezado({ icono, titulo, descripcion }: { icono: string; titulo: string; descripcion: string }) {
+function Encabezado({ descripcion }: { icono?: string; titulo?: string; descripcion: string }) {
+  return <p className="mb-3 text-xs leading-relaxed text-slate-500">{descripcion}</p>;
+}
+
+/** Fila que se despliega al tocarla; solo una abierta a la vez */
+function Desplegable({
+  icono,
+  titulo,
+  resumen,
+  abierto,
+  onAlternar,
+  children,
+}: {
+  icono: string;
+  titulo: string;
+  resumen: string;
+  abierto: boolean;
+  onAlternar: () => void;
+  children: ReactNode;
+}) {
   return (
-    <div className="mb-3 flex items-start gap-3">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-lg" aria-hidden="true">
-        {icono}
-      </span>
-      <div className="min-w-0">
-        <h2 className="text-[15px] font-semibold text-slate-900">{titulo}</h2>
-        <p className="text-xs text-slate-500">{descripcion}</p>
-      </div>
-    </div>
+    <li>
+      <button
+        type="button"
+        onClick={onAlternar}
+        aria-expanded={abierto}
+        className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-50"
+      >
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-base" aria-hidden="true">
+          {icono}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-slate-900">{titulo}</span>
+        <span className="shrink-0 text-sm text-slate-500">{resumen}</span>
+        <svg
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+          className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${abierto ? "rotate-90" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.4}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="m9 6 6 6-6 6" />
+        </svg>
+      </button>
+      {abierto && <div className="border-t border-slate-100 bg-slate-50/40 px-4 pb-4 pt-3">{children}</div>}
+    </li>
+  );
+}
+
+function Grupo({ titulo, children }: { titulo: string; children: ReactNode }) {
+  return (
+    <section>
+      <h2 className="mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{titulo}</h2>
+      <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/80">{children}</ul>
+    </section>
   );
 }
 
@@ -153,7 +230,7 @@ function CambiarClave({
   };
 
   return (
-    <Tarjeta>
+    <>
       <Encabezado icono={icono} titulo={titulo} descripcion={descripcion} />
       <form onSubmit={enviar} className="flex flex-col gap-3">
         <label>
@@ -208,7 +285,7 @@ function CambiarClave({
           Cambiar clave
         </Boton>
       </form>
-    </Tarjeta>
+    </>
   );
 }
 
@@ -253,7 +330,7 @@ function DiasDestete({ min, max, onGuardar }: { min: number; max: number; onGuar
     "h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-center text-xl font-semibold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-200";
 
   return (
-    <Tarjeta>
+    <>
       <Encabezado
         icono="🍼"
         titulo="Días de destete"
@@ -308,7 +385,7 @@ function DiasDestete({ min, max, onGuardar }: { min: number; max: number; onGuar
           </Boton>
         </div>
       </form>
-    </Tarjeta>
+    </>
   );
 }
 
@@ -337,7 +414,7 @@ function Parideras({ actual, onGuardar }: { actual: number; onGuardar: (n: numbe
     "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-2xl font-semibold text-slate-700 active:bg-slate-200";
 
   return (
-    <Tarjeta>
+    <>
       <Encabezado
         icono="🏠"
         titulo="Parideras"
@@ -368,6 +445,6 @@ function Parideras({ actual, onGuardar }: { actual: number; onGuardar: (n: numbe
           Guardar
         </Boton>
       </form>
-    </Tarjeta>
+    </>
   );
 }

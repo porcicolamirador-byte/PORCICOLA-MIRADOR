@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, Fragment } from "react";
 import { Boton, Campo, Entrada, Hoja, IconoMas, Selector, Tarjeta } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
 import {
@@ -56,7 +56,7 @@ export function IconoCategoria({ categoria, className = "h-6 w-6" }: { categoria
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
 /** Apartado de Ajustes avanzados para definir los productos que se usan en Bodega */
-export default function CatalogoProductos() {
+export default function CatalogoProductos({ incrustado = false }: { incrustado?: boolean } = {}) {
   const version = useVersionDatos();
   const [editando, setEditando] = useState<ProductoBodega | "nuevo" | null>(null);
 
@@ -82,8 +82,17 @@ export default function CatalogoProductos() {
     guardarProductos(leerProductos().filter((x) => x.id !== p.id));
   };
 
+  const Contenedor = incrustado ? Fragment : Tarjeta;
   return (
-    <Tarjeta>
+    <Contenedor>
+      {incrustado ? (
+        <div className="mb-3 flex items-center gap-3">
+          <p className="min-w-0 flex-1 text-xs leading-relaxed text-slate-500">Solo estos productos se pueden ingresar en las facturas.</p>
+          <Boton onClick={() => setEditando("nuevo")} className="shrink-0 px-3">
+            <IconoMas /> Producto
+          </Boton>
+        </div>
+      ) : (
       <div className="mb-3 flex items-start gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-lg" aria-hidden="true">
           📦
@@ -96,6 +105,7 @@ export default function CatalogoProductos() {
           <IconoMas /> Producto
         </Boton>
       </div>
+      )}
 
       {inventario === null ? (
         <div className="h-24 animate-pulse rounded-2xl bg-slate-100" />
@@ -134,7 +144,7 @@ export default function CatalogoProductos() {
       )}
 
       <FormProducto producto={editando} onCerrar={() => setEditando(null)} />
-    </Tarjeta>
+    </Contenedor>
   );
 }
 
