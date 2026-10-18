@@ -286,3 +286,7 @@ html.oscuro input:-webkit-autofill {
   -webkit-mask-image: linear-gradient(to top, #000 55%, transparent);
   mask-image: linear-gradient(to top, #000 55%, transparent);
 }
+
+/* Calendario: el amarillo del destete conserva el número oscuro */
+html.oscuro .bg-amber-400.text-amber-950 { color: #451a03; }
+html.oscuro .ring-offset-1 { --tw-ring-offset-color: #1c1c1e; }

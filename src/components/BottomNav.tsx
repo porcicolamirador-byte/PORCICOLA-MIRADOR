@@ -43,14 +43,15 @@ function IconoProduccion({ lleno }: { lleno: boolean }) {
   );
 }
 
-function IconoIndicadores({ lleno }: { lleno: boolean }) {
-  const relleno = lleno ? "currentColor" : "none";
+function IconoCalendario({ lleno }: { lleno: boolean }) {
   return (
     <Svg>
-      <path d="M4 20h16" fill="none" stroke="currentColor" strokeWidth={1.8} />
-      <rect x="5.5" y="12" width="3" height="5" rx="1" fill={relleno} stroke="currentColor" strokeWidth={1.6} />
-      <rect x="10.5" y="6.5" width="3" height="10.5" rx="1" fill={relleno} stroke="currentColor" strokeWidth={1.6} />
-      <rect x="15.5" y="9.5" width="3" height="7.5" rx="1" fill={relleno} stroke="currentColor" strokeWidth={1.6} />
+      <rect x="3.5" y="5" width="17" height="15.5" rx="3" fill={lleno ? "currentColor" : "none"} stroke="currentColor" strokeWidth={1.8} />
+      <path d="M8 3v4M16 3v4" fill="none" stroke="currentColor" strokeWidth={1.8} />
+      <path d="M3.5 10h17" fill="none" stroke={lleno ? PILDORA : "currentColor"} strokeWidth={1.6} />
+      <circle cx="8.5" cy="14.5" r="1.1" fill={lleno ? PILDORA : "currentColor"} />
+      <circle cx="12" cy="14.5" r="1.1" fill={lleno ? PILDORA : "currentColor"} />
+      <circle cx="15.5" cy="14.5" r="1.1" fill={lleno ? PILDORA : "currentColor"} />
     </Svg>
   );
 }
@@ -72,7 +73,7 @@ function IconoAjustes({ lleno }: { lleno: boolean }) {
 const TABS = [
   { nombre: "Inicio", ruta: "/dashboard", Icono: IconoInicio, conPendientes: true },
   { nombre: "Producción", ruta: "/gestacion", Icono: IconoProduccion, conPendientes: false },
-  { nombre: "Indicadores", ruta: "/indicadores", Icono: IconoIndicadores, conPendientes: false },
+  { nombre: "Calendario", ruta: "/calendario", Icono: IconoCalendario, conPendientes: false },
   { nombre: "Ajustes", ruta: "/ajustes", Icono: IconoAjustes, conPendientes: false },
 ];
 
