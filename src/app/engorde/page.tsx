@@ -15,6 +15,7 @@ import {
   leerMovimientos,
   nuevoId,
   useVersionDatos,
+  type Corral,
   type Lote,
 } from "@/lib/datos";
 import { confirmar } from "@/components/Dialogo";
@@ -193,6 +194,45 @@ type Accion = "resumen" | "pesaje" | "muerte" | "alimento" | "corral";
 
 const ICONOS_ACCION: Record<Accion, string> = { resumen: "🐖", pesaje: "⚖️", muerte: "⚠️", alimento: "🥣", corral: "🏚️" };
 
+/** Espacio que muestra el corral guardado del lote */
+function TarjetaCorral({ corral, onCambiar }: { corral?: Corral; onCambiar?: () => void }) {
+  if (!corral) {
+    return (
+      <div className="flex items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-3.5 py-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Corral</p>
+          <p className="text-sm font-medium text-slate-600">Sin corral asignado</p>
+        </div>
+        {onCambiar && (
+          <button type="button" onClick={onCambiar} className="shrink-0 rounded-full bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white active:scale-95">
+            Elegir
+          </button>
+        )}
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-3 rounded-2xl bg-emerald-50 px-3.5 py-3 ring-1 ring-emerald-100">
+      <span className="flex h-11 min-w-[3.5rem] shrink-0 items-center justify-center rounded-xl bg-white px-2 text-base font-bold tabular-nums text-emerald-800 ring-1 ring-emerald-200">
+        {corral.codigo}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700/80">Corral</p>
+        <p className="truncate text-sm font-semibold text-slate-900">
+          {corral.zona}
+          {corral.capacidad ? ` · capacidad ${corral.capacidad}` : ""}
+        </p>
+        {corral.nota && <p className="truncate text-xs text-slate-500">{corral.nota}</p>}
+      </div>
+      {onCambiar && (
+        <button type="button" onClick={onCambiar} className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold text-emerald-700 active:bg-emerald-100">
+          Cambiar
+        </button>
+      )}
+    </div>
+  );
+}
+
 function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   const [accion, setAccion] = useState<Accion>("resumen");
   const [fecha, setFecha] = useState(hoy());
@@ -217,7 +257,9 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
     if (accion === "corral") {
       if (!corralSel) return;
       actualizarLote(lote.id, (l) => ({ ...l, corralId: corralSel }));
-      return limpiar();
+      limpiar();
+      setCorralSel(corralSel);
+      return;
     }
     const n = Number(valor) || 0;
     if (n <= 0) return;
@@ -289,6 +331,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
               Lote creado automáticamente con la camada del parto {lote.origen.codigoParto} (cerda {lote.origen.cerdaId}).
             </p>
           )}
+          <TarjetaCorral corral={corral} onCambiar={lote.activo ? () => setAccion("corral") : undefined} />
           <p className="text-sm text-slate-500">
             Ingresó el {formatoFecha(lote.fechaIngreso, true)} · {r.dias} días
             {!lote.activo && lote.fechaSalida ? ` · cerrado el ${formatoFecha(lote.fechaSalida, true)}` : ""}
@@ -318,7 +361,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                 <Boton variante="suave" onClick={() => setAccion("pesaje")} disabled={!corral}>Pesaje</Boton>
                 <Boton variante="suave" onClick={() => setAccion("muerte")} disabled={!corral}>Muerte</Boton>
               </div>
-              {!corral && <p className="text-center text-xs text-slate-500">Elige el corral del lote para habilitar alimento, pesaje y muerte.</p>}
+              {!corral && <p className="text-center text-xs text-slate-500">Elige el corral del lote para habilitar los demás botones.</p>}
             </div>
           )}
 
@@ -347,11 +390,11 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
 
           <div className="flex flex-wrap justify-center gap-2 pt-1">
             {lote.activo ? (
-              <Boton variante="secundario" onClick={cerrarLote}>Cerrar lote (venta)</Boton>
+              <Boton variante="secundario" onClick={cerrarLote} disabled={!corral}>Cerrar lote (venta)</Boton>
             ) : (
               <Boton variante="secundario" onClick={reabrir}>Reabrir lote</Boton>
             )}
-            <Boton variante="suave" onClick={eliminar} className="text-rose-600">Eliminar</Boton>
+            <Boton variante="suave" onClick={eliminar} disabled={!corral} className="text-rose-600">Eliminar</Boton>
           </div>
         </div>
       ) : (
@@ -362,6 +405,11 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                 Aún no hay corrales. Créalos en Ajustes → Ajustes avanzados → Corrales.
               </p>
             ) : (
+              <>
+              <div>
+                <p className="mb-1.5 text-[13px] font-medium text-slate-700">Corral guardado</p>
+                <TarjetaCorral corral={corral} />
+              </div>
               <Campo etiqueta="Corral donde están los lechones">
                 <Selector
                   value={corralSel}
@@ -372,6 +420,12 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                   ]}
                 />
               </Campo>
+              {corralSel && corralSel !== lote.corralId && (
+                <p className="rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-900 ring-1 ring-emerald-100">
+                  Al guardar, el lote quedará en el corral {corrales.find((c) => c.id === corralSel)?.codigo}.
+                </p>
+              )}
+              </>
             )
           ) : (
           <Campo etiqueta="Fecha">
