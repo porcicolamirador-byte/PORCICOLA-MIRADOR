@@ -7,6 +7,7 @@ import { Boton, Chevron, Tarjeta, Interruptor } from "@/components/ui";
 import DialogoClave from "@/components/DialogoClave";
 import { codigoValido, desbloquearAjustes } from "@/lib/acceso";
 import { aplicarTema, temaGuardado } from "@/lib/tema";
+import DescargaSinConexion from "@/components/DescargaSinConexion";
 import { faceIdActivo, motivoFalloFaceId, verificarFaceId } from "@/lib/faceid";
 import {
   clavesDeLaApp,
@@ -119,6 +120,9 @@ export default function AjustesPage() {
         </div>
         <input ref={archivo} type="file" accept="application/json,.json" onChange={importar} className="hidden" />
       </Tarjeta>
+
+      {/* Descargar la app completa para usarla sin conexión */}
+      <DescargaSinConexion />
 
       {/* Apariencia: modo oscuro */}
       <label className="flex w-full cursor-pointer items-center gap-3 rounded-3xl bg-white p-4 ring-1 ring-slate-200/80">

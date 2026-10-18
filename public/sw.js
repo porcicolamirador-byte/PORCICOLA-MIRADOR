@@ -130,15 +130,23 @@ function redConEspera(request, ms = ESPERA_RED_MS) {
 
 /* ─────────────── Instalación: descargar todo ─────────────── */
 
-async function precargar() {
+/** Descarga todas las pantallas y sus archivos. `avance(hechos, total)` informa el progreso. */
+async function descargarTodo(avance = () => {}) {
   const cache = await caches.open(CACHE);
   const pendientes = new Set(ARCHIVOS);
   const fallidas = [];
+  let hechos = 0;
+  let total = RUTAS.length + ARCHIVOS.length;
+  const paso = () => avance(++hechos, total);
 
   for (const ruta of RUTAS) {
     const res = await guardar(cache, ruta);
-    if (res) extraerRecursos(await res.text()).forEach((u) => pendientes.add(u));
-    else if (res === null) fallidas.push(ruta);
+    if (res) {
+      const antes = pendientes.size;
+      extraerRecursos(await res.text()).forEach((u) => pendientes.add(u));
+      total += pendientes.size - antes;
+    } else if (res === null) fallidas.push(ruta);
+    paso();
   }
 
   const css = [];
@@ -147,13 +155,20 @@ async function precargar() {
       const res = await guardar(cache, url);
       if (res === null && url.startsWith("/_next/static/")) fallidas.push(url);
       if (res && url.split("?")[0].endsWith(".css")) css.push(await res.text());
+      paso();
     })
   );
 
   // Fuentes y archivos que solo aparecen dentro del CSS
   const extra = new Set();
   css.forEach((t) => extraerRecursos(t).forEach((u) => !pendientes.has(u) && extra.add(u)));
-  await Promise.all([...extra].map((u) => guardar(cache, u)));
+  total += extra.size;
+  await Promise.all([...extra].map((u) => guardar(cache, u).then(paso)));
+  return { fallidas, total };
+}
+
+async function precargar() {
+  const { fallidas } = await descargarTodo();
 
   // Si la descarga quedó incompleta (se fue la señal a mitad) y el teléfono ya
   // tiene una versión completa, no se instala esta: se conserva la anterior,
@@ -298,5 +313,37 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(guardadaYActualizar(event, request));
   } else {
     event.respondWith(redPrimero(request));
+  }
+});
+
+/* ─────────────── Mensajes desde la app (botón "Descargar para usar sin conexión") ─────────────── */
+
+self.addEventListener("message", (event) => {
+  const datos = event.data || {};
+  const puerto = event.ports && event.ports[0];
+  if (!puerto) return;
+
+  if (datos.tipo === "estado") {
+    event.waitUntil(
+      (async () => {
+        const cache = await caches.open(CACHE);
+        let guardadas = 0;
+        for (const ruta of RUTAS) if (await cache.match(ruta, { ignoreVary: true })) guardadas += 1;
+        puerto.postMessage({ tipo: "estado", version: VERSION, guardadas, total: RUTAS.length });
+      })()
+    );
+  }
+
+  if (datos.tipo === "descargar-todo") {
+    event.waitUntil(
+      (async () => {
+        try {
+          const { fallidas } = await descargarTodo((hechos, total) => puerto.postMessage({ tipo: "avance", hechos, total }));
+          puerto.postMessage({ tipo: "listo", version: VERSION, fallidas: fallidas.length });
+        } catch (e) {
+          puerto.postMessage({ tipo: "listo", version: VERSION, fallidas: -1, error: String(e) });
+        }
+      })()
+    );
   }
 });
