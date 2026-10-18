@@ -101,13 +101,6 @@ export default function AjustesPage() {
     }
   };
 
-  const borrarTodo = async () => {
-    if (!(await confirmar({ titulo: "Borrar todos los datos", mensaje: "Se borrará toda la información de la granja guardada en este dispositivo.", aceptar: "Continuar", destructivo: true }))) return;
-    if (!(await confirmar({ titulo: "¿Estás seguro?", mensaje: "Esta acción no se puede deshacer. Te recomendamos exportar un respaldo antes.", aceptar: "Borrar todo", destructivo: true }))) return;
-    for (const k of clavesDeLaApp()) localStorage.removeItem(k);
-    notificarCambio();
-    avisar("Datos borrados");
-  };
 
   return (
     <ModuloPage titulo="Ajustes" subtitulo="Respaldo de los datos" icono="⚙️" tono="slate">
@@ -122,9 +115,6 @@ export default function AjustesPage() {
           <Boton variante="secundario" onClick={() => archivo.current?.click()} disabled={!cargado}>Importar respaldo</Boton>
         </div>
         <input ref={archivo} type="file" accept="application/json,.json" onChange={importar} className="hidden" />
-        <Boton variante="suave" onClick={borrarTodo} className="mt-2 w-full text-rose-600" disabled={!cargado}>
-          Borrar todos los datos
-        </Boton>
       </Tarjeta>
 
       {/* Módulo que abre la sección oculta (pide código) */}

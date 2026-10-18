@@ -15,7 +15,7 @@ import {
   type AlimentacionEstandar,
   type ConfigGranja,
 } from "@/lib/config";
-import { leerCorrales, leerProductos, notificarCambio, useVersionDatos } from "@/lib/datos";
+import { clavesDeLaApp, leerCorrales, leerProductos, notificarCambio, useVersionDatos } from "@/lib/datos";
 import CatalogoProductos from "@/components/CatalogoProductos";
 import CatalogoCorrales from "@/components/CatalogoCorrales";
 import { activarFaceId, desactivarFaceId, faceIdActivo, faceIdDisponible } from "@/lib/faceid";
@@ -70,6 +70,15 @@ export default function AjustesAvanzadosPage() {
     if (ok) setConfig(leerConfig());
     else router.replace("/ajustes");
   }, [router]);
+
+  const borrarTodo = async () => {
+    if (!(await confirmar({ titulo: "Borrar todos los datos", mensaje: "Se borrará toda la información de la granja guardada en este dispositivo.", aceptar: "Continuar", destructivo: true }))) return;
+    if (!(await confirmar({ titulo: "¿Estás seguro?", mensaje: "Esta acción no se puede deshacer. Te recomendamos exportar un respaldo antes desde Ajustes.", aceptar: "Borrar todo", destructivo: true }))) return;
+    for (const k of clavesDeLaApp()) localStorage.removeItem(k);
+    notificarCambio();
+    setConfig(leerConfig());
+    await avisar({ titulo: "Datos borrados", mensaje: "Se borró la información de la granja en este teléfono." });
+  };
 
   const bloquear = () => {
     bloquearAjustes();
@@ -221,6 +230,20 @@ export default function AjustesAvanzadosPage() {
         <Desplegable icono="📦" titulo="Productos de bodega" resumen={`${productos}`} abierto={abierto === "productos"} onAlternar={() => alternar("productos")}>
           <CatalogoProductos incrustado />
         </Desplegable>
+      </Grupo>
+
+      <Grupo titulo="Datos">
+        <li>
+          <button type="button" onClick={borrarTodo} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-rose-50">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-base" aria-hidden="true">
+              🗑️
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-medium text-rose-600">Borrar todos los datos</span>
+              <span className="block text-xs text-slate-500">Toda la información de la granja en este teléfono</span>
+            </span>
+          </button>
+        </li>
       </Grupo>
 
       <p className="px-1 text-center text-[11px] text-slate-400">
