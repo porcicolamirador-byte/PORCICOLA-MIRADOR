@@ -31,11 +31,11 @@ export function aplicarTema(oscuro: boolean) {
   const fondo = oscuro ? FONDO_OSCURO : FONDO_CLARO;
   root.style.backgroundColor = fondo;
   root.style.setProperty("--page-bg", fondo);
-  root.style.setProperty("--page-fg", oscuro ? "#e9edef" : "#111827");
+  root.style.setProperty("--page-fg", oscuro ? "#f2f2f7" : "#111827");
   document.body.style.backgroundColor = fondo;
   document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((m) => (m.content = fondo));
   window.dispatchEvent(new Event(EVENTO_TEMA));
 }
 
 /** Script que corre antes de pintar (se inserta en el <head>) */
-export const SCRIPT_TEMA = `(function(){try{if(localStorage.getItem("${CLAVE_TEMA}")==="oscuro"){var r=document.documentElement;r.classList.add("oscuro");r.style.backgroundColor="${FONDO_OSCURO}";r.style.setProperty("--page-bg","${FONDO_OSCURO}");r.style.setProperty("--page-fg","#e9edef");var m=document.querySelectorAll('meta[name="theme-color"]');for(var i=0;i<m.length;i++)m[i].content="${FONDO_OSCURO}";}}catch(e){}})();`;
+export const SCRIPT_TEMA = `(function(){try{if(localStorage.getItem("${CLAVE_TEMA}")==="oscuro"){var r=document.documentElement;r.classList.add("oscuro");r.style.backgroundColor="${FONDO_OSCURO}";r.style.setProperty("--page-bg","${FONDO_OSCURO}");r.style.setProperty("--page-fg","#f2f2f7");var m=document.querySelectorAll('meta[name="theme-color"]');for(var i=0;i<m.length;i++)m[i].content="${FONDO_OSCURO}";}}catch(e){}})();`;

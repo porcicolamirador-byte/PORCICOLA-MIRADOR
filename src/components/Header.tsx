@@ -61,7 +61,7 @@ export default function Header({
     >
       <div className="flex items-center gap-3">
         <div
-          className={`flex h-16 w-16 items-center justify-center rounded-3xl ${iconBgColor} shadow-sm`}
+          className={`logo-caja flex h-16 w-16 items-center justify-center rounded-3xl ${iconBgColor} shadow-sm`}
         >
           <Image
             src="/images/logo-header.png"

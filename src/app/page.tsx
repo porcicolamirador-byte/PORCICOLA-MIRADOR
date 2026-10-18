@@ -25,7 +25,7 @@ export default function Home() {
   return (
     <>
       <div
-        className={`fixed inset-0 flex flex-col overflow-hidden bg-white transition-opacity duration-500 ease-out ${
+        className={`fondo-pagina fixed inset-0 flex flex-col overflow-hidden bg-white transition-opacity duration-500 ease-out ${
           saliendo ? "opacity-0" : "opacity-100"
         }`}
         style={{
@@ -35,7 +35,7 @@ export default function Home() {
       >
         {/* Marca */}
         <section className="relative z-10 flex flex-1 flex-col items-center justify-center px-8">
-          <div className="splash-logo">
+          <div className="splash-logo logo-circulo">
             <Image
               src="/images/logo.png"
               alt="Granja Porcícola El Mirador"

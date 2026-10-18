@@ -73,7 +73,7 @@ export default function usePageBackground(bgColor: string = BLANCO) {
     return () => {
       const base = esOscuro() ? FONDO_OSCURO : BLANCO;
       root.style.setProperty("--page-bg", base);
-      root.style.setProperty("--page-fg", esOscuro() ? "#e9edef" : "#111827");
+      root.style.setProperty("--page-fg", esOscuro() ? "#f2f2f7" : "#111827");
       root.style.backgroundColor = base;
       document.body.style.backgroundColor = base;
       setThemeColor(base);
