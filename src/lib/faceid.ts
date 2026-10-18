@@ -7,6 +7,10 @@
 
 const CLAVE = "faceid-ajustes";
 
+/** Motivo del último fallo al entrar (solo en memoria, para mostrarlo en el aviso) */
+let ultimoFallo = "";
+export const motivoFalloFaceId = () => ultimoFallo;
+
 const aBase64 = (buf: ArrayBuffer) =>
   btoa(String.fromCharCode(...new Uint8Array(buf)))
     .replace(/\+/g, "-")
@@ -91,11 +95,18 @@ export async function verificarFaceId(): Promise<boolean> {
         timeout: 60000,
       },
     })) as PublicKeyCredential | null;
-    if (!credencial || aBase64(credencial.rawId) !== id) return false;
+    if (!credencial || aBase64(credencial.rawId) !== id) {
+      ultimoFallo = "la llave no coincide";
+      return false;
+    }
     // Bandera "usuario verificado" (bit 2) en los datos del autenticador
     const datos = new Uint8Array((credencial.response as AuthenticatorAssertionResponse).authenticatorData);
-    return datos.length > 32 && (datos[32] & 0x04) !== 0;
-  } catch {
+    const ok = datos.length > 32 && (datos[32] & 0x04) !== 0;
+    ultimoFallo = ok ? "" : "rostro no verificado";
+    return ok;
+  } catch (e) {
+    const nombre = (e as { name?: string })?.name ?? "";
+    ultimoFallo = nombre === "NotAllowedError" ? "cancelado o no permitido" : nombre || "error";
     return false;
   }
 }

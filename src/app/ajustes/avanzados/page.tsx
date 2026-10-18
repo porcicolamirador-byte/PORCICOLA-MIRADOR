@@ -37,18 +37,11 @@ export default function AjustesAvanzadosPage() {
 
   useEffect(() => {
     faceIdDisponible().then((disponible) => {
-      let ofrecido = false;
-      try {
-        ofrecido = localStorage.getItem("faceid-ofrecido") === "1";
-      } catch {}
-      setFaceId({ disponible, activo: faceIdActivo(), ofrecer: disponible && !faceIdActivo() && !ofrecido });
+      setFaceId({ disponible, activo: faceIdActivo(), ofrecer: disponible && !faceIdActivo() });
     });
   }, []);
 
   const noOfrecerMas = () => {
-    try {
-      localStorage.setItem("faceid-ofrecido", "1");
-    } catch {}
     setFaceId((f) => ({ ...f, ofrecer: false }));
   };
 
