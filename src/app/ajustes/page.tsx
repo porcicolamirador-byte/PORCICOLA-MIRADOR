@@ -6,7 +6,7 @@ import ModuloPage from "@/components/ModuloPage";
 import { Boton, Chevron, Tarjeta } from "@/components/ui";
 import DialogoClave from "@/components/DialogoClave";
 import { codigoValido, desbloquearAjustes } from "@/lib/acceso";
-import { faceIdActivo, verificarFaceId } from "@/lib/faceid";
+import { faceIdActivo, ultimoErrorFaceId, verificarFaceId } from "@/lib/faceid";
 import {
   clavesDeLaApp,
   hoy,
@@ -27,13 +27,17 @@ export default function AjustesPage() {
   const [pedirCodigo, setPedirCodigo] = useState(false);
 
   const [conFaceId, setConFaceId] = useState(false);
+  const [motivoFaceId, setMotivoFaceId] = useState("");
   useEffect(() => setConFaceId(faceIdActivo()), []);
 
   // Con Face ID activo se pide el rostro; si falla o se cancela, se pide el código
   const entrar = () => {
     if (!faceIdActivo()) return setPedirCodigo(true);
     verificarFaceId().then((ok) => {
-      if (!ok) return setPedirCodigo(true);
+      if (!ok) {
+        setMotivoFaceId(ultimoErrorFaceId()?.texto ?? "Face ID no respondió");
+        return setPedirCodigo(true);
+      }
       desbloquearAjustes();
       router.push("/ajustes/avanzados");
     });
@@ -43,6 +47,7 @@ export default function AjustesPage() {
     if (!codigoValido(codigo)) return false;
     desbloquearAjustes();
     setPedirCodigo(false);
+    setMotivoFaceId("");
     router.push("/ajustes/avanzados");
     return true;
   };
@@ -146,9 +151,12 @@ export default function AjustesPage() {
       <DialogoClave
         abierto={pedirCodigo}
         titulo="Código de confirmación"
-        mensaje="Ingresa el código para abrir los ajustes."
+        mensaje={motivoFaceId ? `Face ID no funcionó (${motivoFaceId}). Ingresa el código.` : "Ingresa el código para abrir los ajustes."}
         onValidar={validarCodigo}
-        onCerrar={() => setPedirCodigo(false)}
+        onCerrar={() => {
+          setPedirCodigo(false);
+          setMotivoFaceId("");
+        }}
       />
 
       {mensaje && (

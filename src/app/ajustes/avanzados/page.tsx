@@ -18,7 +18,7 @@ import {
 import { leerCorrales, leerProductos, notificarCambio, useVersionDatos } from "@/lib/datos";
 import CatalogoProductos from "@/components/CatalogoProductos";
 import CatalogoCorrales from "@/components/CatalogoCorrales";
-import { activarFaceId, desactivarFaceId, faceIdActivo, faceIdDisponible } from "@/lib/faceid";
+import { activarFaceId, desactivarFaceId, faceIdActivo, faceIdDisponible, ultimoErrorFaceId } from "@/lib/faceid";
 
 /**
  * Sección oculta de ajustes: solo se abre después de ingresar el código
@@ -33,7 +33,11 @@ export default function AjustesAvanzadosPage() {
   const version = useVersionDatos();
   const productos = version < 0 ? 0 : leerProductos().length;
   const corrales = version < 0 ? 0 : leerCorrales().length;
-  const [faceId, setFaceId] = useState<{ disponible: boolean; activo: boolean; ofrecer: boolean }>({ disponible: false, activo: false, ofrecer: false });
+  const [faceId, setFaceId] = useState<{ disponible: boolean; activo: boolean; ofrecer: boolean; error?: string }>({
+    disponible: false,
+    activo: false,
+    ofrecer: false,
+  });
 
   useEffect(() => {
     faceIdDisponible().then((disponible) => {
@@ -41,7 +45,7 @@ export default function AjustesAvanzadosPage() {
       try {
         ofrecido = localStorage.getItem("faceid-ofrecido") === "1";
       } catch {}
-      setFaceId({ disponible, activo: faceIdActivo(), ofrecer: disponible && !faceIdActivo() && !ofrecido });
+      setFaceId({ disponible, activo: faceIdActivo(), ofrecer: disponible && !faceIdActivo() && !ofrecido, error: ultimoErrorFaceId()?.texto });
     });
   }, []);
 
@@ -57,10 +61,12 @@ export default function AjustesAvanzadosPage() {
     activarFaceId().then(async (ok) => {
       if (ok) {
         noOfrecerMas();
-        setFaceId((f) => ({ ...f, activo: true }));
+        setFaceId((f) => ({ ...f, activo: true, error: undefined }));
         await avisar({ titulo: "Face ID activado", mensaje: "La próxima vez entrarás a los ajustes con tu rostro. El código sigue funcionando." });
       } else {
-        await avisar({ titulo: "No se activó Face ID", mensaje: "Se canceló o el teléfono no lo permitió. Puedes seguir entrando con el código." });
+        const motivo = ultimoErrorFaceId()?.texto;
+        setFaceId((f) => ({ ...f, error: motivo }));
+        await avisar({ titulo: "No se activó Face ID", mensaje: `Se canceló o el teléfono no lo permitió${motivo ? ` (${motivo})` : ""}. Puedes seguir entrando con el código.` });
       }
     });
   };
@@ -133,6 +139,7 @@ export default function AjustesAvanzadosPage() {
               <span className="block text-xs text-slate-500">
                 {!faceId.disponible ? "No disponible en este teléfono" : faceId.activo ? "Activado en este teléfono" : "Desactivado: se pide el código"}
               </span>
+              {faceId.error && <span className="mt-0.5 block break-words text-[11px] text-rose-600">Último fallo · {faceId.error}</span>}
             </span>
             {faceId.disponible && (
               <Interruptor activo={faceId.activo} onCambiar={(v) => (v ? encenderFaceId() : apagarFaceId())} />
