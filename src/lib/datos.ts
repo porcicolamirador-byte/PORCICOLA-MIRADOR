@@ -212,6 +212,7 @@ export function leerLotes(): Lote[] {
     alimento: Array.isArray(l.alimento) ? l.alimento : [],
     activo: l.activo !== false,
     fechaSalida: l.fechaSalida,
+    corralId: typeof l.corralId === "string" && l.corralId ? l.corralId : undefined,
     origen:
       l.origen && typeof l.origen.cerdaId === "string" && typeof l.origen.codigoParto === "string"
         ? l.origen

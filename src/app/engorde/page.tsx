@@ -405,12 +405,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                 Aún no hay corrales. Créalos en Ajustes → Ajustes avanzados → Corrales.
               </p>
             ) : (
-              <>
-              <div>
-                <p className="mb-1.5 text-[13px] font-medium text-slate-700">Corral guardado</p>
-                <TarjetaCorral corral={corral} />
-              </div>
-              <Campo etiqueta="Corral donde están los lechones">
+              <Campo etiqueta="Corral">
                 <Selector
                   value={corralSel}
                   onChange={setCorralSel}
@@ -420,12 +415,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                   ]}
                 />
               </Campo>
-              {corralSel && corralSel !== lote.corralId && (
-                <p className="rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-900 ring-1 ring-emerald-100">
-                  Al guardar, el lote quedará en el corral {corrales.find((c) => c.id === corralSel)?.codigo}.
-                </p>
-              )}
-              </>
+
             )
           ) : (
           <Campo etiqueta="Fecha">
