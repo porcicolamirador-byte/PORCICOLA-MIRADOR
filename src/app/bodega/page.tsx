@@ -158,9 +158,9 @@ export default function BodegaPage() {
                     <button
                       type="button"
                       onClick={() => setFacturaSel(f.id)}
-                      className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-slate-50 active:bg-slate-100"
+                      className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left transition hover:bg-slate-50 active:bg-slate-100"
                     >
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-xl" aria-hidden="true">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-50 text-base" aria-hidden="true">
                         🧾
                       </span>
                       <span className="min-w-0 flex-1">
@@ -183,17 +183,17 @@ export default function BodegaPage() {
               {vista === "reponer" ? "No hay productos por reponer. 👍" : "Ningún producto coincide con la búsqueda."}
             </p>
           ) : (
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
               {CATEGORIAS_BODEGA.map(({ valor: cat }) => {
                 const items = inventarioVisible.filter((i) => i.producto.categoria === cat);
                 if (!items.length) return null;
                 return (
                   <section key={cat}>
-                    <h2 className="mb-2 flex items-center gap-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                    <h2 className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                       <IconoCategoria categoria={cat} className="h-4 w-4 text-[11px]" />
                       {cat} · {items.length}
                     </h2>
-                    <div className="grid grid-cols-2 gap-2.5">
+                    <div className="grid grid-cols-2 gap-2">
                       {items.map(({ producto: p, existencia, bajoMinimo, ultimoPrecio }) => {
                         const agotado = existencia <= 0;
                         const referencia = Math.max(p.minimo * 3, p.minimo + 1, 1);
@@ -211,24 +211,24 @@ export default function BodegaPage() {
                             key={p.id}
                             type="button"
                             onClick={() => setProductoSel(p.id)}
-                            className={`flex flex-col gap-2 rounded-3xl bg-white p-3.5 text-left ring-1 transition active:scale-[0.98] ${
+                            className={`flex flex-col gap-1.5 rounded-2xl bg-white p-2.5 text-left ring-1 transition active:scale-[0.98] ${
                               agotado || bajoMinimo ? "ring-red-200" : "ring-slate-200/80"
                             }`}
                           >
                             <div className="flex items-start justify-between gap-2">
-                              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-teal-50 text-2xl">
-                                <IconoCategoria categoria={p.categoria} className="h-8 w-8 text-2xl" />
+                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-xl">
+                                <IconoCategoria categoria={p.categoria} className="h-6 w-6 text-xl" />
                               </span>
                               <Insignia clase={estado.c}>{estado.t}</Insignia>
                             </div>
-                            <p className="line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-snug text-slate-900">{p.nombre}</p>
-                            <p className={`text-2xl font-bold leading-none tabular-nums ${agotado || bajoMinimo ? "text-red-600" : "text-slate-900"}`}>
+                            <p className="line-clamp-2 text-[13px] font-semibold leading-tight text-slate-900">{p.nombre}</p>
+                            <p className={`text-xl font-bold leading-none tabular-nums ${agotado || bajoMinimo ? "text-red-600" : "text-slate-900"}`}>
                               {fmt(existencia)} <span className="text-xs font-semibold text-slate-500">{p.unidad}</span>
                             </p>
-                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100" role="img" aria-label={`Nivel ${Math.round(nivel)} %`}>
+                            <div className="h-1 w-full overflow-hidden rounded-full bg-slate-100" role="img" aria-label={`Nivel ${Math.round(nivel)} %`}>
                               <div className={`h-full rounded-full ${colorBarra}`} style={{ width: `${Math.max(nivel, agotado ? 0 : 4)}%` }} />
                             </div>
-                            <p className="text-[11px] text-slate-500">
+                            <p className="text-[10px] leading-tight text-slate-500">
                               Mín. {fmt(p.minimo)} {p.unidad}
                               {ultimoPrecio > 0 && existencia > 0 ? ` · ${formatoPesos(existencia * ultimoPrecio)}` : ""}
                             </p>
