@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import ModuloPage from "@/components/ModuloPage";
-import { Boton, Campo, Chips, Dato, Entrada, IconoMas, Selector, Vacio } from "@/components/ui";
+import { Boton, Campo, Chips, Dato, Entrada, IconoMas, SeccionDesplegable, Selector, Vacio } from "@/components/ui";
 import {
   diasEntre,
   formatoFecha,
@@ -377,8 +377,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
           )}
 
           {(lote.pesajes.length > 0 || lote.mortalidad.length > 0 || lote.alimento.length > 0) && (
-            <div>
-              <h3 className="mb-2 text-sm font-semibold text-slate-900">Registros</h3>
+            <SeccionDesplegable titulo="Registros" cantidad={lote.pesajes.length + lote.mortalidad.length + lote.alimento.length}>
               <ul className="flex flex-col gap-1.5 text-sm">
                 {[
                   ...lote.pesajes.map((p) => ({ f: p.fecha, h: "", t: `Pesaje: ${p.pesoPromedio} kg promedio` })),
@@ -402,7 +401,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                     </li>
                   ))}
               </ul>
-            </div>
+            </SeccionDesplegable>
           )}
 
           <div className="flex flex-wrap justify-center gap-2 pt-1">

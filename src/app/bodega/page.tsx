@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
-import { Boton, Campo, Chevron, Chips, Dato, Entrada, Hoja, IconoMas, Insignia, Selector, Vacio } from "@/components/ui";
+import { Boton, Campo, Chevron, Chips, Dato, Entrada, Hoja, IconoMas, Insignia, SeccionDesplegable, Selector, Vacio } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
 import DialogoClave from "@/components/DialogoClave";
 import { leerConfig } from "@/lib/config";
@@ -572,8 +572,7 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
           <Boton variante="secundario" onClick={() => setSalida(true)} disabled={!libre && existencia <= 0}>
             − Registrar salida (consumo)
           </Boton>
-          <div>
-            <h3 className="mb-2 text-sm font-semibold text-slate-900">Movimientos</h3>
+          <SeccionDesplegable titulo="Movimientos" cantidad={movimientos.length}>
             {movimientos.length === 0 ? (
               <p className="text-sm text-slate-500">Sin movimientos. Ingresa una factura con este producto.</p>
             ) : (
@@ -607,7 +606,7 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
                 ))}
               </ul>
             )}
-          </div>
+          </SeccionDesplegable>
         </div>
       ) : (
         <form onSubmit={registrar} className="flex flex-col gap-3.5">

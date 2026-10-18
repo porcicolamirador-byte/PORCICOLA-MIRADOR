@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 /* Componentes de interfaz compartidos por los módulos. */
 
@@ -306,5 +306,49 @@ export function Interruptor({ activo, onCambiar }: { activo: boolean; onCambiar:
         <span className={`h-[27px] w-[27px] rounded-full bg-white shadow transition-transform ${activo ? "translate-x-5" : ""}`} />
       </span>
     </span>
+  );
+}
+
+/** Sección que se despliega y oculta (historial, movimientos…); cerrada por defecto */
+export function SeccionDesplegable({
+  titulo,
+  cantidad,
+  children,
+  inicialAbierta = false,
+}: {
+  titulo: string;
+  cantidad?: number;
+  children: ReactNode;
+  inicialAbierta?: boolean;
+}) {
+  const [abierta, setAbierta] = useState(inicialAbierta);
+  return (
+    <div className="overflow-hidden rounded-2xl ring-1 ring-slate-200/80">
+      <button
+        type="button"
+        onClick={() => setAbierta((a) => !a)}
+        aria-expanded={abierta}
+        className="flex w-full items-center gap-2 bg-slate-50 px-3.5 py-2.5 text-left active:bg-slate-100"
+      >
+        <span className="flex-1 text-sm font-semibold text-slate-900">{titulo}</span>
+        {cantidad !== undefined && (
+          <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-slate-700">{cantidad}</span>
+        )}
+        <span className="text-xs font-medium text-emerald-700">{abierta ? "Ocultar" : "Ver"}</span>
+        <svg
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+          className={`h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 ${abierta ? "rotate-180" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.4}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+      {abierta && <div className="border-t border-slate-100 p-2">{children}</div>}
+    </div>
   );
 }
