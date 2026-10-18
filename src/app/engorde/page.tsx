@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import ModuloPage from "@/components/ModuloPage";
-import { Boton, Campo, Chips, Dato, Entrada, Hoja, IconoMas, Vacio } from "@/components/ui";
+import { Boton, Campo, Chips, Dato, Entrada, IconoMas, Vacio } from "@/components/ui";
 import {
   diasEntre,
   formatoFecha,
@@ -17,6 +17,7 @@ import {
   type Lote,
 } from "@/lib/datos";
 import { confirmar } from "@/components/Dialogo";
+import Modal from "@/components/Modal";
 
 /** Indicadores calculados de un lote */
 function resumenLote(l: Lote) {
@@ -163,7 +164,7 @@ function NuevoLote({ abierta, onCerrar }: { abierta: boolean; onCerrar: () => vo
   };
 
   return (
-    <Hoja abierta={abierta} titulo="Nuevo lote de engorde" onCerrar={onCerrar}>
+    <Modal abierta={abierta} etiqueta="Engorde" titulo="Nuevo lote" subtitulo="Lote de engorde" icono="🐖" onCerrar={onCerrar}>
       <form onSubmit={guardar} className="flex flex-col gap-3.5">
         <Campo etiqueta="Nombre del lote">
           <Entrada value={nombre} onChange={setNombre} placeholder="Ej. Corral 3 – octubre" />
@@ -183,11 +184,13 @@ function NuevoLote({ abierta, onCerrar }: { abierta: boolean; onCerrar: () => vo
           Crear lote
         </Boton>
       </form>
-    </Hoja>
+    </Modal>
   );
 }
 
 type Accion = "resumen" | "pesaje" | "muerte" | "alimento";
+
+const ICONOS_ACCION: Record<Accion, string> = { resumen: "🐖", pesaje: "⚖️", muerte: "⚠️", alimento: "🥣" };
 
 function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   const [accion, setAccion] = useState<Accion>("resumen");
@@ -260,7 +263,14 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   };
 
   return (
-    <Hoja abierta titulo={titulos[accion]} onCerrar={accion === "resumen" ? onCerrar : limpiar}>
+    <Modal
+      abierta
+      etiqueta={accion === "resumen" ? "Lote de engorde" : lote.nombre}
+      titulo={titulos[accion]}
+      subtitulo={accion === "resumen" ? `${lote.vivos} animales · ${lote.activo ? "activo" : "cerrado"}` : undefined}
+      icono={ICONOS_ACCION[accion]}
+      onCerrar={accion === "resumen" ? onCerrar : limpiar}
+    >
       {accion === "resumen" ? (
         <div className="flex flex-col gap-4">
           {lote.origen && (
@@ -372,6 +382,6 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
           </div>
         </form>
       )}
-    </Hoja>
+    </Modal>
   );
 }
