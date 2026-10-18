@@ -6,31 +6,6 @@
  */
 
 const CLAVE = "faceid-ajustes";
-const CLAVE_ERROR = "faceid-ultimo-error";
-
-/** Guarda el motivo del último fallo para mostrarlo en Ajustes */
-function anotarError(etapa: string, e: unknown) {
-  const err = e as { name?: string; message?: string } | undefined;
-  const texto = `${etapa}: ${err?.name ?? "Error"}${err?.message ? ` – ${err.message}` : ""}`;
-  try {
-    localStorage.setItem(CLAVE_ERROR, JSON.stringify({ texto, fecha: new Date().toISOString() }));
-  } catch {}
-}
-
-/** Último motivo por el que Face ID no funcionó (para diagnóstico) */
-export function ultimoErrorFaceId(): { texto: string; fecha: string } | null {
-  try {
-    return JSON.parse(localStorage.getItem(CLAVE_ERROR) || "null");
-  } catch {
-    return null;
-  }
-}
-
-function limpiarError() {
-  try {
-    localStorage.removeItem(CLAVE_ERROR);
-  } catch {}
-}
 
 const aBase64 = (buf: ArrayBuffer) =>
   btoa(String.fromCharCode(...new Uint8Array(buf)))
@@ -86,25 +61,15 @@ export async function activarFaceId(): Promise<boolean> {
           { type: "public-key", alg: -7 },
           { type: "public-key", alg: -257 },
         ],
-        authenticatorSelection: {
-          authenticatorAttachment: "platform",
-          userVerification: "required",
-          residentKey: "required",
-          requireResidentKey: true,
-        },
+        authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required", residentKey: "preferred" },
         attestation: "none",
         timeout: 60000,
       },
     })) as PublicKeyCredential | null;
-    if (!credencial) {
-      anotarError("Activar", { name: "SinRespuesta" });
-      return false;
-    }
+    if (!credencial) return false;
     localStorage.setItem(CLAVE, aBase64(credencial.rawId));
-    limpiarError();
     return true;
-  } catch (e) {
-    anotarError("Activar", e);
+  } catch {
     return false;
   }
 }
@@ -117,30 +82,20 @@ export async function verificarFaceId(): Promise<boolean> {
   const id = idGuardado();
   if (!id) return false;
   try {
-    if (!window.PublicKeyCredential || !navigator.credentials) throw { name: "NoSoportado" };
-    // Sin lista de llaves: el iPhone busca la llave guardada de esta app y pide
-    // Face ID. Funciona mejor que indicar la llave en algunas versiones de iOS.
     const credencial = (await navigator.credentials.get({
       publicKey: {
         challenge: aleatorio(32),
         rpId: location.hostname,
+        allowCredentials: [{ type: "public-key", id: deBase64(id) }],
         userVerification: "required",
         timeout: 60000,
       },
     })) as PublicKeyCredential | null;
-    if (!credencial) throw { name: "SinRespuesta" };
-    const recibido = aBase64(credencial.rawId);
-    if (recibido !== id) {
-      // Llave de esta misma app creada antes: se adopta como la actual
-      localStorage.setItem(CLAVE, recibido);
-    }
+    if (!credencial || aBase64(credencial.rawId) !== id) return false;
     // Bandera "usuario verificado" (bit 2) en los datos del autenticador
     const datos = new Uint8Array((credencial.response as AuthenticatorAssertionResponse).authenticatorData);
-    if (!(datos.length > 32 && (datos[32] & 0x04) !== 0)) throw { name: "RostroNoVerificado" };
-    limpiarError();
-    return true;
-  } catch (e) {
-    anotarError("Entrar", e);
+    return datos.length > 32 && (datos[32] & 0x04) !== 0;
+  } catch {
     return false;
   }
 }
