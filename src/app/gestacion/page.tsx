@@ -27,6 +27,20 @@ export default function Gestacion() {
   const router = useRouter();
 
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  // Vista: lista (con deslizar para editar) o cuadrícula de 2 columnas; se recuerda
+  const [cuadricula, setCuadricula] = useState(false);
+  useEffect(() => {
+    try {
+      setCuadricula(localStorage.getItem("gestacion-vista") === "cuadricula");
+    } catch {}
+  }, []);
+  const cambiarVista = () =>
+    setCuadricula((v) => {
+      try {
+        localStorage.setItem("gestacion-vista", v ? "lista" : "cuadricula");
+      } catch {}
+      return !v;
+    });
   const [buscar, setBuscar] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState("Todos");
   const [mostrarMenuFlotante, setMostrarMenuFlotante] = useState(false);
@@ -545,7 +559,26 @@ export default function Gestacion() {
           >
             ‹ Inicio
           </button>
-          <h1 className="text-3xl font-bold tracking-tight text-emerald-900">Gestación</h1>
+          <div className="flex items-center justify-between gap-3">
+            <h1 className="text-3xl font-bold tracking-tight text-emerald-900">Gestación</h1>
+            {/* Cambiar entre lista y cuadrícula de 2 columnas */}
+            <button
+              type="button"
+              onClick={cambiarVista}
+              aria-pressed={cuadricula}
+              aria-label={cuadricula ? "Ver como lista" : "Ver en cuadrícula de 2 columnas"}
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${
+                cuadricula ? "bg-emerald-800 text-white" : "bg-slate-100 text-slate-700"
+              }`}
+            >
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill={cuadricula ? "currentColor" : "none"} stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+                <rect x="3.5" y="3.5" width="7" height="7" rx="1.8" />
+                <rect x="13.5" y="3.5" width="7" height="7" rx="1.8" />
+                <rect x="3.5" y="13.5" width="7" height="7" rx="1.8" />
+                <rect x="13.5" y="13.5" width="7" height="7" rx="1.8" />
+              </svg>
+            </button>
+          </div>
           <p className="mt-0.5 text-sm text-slate-500">
             {cerdas.length === 1 ? "1 hembra en el inventario" : `${cerdas.length} hembras en el inventario`}
           </p>
@@ -621,6 +654,49 @@ export default function Gestacion() {
                 ? "Toca + y agrega la primera hembra."
                 : "Cambia la búsqueda o el filtro de estado."}
             </p>
+          </div>
+        ) : cuadricula ? (
+          /* Cuadrícula de 2 columnas, como los módulos del Dashboard */
+          <div className="grid grid-cols-2 gap-2.5">
+            {filtradas.map((cerda) => {
+              const historial = historiales.get(cerda.id) ?? [];
+              const ultimoRegistro = historial[0] || null;
+              const estadoLabel = ultimoRegistro ? obtenerEstadoPorRegistro(ultimoRegistro.tipo) : "Activa";
+              const ultimaInseminacion = historial.find((item: any) => item.tipo === "Inseminación");
+              const diasParaParto = ultimaInseminacion ? calcularDiasParaParto(ultimaInseminacion.fecha) : null;
+              const dato =
+                estadoLabel === "Gestación" && diasParaParto !== null
+                  ? { t: "Parto", v: formatearFechaCorta(calcularParto(ultimaInseminacion?.fecha || cerda.fecha)), n: diasParaParto === 1 ? "Queda 1 día" : `Quedan ${diasParaParto} días` }
+                  : ultimoRegistro
+                    ? { t: ultimoRegistro.tipo, v: formatearFechaCorta(ultimoRegistro.fecha), n: "" }
+                    : { t: "Llegada", v: formatearFechaCorta(cerda.fecha), n: "" };
+              return (
+                <button
+                  key={cerda.id}
+                  type="button"
+                  onClick={() => router.push(`/cerda/${encodeURIComponent(cerda.id)}`)}
+                  className="relative flex min-w-0 flex-col items-start gap-2.5 overflow-hidden rounded-3xl border border-slate-200 bg-white px-3.5 py-3.5 text-left shadow-sm transition active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+                >
+                  <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${obtenerBarraColor(estadoLabel)}`} />
+                  <div className="relative flex h-11 min-w-[3.25rem] max-w-full items-center justify-center rounded-xl bg-amber-300 px-2.5 pt-1.5 shadow-inner">
+                    <span aria-hidden="true" className="absolute left-1/2 top-1 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-amber-50/90 ring-1 ring-amber-600/40" />
+                    <span className="truncate text-base font-black tabular-nums text-amber-950">{cerda.id}</span>
+                  </div>
+                  <div className="w-full min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-950">{cerda.raza || "Sin raza"}</p>
+                    <span className={`mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${obtenerEstadoStyles(estadoLabel)}`}>
+                      <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-current" />
+                      <span className="truncate">{estadoLabel}</span>
+                    </span>
+                  </div>
+                  <div className="w-full min-w-0 border-t border-slate-100 pt-2">
+                    <p className="truncate text-[11px] text-slate-500">{dato.t}</p>
+                    <p className="truncate text-sm font-semibold text-slate-900">{dato.v}</p>
+                    {dato.n && <p className="truncate text-[11px] font-medium text-blue-700">{dato.n}</p>}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
