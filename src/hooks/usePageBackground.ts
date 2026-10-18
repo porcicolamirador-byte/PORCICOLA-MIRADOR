@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { EVENTO_TEMA, FONDO_OSCURO, esOscuro } from "@/lib/tema";
 
 const BLANCO = "#ffffff";
 
@@ -48,9 +49,19 @@ function setThemeColor(color: string) {
  * al color de la página. Al salir de la página vuelve a blanco.
  */
 export default function usePageBackground(bgColor: string = BLANCO) {
+  // Se vuelve a aplicar cuando se activa o desactiva el modo oscuro
+  const [tema, setTema] = useState(0);
+  useEffect(() => {
+    const alCambiar = () => setTema((t) => t + 1);
+    window.addEventListener(EVENTO_TEMA, alCambiar);
+    return () => window.removeEventListener(EVENTO_TEMA, alCambiar);
+  }, []);
+
   useEffect(() => {
     const root = document.documentElement;
-    const color = bgColor || BLANCO;
+    // En modo oscuro, las páginas blancas usan el fondo oscuro
+    const blanco = (c: string) => !c || c.toLowerCase() === BLANCO || c.toLowerCase() === "#fff" || c.toLowerCase() === "white";
+    const color = esOscuro() && blanco(bgColor) ? FONDO_OSCURO : bgColor || BLANCO;
     const pageFg = isColorDark(color) ? "#ffffff" : "#111827";
 
     root.style.setProperty("--page-bg", color);
@@ -60,11 +71,12 @@ export default function usePageBackground(bgColor: string = BLANCO) {
     setThemeColor(color);
 
     return () => {
-      root.style.setProperty("--page-bg", BLANCO);
-      root.style.setProperty("--page-fg", "#111827");
-      root.style.backgroundColor = BLANCO;
-      document.body.style.backgroundColor = BLANCO;
-      setThemeColor(BLANCO);
+      const base = esOscuro() ? FONDO_OSCURO : BLANCO;
+      root.style.setProperty("--page-bg", base);
+      root.style.setProperty("--page-fg", esOscuro() ? "#e9edef" : "#111827");
+      root.style.backgroundColor = base;
+      document.body.style.backgroundColor = base;
+      setThemeColor(base);
     };
-  }, [bgColor]);
+  }, [bgColor, tema]);
 }

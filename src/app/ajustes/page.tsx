@@ -3,9 +3,10 @@
 import { useRef, useState, type ChangeEvent, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
-import { Boton, Chevron, Tarjeta } from "@/components/ui";
+import { Boton, Chevron, Tarjeta, Interruptor } from "@/components/ui";
 import DialogoClave from "@/components/DialogoClave";
 import { codigoValido, desbloquearAjustes } from "@/lib/acceso";
+import { aplicarTema, temaGuardado } from "@/lib/tema";
 import { faceIdActivo, motivoFalloFaceId, verificarFaceId } from "@/lib/faceid";
 import {
   clavesDeLaApp,
@@ -26,6 +27,8 @@ export default function AjustesPage() {
   const router = useRouter();
   const [pedirCodigo, setPedirCodigo] = useState(false);
 
+  const [oscuro, setOscuro] = useState(false);
+  useEffect(() => setOscuro(temaGuardado() === "oscuro"), []);
   const [conFaceId, setConFaceId] = useState(false);
   const [avisoFaceId, setAvisoFaceId] = useState("");
   useEffect(() => setConFaceId(faceIdActivo()), []);
@@ -116,6 +119,26 @@ export default function AjustesPage() {
         </div>
         <input ref={archivo} type="file" accept="application/json,.json" onChange={importar} className="hidden" />
       </Tarjeta>
+
+      {/* Apariencia: modo oscuro */}
+      <label className="flex w-full cursor-pointer items-center gap-3 rounded-3xl bg-white p-4 ring-1 ring-slate-200/80">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-200 text-slate-800" aria-hidden="true">
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+          </svg>
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-slate-900">Modo oscuro</span>
+          <span className="block text-xs text-slate-500">{oscuro ? "Activado" : "Desactivado"}</span>
+        </span>
+        <Interruptor
+          activo={oscuro}
+          onCambiar={(v) => {
+            aplicarTema(v);
+            setOscuro(v);
+          }}
+        />
+      </label>
 
       {/* Módulo que abre la sección oculta (pide código) */}
       <button

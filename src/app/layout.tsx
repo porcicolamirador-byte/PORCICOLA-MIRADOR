@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ModoSinConexion from "@/components/ModoSinConexion";
 import DialogoHost from "@/components/Dialogo";
+import { SCRIPT_TEMA } from "@/lib/tema";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -45,7 +46,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full bg-white antialiased`}
       style={{ backgroundColor: "#ffffff" }}
+      suppressHydrationWarning
     >
+      <head>
+        {/* Modo oscuro: se aplica antes de pintar para evitar un destello blanco */}
+        <script dangerouslySetInnerHTML={{ __html: SCRIPT_TEMA }} />
+      </head>
       <body className="min-h-full flex flex-col bg-white">
         <ModoSinConexion />
         <DialogoHost />
