@@ -98,8 +98,10 @@ export default function BottomNav() {
       className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3"
       style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)", transform: "translateZ(0)" }}
     >
+      {/* Difuminado detrás de la barra: el contenido que baja se desvanece y se ve borroso */}
+      <div aria-hidden="true" className="difuminado-nav pointer-events-none absolute inset-x-0 bottom-0 -z-10" />
       {/* Módulo rectangular fijo que contiene las cuatro secciones */}
-      <ul className="barra-inferior pointer-events-auto mx-auto grid w-full max-w-md grid-cols-4 rounded-[20px] border border-[#e9edef] bg-white px-1.5 py-2 shadow-[0_10px_30px_-12px_rgba(17,27,33,0.28),0_2px_6px_-2px_rgba(17,27,33,0.08)]">
+      <ul className="barra-inferior pointer-events-auto mx-auto grid w-full max-w-md grid-cols-4 rounded-[32px] border border-[#e9edef] bg-white px-2 py-2 shadow-[0_10px_30px_-12px_rgba(17,27,33,0.28),0_2px_6px_-2px_rgba(17,27,33,0.08)]">
         {TABS.map(({ nombre, ruta, Icono, conPendientes }) => {
           const activa = pathname === ruta;
           const globo = conPendientes && pendientes > 0 ? (pendientes > 99 ? "99+" : String(pendientes)) : null;

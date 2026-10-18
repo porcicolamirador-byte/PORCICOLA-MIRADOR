@@ -276,3 +276,13 @@ html.oscuro input:-webkit-autofill {
   -webkit-text-fill-color: #f2f2f7;
   -webkit-box-shadow: 0 0 0 1000px #2c2c2e inset;
 }
+
+/* Zona difuminada bajo la barra inferior del Dashboard */
+.difuminado-nav {
+  height: calc(env(safe-area-inset-bottom) + 7rem);
+  background: linear-gradient(to top, var(--page-bg, #ffffff) 35%, color-mix(in srgb, var(--page-bg, #ffffff) 70%, transparent) 65%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  -webkit-mask-image: linear-gradient(to top, #000 55%, transparent);
+  mask-image: linear-gradient(to top, #000 55%, transparent);
+}
