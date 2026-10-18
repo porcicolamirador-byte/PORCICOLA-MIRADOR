@@ -299,3 +299,7 @@ html.oscuro .ring-offset-1 { --tw-ring-offset-color: #1c1c1e; }
 @media (prefers-reduced-motion: no-preference) {
   .latido-suave { animation: latido-suave 2.2s cubic-bezier(0, 0, 0.2, 1) infinite; }
 }
+
+/* Calendario: fucsia del parto registrado en modo oscuro */
+html.oscuro .text-fuchsia-700 { color: #f0abfc; }
+html.oscuro .stroke-white { stroke: #1c1c1e; }

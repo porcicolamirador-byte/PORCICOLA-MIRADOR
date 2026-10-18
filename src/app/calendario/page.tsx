@@ -4,7 +4,6 @@ import { useMemo, useRef, useState, type TouchEvent } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Chevron } from "@/components/ui";
-import { BarrasHorizontales } from "@/components/Graficas";
 import {
   estadoDeCerda,
   formatoFecha,
@@ -31,13 +30,13 @@ interface EventoDia {
 }
 
 const ESTILO: Record<Tipo, { punto: string; celda: string; etiqueta: string; texto: string }> = {
-  parto: { punto: "bg-emerald-500", celda: "bg-emerald-500 text-white", etiqueta: "Parto registrado", texto: "text-emerald-700" },
+  parto: { punto: "bg-fuchsia-500", celda: "bg-fuchsia-500 text-white", etiqueta: "Parto registrado", texto: "text-fuchsia-700" },
   estimado: { punto: "bg-blue-500", celda: "bg-blue-500 text-white", etiqueta: "Parto estimado", texto: "text-blue-700" },
   destete: { punto: "bg-amber-400", celda: "bg-amber-400 text-amber-950", etiqueta: `Destete (día ${DIAS_DESTETE})`, texto: "text-amber-700" },
 };
 const ORDEN: Tipo[] = ["parto", "estimado", "destete"];
 /** Mismos colores de las marcas del calendario (verde, azul y amarillo) */
-const COLOR_BARRA: Record<Tipo, string> = { parto: "#10b981", estimado: "#3b82f6", destete: "#fbbf24" };
+const COLOR_BARRA: Record<Tipo, string> = { parto: "#d946ef", estimado: "#3b82f6", destete: "#f59e0b" };
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 const DIAS_SEMANA = ["L", "M", "M", "J", "V", "S", "D"];
@@ -306,19 +305,116 @@ export default function CalendarioPage() {
           </ul>
         )}
       </section>
-      {/* Resumen del mes: barras horizontales con los mismos colores del calendario */}
+      {/* Resumen del mes: gráfica de líneas, eventos acumulados día a día */}
       <section className="rounded-3xl bg-white p-4 ring-1 ring-slate-200/80">
-        <div className="mb-3 flex items-baseline justify-between gap-2">
+        <div className="mb-1 flex items-baseline justify-between gap-2">
           <h2 className="text-[15px] font-bold text-slate-900">Resumen de {MESES[mes].toLowerCase()}</h2>
           <span className="text-xs text-slate-500">
             {delMes.length} {delMes.length === 1 ? "evento" : "eventos"}
           </span>
         </div>
-        <BarrasHorizontales
-          filas={ORDEN.map((t) => ({ nombre: ESTILO[t].etiqueta, valor: cuenta(t), color: COLOR_BARRA[t] }))}
-          formato={(n) => String(Math.round(n))}
+        <ul className="mb-2 flex flex-wrap gap-x-3 gap-y-1">
+          {ORDEN.map((t) => (
+            <li key={t} className="flex items-center gap-1.5 text-[11px] text-slate-600">
+              <span className="h-0.5 w-3.5 rounded-full" style={{ backgroundColor: COLOR_BARRA[t] }} aria-hidden="true" />
+              {ESTILO[t].etiqueta} <b className="tabular-nums text-slate-900">{cuenta(t)}</b>
+            </li>
+          ))}
+        </ul>
+        <GraficaLineas
+          dias={diasMes}
+          series={ORDEN.map((t) => ({
+            tipo: t,
+            color: COLOR_BARRA[t],
+            porDia: Array.from({ length: diasMes }, (_, d) => (eventos.get(clave(anio, mes, d + 1)) ?? []).filter((e) => e.tipo === t).length),
+          }))}
+          diaElegido={seleccion.startsWith(prefijo) ? Number(seleccion.slice(8, 10)) : null}
+          onElegir={(d) => setSeleccion(clave(anio, mes, d))}
         />
+        <p className="mt-1 text-center text-[10px] text-slate-400">Eventos acumulados en el mes · toca la gráfica para ver un día</p>
       </section>
     </ModuloPage>
+  );
+}
+
+/** Gráfica de líneas del mes: cada línea suma los eventos de su tipo día a día */
+function GraficaLineas({
+  dias,
+  series,
+  diaElegido,
+  onElegir,
+}: {
+  dias: number;
+  series: { tipo: Tipo; color: string; porDia: number[] }[];
+  diaElegido: number | null;
+  onElegir: (dia: number) => void;
+}) {
+  const W = 320;
+  const H = 130;
+  const izq = 22;
+  const der = 22;
+  const arriba = 10;
+  const abajo = 20;
+  const acumuladas = series.map((s) => {
+    let suma = 0;
+    return { ...s, valores: s.porDia.map((v) => (suma += v)) };
+  });
+  const maximo = Math.max(1, ...acumuladas.map((s) => s.valores[s.valores.length - 1] ?? 0));
+  const tope = maximo <= 4 ? maximo : Math.ceil(maximo / 2) * 2;
+  const x = (d: number) => izq + ((d - 1) / Math.max(1, dias - 1)) * (W - izq - der);
+  const y = (v: number) => arriba + (1 - v / tope) * (H - arriba - abajo);
+  const marcasX = [1, 8, 15, 22, dias].filter((d, i, a) => d <= dias && a.indexOf(d) === i);
+  const marcasY = tope <= 4 ? Array.from({ length: tope + 1 }, (_, i) => i) : [0, tope / 2, tope];
+
+  const elegirDesde = (clienteX: number, caja: DOMRect) => {
+    const rel = ((clienteX - caja.left) / caja.width) * W;
+    const d = Math.round(((rel - izq) / (W - izq - der)) * (dias - 1)) + 1;
+    onElegir(Math.min(dias, Math.max(1, d)));
+  };
+
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="h-auto w-full touch-pan-y select-none"
+      role="img"
+      aria-label={acumuladas.map((s) => `${s.tipo}: ${s.valores[s.valores.length - 1] ?? 0}`).join(", ")}
+      onClick={(e) => elegirDesde(e.clientX, e.currentTarget.getBoundingClientRect())}
+    >
+      {/* Cuadrícula */}
+      {marcasY.map((v) => (
+        <g key={v}>
+          <line x1={izq} x2={W - der} y1={y(v)} y2={y(v)} className="stroke-slate-200" strokeDasharray={v === 0 ? undefined : "3 4"} strokeWidth={1} />
+          <text x={izq - 6} y={y(v) + 3} textAnchor="end" className="fill-slate-400 text-[9px] tabular-nums">
+            {v}
+          </text>
+        </g>
+      ))}
+      {marcasX.map((d) => (
+        <text key={d} x={x(d)} y={H - 5} textAnchor="middle" className="fill-slate-400 text-[9px] tabular-nums">
+          {d}
+        </text>
+      ))}
+      {/* Día elegido */}
+      {diaElegido && (
+        <line x1={x(diaElegido)} x2={x(diaElegido)} y1={arriba} y2={H - abajo} className="stroke-slate-400" strokeWidth={1} />
+      )}
+      {/* Líneas */}
+      {acumuladas.map((s) => (
+        <g key={s.tipo}>
+          <polyline
+            points={s.valores.map((v, i) => `${x(i + 1)},${y(v)}`).join(" ")}
+            fill="none"
+            stroke={s.color}
+            strokeWidth={2}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+          <circle cx={x(dias)} cy={y(s.valores[dias - 1] ?? 0)} r={3.5} fill={s.color} className="stroke-white" strokeWidth={1.5} />
+          {diaElegido && (s.porDia[diaElegido - 1] ?? 0) > 0 && (
+            <circle cx={x(diaElegido)} cy={y(s.valores[diaElegido - 1])} r={4} fill={s.color} className="stroke-white" strokeWidth={1.5} />
+          )}
+        </g>
+      ))}
+    </svg>
   );
 }
