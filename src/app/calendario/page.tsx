@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, type TouchEvent } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Chevron } from "@/components/ui";
@@ -99,6 +99,34 @@ export default function CalendarioPage() {
     const d = new Date(anio, mes + delta, 1);
     setAnio(d.getFullYear());
     setMes(d.getMonth());
+    // El mes nuevo entra desde el lado hacia donde se deslizó
+    setEntrada(delta > 0 ? "derecha" : "izquierda");
+    setVuelta((v) => v + 1);
+  };
+
+  // Deslizar a los lados para cambiar de mes
+  const [dx, setDx] = useState(0);
+  const [entrada, setEntrada] = useState<"derecha" | "izquierda" | null>(null);
+  const [vuelta, setVuelta] = useState(0);
+  const toque = useRef<{ x: number; y: number; horizontal: boolean | null } | null>(null);
+  const alTocar = (e: TouchEvent) => {
+    const t = e.touches[0];
+    toque.current = { x: t.clientX, y: t.clientY, horizontal: null };
+  };
+  const alMover = (e: TouchEvent) => {
+    const t = toque.current;
+    if (!t) return;
+    const mx = e.touches[0].clientX - t.x;
+    const my = e.touches[0].clientY - t.y;
+    // Se decide la dirección con los primeros píxeles: si es vertical, se deja desplazar la página
+    if (t.horizontal === null && (Math.abs(mx) > 8 || Math.abs(my) > 8)) t.horizontal = Math.abs(mx) > Math.abs(my);
+    if (t.horizontal) setDx(mx);
+  };
+  const alSoltar = () => {
+    const t = toque.current;
+    toque.current = null;
+    if (t?.horizontal && Math.abs(dx) > 50) cambiarMes(dx < 0 ? 1 : -1);
+    setDx(0);
   };
   const irAHoy = () => {
     setAnio(Number(fechaHoy.slice(0, 4)));
@@ -167,6 +195,24 @@ export default function CalendarioPage() {
               {d}
             </span>
           ))}
+        </div>
+        <div
+          className="overflow-hidden"
+          onTouchStart={alTocar}
+          onTouchMove={alMover}
+          onTouchEnd={alSoltar}
+          onTouchCancel={alSoltar}
+          style={{ touchAction: "pan-y" }}
+        >
+        <div
+          key={vuelta}
+          className={`grid grid-cols-7 gap-1 text-center ${dx === 0 && entrada ? `entrada-${entrada}` : ""}`}
+          style={{
+            transform: dx ? `translateX(${dx}px)` : undefined,
+            opacity: dx ? Math.max(0.4, 1 - Math.abs(dx) / 400) : undefined,
+            transition: dx ? "none" : "transform 200ms ease-out, opacity 200ms ease-out",
+          }}
+        >
           {celdas.map((dia, i) => {
             if (dia === null) return <span key={i} />;
             const fecha = clave(anio, mes, dia);
@@ -198,8 +244,16 @@ export default function CalendarioPage() {
             );
           })}
         </div>
+        </div>
 
         <div className="mt-2 flex justify-center">
+          <style>{`
+            .entrada-derecha { animation: cal-derecha 240ms ease-out; }
+            .entrada-izquierda { animation: cal-izquierda 240ms ease-out; }
+            @keyframes cal-derecha { from { transform: translateX(40%); opacity: 0 } to { transform: none; opacity: 1 } }
+            @keyframes cal-izquierda { from { transform: translateX(-40%); opacity: 0 } to { transform: none; opacity: 1 } }
+            @media (prefers-reduced-motion: reduce) { .entrada-derecha, .entrada-izquierda { animation: none } }
+          `}</style>
           <button type="button" onClick={irAHoy} className="rounded-full px-3 py-1 text-xs font-semibold text-emerald-700 active:bg-emerald-50">
             Hoy
           </button>
