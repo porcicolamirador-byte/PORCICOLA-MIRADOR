@@ -20,8 +20,6 @@ const ESTADOS = [
 
 const RAZAS = ["Camborough", "Landrace", "Large White", "Yorkshire", "Duroc", "Pietrain", "Hampshire"];
 
-const inputBase =
-  "w-full h-12 rounded-xl bg-slate-50 px-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-200";
 
 export default function Gestacion() {
   const router = useRouter();
@@ -1058,172 +1056,123 @@ export default function Gestacion() {
               className="form-fondo absolute inset-0 bg-slate-950/45 backdrop-blur-[2px]"
             />
 
-            <div className="form-hoja relative flex max-h-full w-full max-w-md flex-col overflow-hidden rounded-[28px] bg-white text-slate-900 shadow-2xl">
-              {/* Encabezado verde con el arete */}
-              <div className="relative overflow-hidden bg-emerald-900 px-5 py-5 text-white">
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 opacity-60"
-                  style={{
-                    backgroundImage:
-                      "repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 10px, transparent 10px 26px)",
-                  }}
-                />
+            <div className="form-hoja hoja-ios relative flex max-h-full w-full max-w-md flex-col overflow-hidden rounded-[22px] shadow-2xl">
+              {/* Barra superior estilo iOS: Cancelar · título · Guardar */}
+              <div className="barra-ios grid shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b px-2 py-2.5">
                 <button
                   type="button"
                   onClick={() => setMostrarFormulario(false)}
-                  aria-label="Cerrar"
-                  className="absolute right-3 top-3 z-20 flex h-11 w-11 touch-manipulation items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25 active:bg-white/30"
+                  className="justify-self-start rounded-lg px-2.5 py-1.5 text-[17px] text-emerald-700 active:opacity-50"
                 >
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" aria-hidden="true">
-                    <path d="M6 6l12 12M18 6 6 18" />
-                  </svg>
+                  Cancelar
                 </button>
-
-                <div className="relative flex items-center gap-4 pr-12">
-                  <div className="relative flex h-16 min-w-[4.5rem] max-w-[8rem] shrink-0 items-center justify-center rounded-2xl bg-amber-300 px-3 pt-2 shadow-inner">
-                    <span aria-hidden="true" className="absolute left-1/2 top-1.5 h-2 w-2 -translate-x-1/2 rounded-full bg-amber-50/90 ring-1 ring-amber-600/40" />
-                    <span className={`truncate text-2xl font-black tabular-nums ${id ? "text-amber-950" : "text-amber-950/35"}`}>
-                      {id || "ID"}
-                    </span>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium uppercase tracking-[0.18em] text-emerald-200/90">Registro de hembra</p>
-                    <p className="mt-0.5 truncate text-xl font-bold">{editIndex !== null ? "Editar cerda" : "Nueva cerda"}</p>
-                    <span className="mt-1.5 inline-flex max-w-full items-center rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-semibold text-white">
-                      <span className="truncate">{(raza === "OTRA" ? otraRaza : raza) || "Raza"}</span>
-                    </span>
-                  </div>
-                </div>
+                <h3 className="text-[17px] font-semibold text-slate-900">{editIndex !== null ? "Editar cerda" : "Nueva cerda"}</h3>
+                <button
+                  type="button"
+                  onClick={agregarOCrear}
+                  disabled={!id.trim()}
+                  className="justify-self-end rounded-lg px-2.5 py-1.5 text-[17px] font-semibold text-emerald-700 active:opacity-50 disabled:text-slate-400"
+                >
+                  {editIndex !== null ? "Listo" : "Guardar"}
+                </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-5 pb-5 pt-4">
-                <h4 className="mb-1 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Datos generales</h4>
-                <div className="divide-y divide-slate-100 rounded-2xl ring-1 ring-slate-100">
-                  {/* ID */}
-                  <div className="flex items-start gap-3 px-3.5 py-3">
-                    <span aria-hidden="true" className="mt-6 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-base">🏷️</span>
-                    <div className="min-w-0 flex-1">
-                      <label htmlFor="f-id" className="mb-1 block text-sm text-slate-500">Identificación</label>
+              <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 pb-6 pt-5">
+                {/* Identificación y raza */}
+                <ul className="celda-ios divide-y overflow-hidden rounded-xl">
+                  <li className="flex min-h-[46px] items-center gap-3 px-4">
+                    <label htmlFor="f-id" className="w-32 shrink-0 text-[15px] text-slate-900">Identificación</label>
+                    <input
+                      id="f-id"
+                      type="text"
+                      placeholder="A-102"
+                      autoComplete="off"
+                      autoCapitalize="characters"
+                      value={id}
+                      onChange={(e) => {
+                        setId(e.target.value.toUpperCase());
+                        if (idError) setIdError("");
+                      }}
+                      className="campo-ios min-w-0 flex-1 uppercase"
+                    />
+                  </li>
+                  <li className="flex min-h-[46px] items-center gap-3 px-4">
+                    <label htmlFor="f-raza" className="w-32 shrink-0 text-[15px] text-slate-900">Raza</label>
+                    <select id="f-raza" value={raza} onChange={(e) => setRaza(e.target.value)} className="campo-ios min-w-0 flex-1">
+                      {RAZAS.map((r) => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                      <option value="OTRA">Otra</option>
+                    </select>
+                  </li>
+                  {raza === "OTRA" && (
+                    <li className="flex min-h-[46px] items-center gap-3 px-4">
+                      <label htmlFor="f-otra" className="w-32 shrink-0 text-[15px] text-slate-900">Cuál</label>
                       <input
-                        id="f-id"
+                        id="f-otra"
                         type="text"
-                        placeholder="Ej: A-102"
-                        value={id}
-                        onChange={(e) => {
-                          setId(e.target.value.toUpperCase());
-                          if (idError) setIdError("");
-                        }}
-                        className={`${inputBase} border uppercase ${idError ? "border-red-500" : "border-slate-200"}`}
+                        placeholder="Nombre de la raza"
+                        value={otraRaza}
+                        onChange={(e) => setOtraRaza(e.target.value)}
+                        className="campo-ios min-w-0 flex-1"
                       />
-                      {idError && <p className="mt-1.5 text-sm text-red-600">{idError}</p>}
-                    </div>
-                  </div>
+                    </li>
+                  )}
+                </ul>
+                {(idError || razaError) && <p className="mt-1.5 px-4 text-[13px] text-red-600">{idError || razaError}</p>}
+                {!idError && !razaError && (
+                  <p className="mt-1.5 px-4 text-[13px] text-slate-500">El número del arete. Debe ser único en el hato.</p>
+                )}
 
-                  {/* RAZA */}
-                  <div className="flex items-start gap-3 px-3.5 py-3">
-                    <span aria-hidden="true" className="mt-6 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-base">🧬</span>
-                    <div className="min-w-0 flex-1">
-                      <label htmlFor="f-raza" className="mb-1 block text-sm text-slate-500">Raza</label>
-                      <select
-                        id="f-raza"
-                        value={raza}
-                        onChange={(e) => setRaza(e.target.value)}
-                        className={`${inputBase} border border-slate-200`}
-                      >
-                        {RAZAS.map((r) => (
-                          <option key={r} value={r}>{r}</option>
-                        ))}
-                        <option value="OTRA">Otra</option>
-                      </select>
-                      {raza === "OTRA" && (
-                        <div className="mt-2">
-                          <input
-                            type="text"
-                            placeholder="Escribe la raza"
-                            value={otraRaza}
-                            onChange={(e) => setOtraRaza(e.target.value)}
-                            aria-label="Otra raza"
-                            className={`${inputBase} border ${razaError ? "border-red-500" : "border-slate-200"}`}
-                          />
-                          {razaError && <p className="mt-1.5 text-sm text-red-600">{razaError}</p>}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                {/* Llegada */}
+                <p className="mb-1.5 mt-6 px-4 text-[13px] uppercase tracking-wide text-slate-500">Llegada</p>
+                <ul className="celda-ios divide-y overflow-hidden rounded-xl">
+                  <li className="flex min-h-[46px] items-center gap-3 px-4">
+                    <label htmlFor="f-fecha" className="w-32 shrink-0 text-[15px] text-slate-900">Fecha</label>
+                    <input
+                      id="f-fecha"
+                      type="date"
+                      value={fecha}
+                      max={fechaLocalISO(new Date())}
+                      onChange={(e) => {
+                        setFecha(e.target.value);
+                        if (fechaError) setFechaError("");
+                      }}
+                      className="campo-ios min-w-0 flex-1 appearance-none"
+                    />
+                  </li>
+                  <li className="flex min-h-[46px] items-center gap-3 px-4">
+                    <label htmlFor="f-peso" className="w-32 shrink-0 text-[15px] text-slate-900">Peso</label>
+                    <input
+                      id="f-peso"
+                      type="tel"
+                      inputMode="decimal"
+                      pattern="[0-9]*[.,]?[0-9]*"
+                      value={peso}
+                      onChange={(e) => {
+                        setPeso(e.target.value.replace(/[^0-9.,]/g, ""));
+                        if (pesoError) setPesoError("");
+                      }}
+                      placeholder="0"
+                      className="campo-ios min-w-0 flex-1"
+                    />
+                    <span className="-ml-1 text-[15px] text-slate-500">kg</span>
+                  </li>
+                </ul>
+                {(fechaError || pesoError) && <p className="mt-1.5 px-4 text-[13px] text-red-600">{fechaError || pesoError}</p>}
 
-                  {/* PESO */}
-                  <div className="flex items-start gap-3 px-3.5 py-3">
-                    <span aria-hidden="true" className="mt-6 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-base">⚖️</span>
-                    <div className="min-w-0 flex-1">
-                      <label htmlFor="f-peso" className="mb-1 block text-sm text-slate-500">Peso de llegada (kg)</label>
-                      <input
-                        id="f-peso"
-                        type="tel"
-                        inputMode="decimal"
-                        pattern="[0-9]*[.,]?[0-9]*"
-                        value={peso}
-                        onChange={(e) => {
-                          const nuevo = e.target.value.replace(/[^0-9.,]/g, "");
-                          setPeso(nuevo);
-                          if (pesoError) setPesoError("");
-                        }}
-                        placeholder="Ej: 70.0"
-                        className={`${inputBase} border ${pesoError ? "border-red-500" : "border-slate-200"}`}
-                      />
-                      {pesoError && <p className="mt-1.5 text-sm text-red-600">{pesoError}</p>}
-                    </div>
-                  </div>
-
-                  {/* FECHA */}
-                  <div className="flex items-start gap-3 px-3.5 py-3">
-                    <span aria-hidden="true" className="mt-6 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-base">📅</span>
-                    <div className="min-w-0 flex-1">
-                      <label htmlFor="f-fecha" className="mb-1 block text-sm text-slate-500">Fecha de llegada</label>
-                      <input
-                        id="f-fecha"
-                        type="date"
-                        value={fecha}
-                        max={fechaLocalISO(new Date())}
-                        onChange={(e) => {
-                          setFecha(e.target.value);
-                          if (fechaError) setFechaError("");
-                        }}
-                        className={`${inputBase} appearance-none border ${fechaError ? "border-red-500" : "border-slate-200"}`}
-                      />
-                      {fechaError && <p className="mt-1.5 text-sm text-red-600">{fechaError}</p>}
-                    </div>
-                  </div>
-                </div>
-
-                {/* CARACTERÍSTICAS */}
-                <h4 className="mb-1 mt-5 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Características</h4>
-                <div className="rounded-2xl bg-amber-50/70 p-3 ring-1 ring-amber-100">
+                {/* Notas */}
+                <p className="mb-1.5 mt-6 px-4 text-[13px] uppercase tracking-wide text-slate-500">Notas</p>
+                <div className="celda-ios overflow-hidden rounded-xl">
                   <label htmlFor="f-car" className="sr-only">Características</label>
                   <textarea
                     id="f-car"
                     value={caracteristicas}
                     onChange={(e) => setCaracteristicas(e.target.value)}
                     placeholder="Marcas, temperamento, observaciones"
-                    className="h-20 w-full resize-none rounded-xl border border-amber-100 bg-white/80 px-3 py-2 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-200"
+                    rows={3}
+                    className="block w-full resize-none bg-transparent px-4 py-3 text-base text-slate-900 outline-none placeholder:text-slate-400"
                   />
-                </div>
-
-                <div className="mt-5 grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={agregarOCrear}
-                    className="rounded-2xl bg-emerald-700 py-3 text-sm font-bold text-white transition hover:bg-emerald-800 active:scale-[0.98]"
-                  >
-                    {editIndex !== null ? "Actualizar" : "Agregar cerda"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMostrarFormulario(false)}
-                    className="rounded-2xl bg-slate-100 py-3 text-sm font-bold text-slate-800 transition hover:bg-slate-200 active:scale-[0.98]"
-                  >
-                    Cancelar
-                  </button>
                 </div>
               </div>
             </div>

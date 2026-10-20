@@ -303,3 +303,27 @@ html.oscuro .ring-offset-1 { --tw-ring-offset-color: #1c1c1e; }
 /* Calendario: fucsia del parto registrado en modo oscuro */
 html.oscuro .text-fuchsia-700 { color: #f0abfc; }
 html.oscuro .stroke-white { stroke: #1c1c1e; }
+
+/* Formularios estilo iOS (fondo gris agrupado, celdas blancas) */
+.hoja-ios { background-color: #f2f2f7; color: #0f172a; }
+.barra-ios { background-color: rgb(249 249 251 / 0.94); border-color: #d1d1d6; }
+.celda-ios { background-color: #ffffff; }
+.celda-ios > * + * { border-color: #e5e5ea; }
+.campo-ios {
+  background: transparent;
+  border: 0;
+  outline: none;
+  text-align: right;
+  font-size: 16px;
+  color: #3a3a3c;
+  padding: 12px 0;
+}
+.campo-ios::placeholder { color: #c7c7cc; }
+select.campo-ios { text-align-last: right; -webkit-appearance: none; appearance: none; cursor: pointer; }
+input[type="date"].campo-ios::-webkit-date-and-time-value { text-align: right; }
+html.oscuro .hoja-ios { background-color: #1c1c1e; color: #f2f2f7; }
+html.oscuro .barra-ios { background-color: rgb(28 28 30 / 0.94); border-color: #38383a; }
+html.oscuro .celda-ios { background-color: #2c2c2e; }
+html.oscuro .celda-ios > * + * { border-color: #3a3a3c; }
+html.oscuro .campo-ios { color: #d1d1d6; }
+html.oscuro .campo-ios::placeholder { color: #636366; }
