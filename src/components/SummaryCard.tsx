@@ -59,11 +59,9 @@ export default function SummaryCard({
           <span className="text-base">{icon}</span>
         </div>
         <div className="text-right">
-          <p
-            className={`text-[10px] font-semibold uppercase tracking-[0.12em] ${detailColor}`}
-          >
-            {detalle}
-          </p>
+          {detalle && (
+            <p className={`text-[10px] font-semibold uppercase tracking-[0.12em] ${detailColor}`}>{detalle}</p>
+          )}
           <p className={`text-base font-black ${textColor}`}>{valor}</p>
         </div>
       </div>

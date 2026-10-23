@@ -177,16 +177,16 @@ export default function Dashboard() {
 
   const resumen = [
     {
-      nombre: "Cerdos",
+      nombre: "Total cerdos",
       valor: totalCerdos,
-      detalle: "Total",
+      detalle: "",
       icon: "🐖",
       iconBg: "bg-emerald-50 text-emerald-700",
     },
     {
-      nombre: "Gestantes",
+      nombre: "Gestantes en producción",
       valor: gestantes,
-      detalle: "En producción",
+      detalle: "",
       icon: "🐷",
       iconBg: "bg-gray-100 text-gray-700",
     },
@@ -200,7 +200,6 @@ export default function Dashboard() {
       <div className="mx-auto flex max-w-xl flex-1 flex-col gap-5 pb-44">
         <Header
           title="El Mirador"
-          subtitle="Sistema integral de producción porcina"
           bgColor={COLOR_PAGINA}
         />
 
