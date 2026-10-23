@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Header from "@/components/Header";
+import SummaryCard from "@/components/SummaryCard";
 import PageShell from "@/components/PageShell";
 import BottomNav from "@/components/BottomNav";
 import {
@@ -173,78 +175,160 @@ export default function Dashboard() {
     }, 0);
   }, [cerdas]);
 
+  const resumen = [
+    {
+      nombre: "Cerdos",
+      valor: totalCerdos,
+      detalle: "Total",
+      icon: "🐖",
+      iconBg: "bg-emerald-50 text-emerald-700",
+    },
+    {
+      nombre: "Gestantes",
+      valor: gestantes,
+      detalle: "En producción",
+      icon: "🐷",
+      iconBg: "bg-gray-100 text-gray-700",
+    },
+    {
+      nombre: "Lechones",
+      valor: "54",
+      detalle: "Esta semana",
+      icon: "🐽",
+      iconBg: "bg-amber-50 text-amber-700",
+    },
+    {
+      nombre: "Rendimiento",
+      valor: "92%",
+      detalle: "Este mes",
+      icon: "📝",
+      iconBg: "bg-sky-50 text-sky-700",
+    },
+  ];
 
   const hayCriticas = cerdasCriticas.length > 0;
+  const [destacado, ...otrosModulos] = modulos;
 
   return (
     <PageShell bgColor={COLOR_PAGINA} className="flex flex-col">
-      <div className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-7 pb-44">
-        {/* Encabezado: saludo, nombre y logo, sin cajas */}
-        <header className="flex items-center justify-between gap-3 pt-1">
-          <div className="min-w-0">
-            <p className="text-sm text-slate-500">{saludo}</p>
-            <h1 className="text-[28px] font-bold leading-tight tracking-tight text-slate-950">El Mirador</h1>
-          </div>
-          <span className="logo-caja flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white ring-1 ring-slate-200">
-            <img src="/images/logo-header.png" alt="Logo Porcícola El Mirador" width={34} height={34} className="h-[34px] w-[34px] object-contain" />
-          </span>
-        </header>
+      <div className="mx-auto flex max-w-xl flex-1 flex-col gap-5 pb-44">
+        <Header
+          title="El Mirador"
+          subtitle="Sistema integral de producción porcina"
+          bgColor={COLOR_PAGINA}
+        />
 
-        {/* Estado del día: una sola línea */}
-        <button
-          type="button"
-          onClick={() => router.push("/tareas")}
-          disabled={pendientes === 0}
-          className="-mx-1 flex items-center gap-3 rounded-2xl px-1 py-1 text-left transition active:opacity-60 disabled:active:opacity-100"
+        {/* Parte del día: compacto, una sola franja */}
+        <section
+          aria-label="Estado del día"
+          className="relative flex items-center gap-3 overflow-hidden rounded-2xl bg-emerald-900 px-4 py-3 text-white shadow-md"
         >
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0"
+            style={{
+              backgroundImage:
+                "repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 10px, transparent 10px 26px)",
+            }}
+          />
+
           <span
             aria-hidden="true"
-            className={`h-2.5 w-2.5 shrink-0 rounded-full ${hayCriticas ? "bg-rose-500" : pendientes > 0 ? "bg-amber-400" : "bg-emerald-500"}`}
-          />
-          <span className="min-w-0 flex-1">
-            <span className="block text-[15px] font-medium text-slate-900">
-              {pendientes > 0 ? `${pendientes} ${pendientes === 1 ? "tarea pendiente" : "tareas pendientes"}` : "Todo al día"}
-            </span>
-            <span className="block text-xs text-slate-500">
-              {hayCriticas
-                ? `${cerdasCriticas.length} ${cerdasCriticas.length === 1 ? "urgente" : "urgentes"}`
-                : pendientes > 0
-                ? "Ninguna urgente"
-                : "Nada por atender"}
-            </span>
+            className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold tabular-nums ${
+              hayCriticas ? "bg-rose-500 text-white" : "bg-white/15 text-white"
+            }`}
+          >
+            {pendientes > 0 ? pendientes : "✓"}
           </span>
-          {pendientes > 0 && <span className="text-sm font-medium text-emerald-700">Ver</span>}
-        </button>
 
-        {/* Cifras principales: solo números */}
-        <section aria-label="Resumen" className="grid grid-cols-3 divide-x divide-slate-200">
-          {[
-            { etiqueta: "Cerdas", valor: totalCerdos },
-            { etiqueta: "Gestantes", valor: gestantes },
-            { etiqueta: "Pendientes", valor: pendientes },
-          ].map((c) => (
-            <div key={c.etiqueta} className="px-3 first:pl-0">
-              <p className="text-[28px] font-semibold leading-none tabular-nums text-slate-950">{c.valor}</p>
-              <p className="mt-1.5 text-xs text-slate-500">{c.etiqueta}</p>
-            </div>
-          ))}
+          <div className="relative min-w-0 flex-1">
+            <p className="truncate text-[15px] font-semibold leading-tight">
+              {pendientes > 0
+                ? `${pendientes === 1 ? "Tarea pendiente" : "Tareas pendientes"}`
+                : "Todo al día"}
+            </p>
+            <p className="truncate text-xs text-emerald-100/90">
+              {hayCriticas
+                ? `${cerdasCriticas.length} ${cerdasCriticas.length === 1 ? "urgente" : "urgentes"} · ${saludo}`
+                : pendientes > 0
+                ? `Ninguna urgente · ${saludo}`
+                : `${saludo} · nada por atender`}
+            </p>
+          </div>
+
+          {pendientes > 0 && (
+            <button
+              type="button"
+              onClick={() => router.push("/tareas")}
+              className="relative shrink-0 rounded-full bg-white px-3.5 py-1.5 text-xs font-semibold text-emerald-900 transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-emerald-900"
+            >
+              Ver
+            </button>
+          )}
         </section>
 
-        {/* Módulos: cuadrícula limpia, solo ícono y nombre */}
         <section>
-          <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-slate-400">Módulos</h2>
-          <div className="grid grid-cols-3 gap-2.5">
-            {modulos.map((modulo) => (
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-base font-semibold text-slate-950">Resumen rápido</h2>
+            <span className="text-xs text-slate-500">Actualizado hoy</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            {resumen.map((item) => (
+              <SummaryCard
+                key={item.nombre}
+                nombre={item.nombre}
+                valor={item.valor}
+                detalle={item.detalle}
+                icon={item.icon}
+                iconBg={item.iconBg}
+                bgColor={COLOR_PAGINA}
+              />
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <h2 className="mb-3 text-base font-semibold text-slate-950">Módulos</h2>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            {/* Gestación: el módulo de uso diario ocupa todo el ancho */}
+            <button
+              type="button"
+              onClick={() => router.push(destacado.ruta)}
+              className={`col-span-2 flex items-center justify-between gap-3 rounded-3xl border px-4 py-4 text-left shadow-sm transition active:scale-[0.98] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${destacado.card}`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`flex h-14 w-14 items-center justify-center rounded-2xl text-3xl ${destacado.tile}`}>
+                  {destacado.icon}
+                </div>
+                <div>
+                  <p className="text-base font-bold text-slate-950">{destacado.nombre}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">{destacado.descripcion}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-bold leading-none text-emerald-800">{gestantes}</p>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  {gestantes === 1 ? "gestante" : "gestantes"}
+                </p>
+              </div>
+            </button>
+
+            {otrosModulos.map((modulo) => (
               <button
                 key={modulo.nombre}
                 type="button"
                 onClick={() => router.push(modulo.ruta)}
-                className="flex aspect-square flex-col items-center justify-center gap-2 rounded-2xl bg-slate-50 px-2 text-center transition active:scale-[0.97] active:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+                className={`flex flex-col items-start gap-3 rounded-3xl border px-3.5 py-3.5 text-left shadow-sm transition active:scale-[0.97] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${modulo.card}`}
               >
-                <span className="text-[26px] leading-none" aria-hidden="true">
+                <div className={`flex h-11 w-11 items-center justify-center rounded-2xl text-2xl ${modulo.tile}`}>
                   {modulo.icon}
-                </span>
-                <span className="w-full truncate text-[13px] font-medium text-slate-800">{modulo.nombre}</span>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-slate-950">{modulo.nombre}</p>
+                  <p className="mt-0.5 text-xs leading-snug text-slate-500">{modulo.descripcion}</p>
+                </div>
               </button>
             ))}
           </div>
