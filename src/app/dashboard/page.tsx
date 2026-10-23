@@ -190,20 +190,6 @@ export default function Dashboard() {
       icon: "🐷",
       iconBg: "bg-gray-100 text-gray-700",
     },
-    {
-      nombre: "Lechones",
-      valor: "54",
-      detalle: "Esta semana",
-      icon: "🐽",
-      iconBg: "bg-amber-50 text-amber-700",
-    },
-    {
-      nombre: "Rendimiento",
-      valor: "92%",
-      detalle: "Este mes",
-      icon: "📝",
-      iconBg: "bg-sky-50 text-sky-700",
-    },
   ];
 
   const hayCriticas = cerdasCriticas.length > 0;
