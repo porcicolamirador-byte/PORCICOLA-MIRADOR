@@ -24,7 +24,7 @@ const modulos = [
     ruta: "/gestacion",
     icon: "🐖",
     tile: "bg-emerald-100 text-emerald-800",
-    card: "bg-white border-emerald-200",
+    card: "bg-white border-slate-200",
   },
   {
     nombre: "Engorde",
@@ -32,7 +32,7 @@ const modulos = [
     ruta: "/engorde",
     icon: "🐷",
     tile: "bg-amber-100 text-amber-800",
-    card: "bg-white border-amber-200",
+    card: "bg-white border-slate-200",
   },
   {
     nombre: "Monitoreo",
@@ -40,7 +40,7 @@ const modulos = [
     ruta: "/monitoreo",
     icon: "🌡️",
     tile: "bg-orange-100 text-orange-800",
-    card: "bg-white border-orange-200",
+    card: "bg-white border-slate-200",
   },
   {
     nombre: "Tratamientos",
@@ -48,7 +48,7 @@ const modulos = [
     ruta: "/tratamientos",
     icon: "🩺",
     tile: "bg-rose-100 text-rose-800",
-    card: "bg-white border-rose-200",
+    card: "bg-white border-slate-200",
   },
   {
     nombre: "Bodega",
@@ -56,7 +56,7 @@ const modulos = [
     ruta: "/bodega",
     icon: "📦",
     tile: "bg-teal-100 text-teal-800",
-    card: "bg-white border-teal-200",
+    card: "bg-white border-slate-200",
   },
   {
     nombre: "Bioseguridad",
@@ -64,7 +64,7 @@ const modulos = [
     ruta: "/bioseguridad",
     icon: "🛡️",
     tile: "bg-sky-100 text-sky-800",
-    card: "bg-white border-sky-200",
+    card: "bg-white border-slate-200",
   },
   {
     nombre: "Indicadores",
@@ -72,7 +72,7 @@ const modulos = [
     ruta: "/indicadores",
     icon: "📊",
     tile: "bg-violet-100 text-violet-800",
-    card: "bg-white border-violet-200",
+    card: "bg-white border-slate-200",
   },
   {
     nombre: "Contabilidad",
@@ -80,7 +80,7 @@ const modulos = [
     ruta: "/contabilidad",
     icon: "💼",
     tile: "bg-stone-200 text-stone-800",
-    card: "bg-white border-stone-300",
+    card: "bg-white border-slate-200",
   },
   {
     nombre: "Programación",
@@ -88,7 +88,7 @@ const modulos = [
     ruta: "/programacion",
     icon: "🐖",
     tile: "bg-pink-100 text-pink-800",
-    card: "bg-white border-pink-200",
+    card: "bg-white border-slate-200",
   },
 ];
 
