@@ -27,17 +27,20 @@ function deBase64(texto: string): Uint8Array<ArrayBuffer> {
 
 const aleatorio = (n: number) => crypto.getRandomValues(new Uint8Array(new ArrayBuffer(n)));
 
-function idGuardado(): string | null {
+/** Clave de la llave de acceso para entrar a la app (distinta de la de ajustes) */
+export const CLAVE_FACEID_APP = "faceid-app";
+
+function idGuardado(clave = CLAVE): string | null {
   try {
-    return localStorage.getItem(CLAVE);
+    return localStorage.getItem(clave);
   } catch {
     return null;
   }
 }
 
 /** Si ya se activó Face ID en este teléfono */
-export function faceIdActivo(): boolean {
-  return !!idGuardado();
+export function faceIdActivo(clave = CLAVE): boolean {
+  return !!idGuardado(clave);
 }
 
 /** Si el teléfono tiene Face ID / Touch ID disponible para la app */
@@ -54,13 +57,13 @@ export async function faceIdDisponible(): Promise<boolean> {
  * Registra el rostro. Debe llamarse directamente al tocar un botón
  * (el iPhone solo muestra Face ID como respuesta a un toque).
  */
-export async function activarFaceId(): Promise<boolean> {
+export async function activarFaceId(clave = CLAVE, nombre = "Ajustes privados"): Promise<boolean> {
   try {
     const credencial = (await navigator.credentials.create({
       publicKey: {
         challenge: aleatorio(32),
         rp: { name: "Porcícola El Mirador", id: location.hostname },
-        user: { id: aleatorio(16), name: "Ajustes privados", displayName: "Ajustes privados" },
+        user: { id: aleatorio(16), name: nombre, displayName: nombre },
         pubKeyCredParams: [
           { type: "public-key", alg: -7 },
           { type: "public-key", alg: -257 },
@@ -71,7 +74,7 @@ export async function activarFaceId(): Promise<boolean> {
       },
     })) as PublicKeyCredential | null;
     if (!credencial) return false;
-    localStorage.setItem(CLAVE, aBase64(credencial.rawId));
+    localStorage.setItem(clave, aBase64(credencial.rawId));
     return true;
   } catch {
     return false;
@@ -82,8 +85,8 @@ export async function activarFaceId(): Promise<boolean> {
  * Pide el rostro. Devuelve true solo si el teléfono confirmó a la persona.
  * Igual que activarFaceId, debe llamarse directamente al tocar.
  */
-export async function verificarFaceId(): Promise<boolean> {
-  const id = idGuardado();
+export async function verificarFaceId(clave = CLAVE): Promise<boolean> {
+  const id = idGuardado(clave);
   if (!id) return false;
   try {
     const credencial = (await navigator.credentials.get({
@@ -111,9 +114,9 @@ export async function verificarFaceId(): Promise<boolean> {
   }
 }
 
-export function desactivarFaceId() {
+export function desactivarFaceId(clave = CLAVE) {
   try {
-    localStorage.removeItem(CLAVE);
+    localStorage.removeItem(clave);
   } catch {
     // sin almacenamiento: nada que borrar
   }

@@ -1,6 +1,7 @@
 "use client";
 
 import { leerLog, registrarLog } from "@/lib/log";
+import { perfilGuardado, puede } from "@/lib/nube";
 import { useEffect, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
@@ -40,7 +41,8 @@ export default function AjustesAvanzadosPage() {
   const router = useRouter();
   // En el cliente el permiso y la configuración se leen al instante (sin pantalla intermedia)
   const cliente = useSyncExternalStore(sinSuscripcion, () => true, () => false);
-  const permitido = cliente && ajustesDesbloqueados();
+  const permitido = cliente && ajustesDesbloqueados() && puede("ajustes");
+  const esAdmin = cliente && perfilGuardado()?.rol === "admin";
   const [config, setConfig] = useState<ConfigGranja>(() => (typeof window === "undefined" ? CONFIG_POR_DEFECTO : leerConfig()));
   const [abierto, setAbierto] = useState<string | null>(null);
   const alternar = (id: string) => setAbierto((a) => (a === id ? null : id));
@@ -88,7 +90,7 @@ export default function AjustesAvanzadosPage() {
   };
 
   useEffect(() => {
-    if (!ajustesDesbloqueados()) router.replace("/ajustes");
+    if (!ajustesDesbloqueados() || !puede("ajustes")) router.replace("/ajustes");
   }, [router]);
 
   const borrarTodo = async () => {
@@ -146,6 +148,22 @@ export default function AjustesAvanzadosPage() {
       )}
 
       <Grupo titulo="Acceso">
+        {esAdmin && (
+          <li>
+            <button type="button" onClick={() => router.push("/ajustes/usuarios")} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-50">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700" aria-hidden="true">
+                <IconoAjuste nombre="usuarios" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-medium text-slate-900">Usuarios</span>
+                <span className="block text-xs text-slate-500">Crear usuarios, PIN y permisos</span>
+              </span>
+              <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+                <path d="m9 6 6 6-6 6" />
+              </svg>
+            </button>
+          </li>
+        )}
         <li>
           <label className={`flex w-full items-center gap-3 px-4 py-3 ${faceId.disponible ? "cursor-pointer" : "opacity-50"}`}>
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700" aria-hidden="true">
@@ -389,6 +407,12 @@ const TRAZOS_AJUSTES = {
     <>
       <path d="M21 8 12 3 3 8v8l9 5 9-5z" />
       <path d="m3 8 9 5 9-5M12 13v8" />
+    </>
+  ),
+  usuarios: (
+    <>
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5" />
     </>
   ),
   registro: (

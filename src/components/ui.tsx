@@ -133,7 +133,7 @@ export function Entrada({
 }: {
   value: string | number;
   onChange: (v: string) => void;
-  type?: "text" | "number" | "date" | "time";
+  type?: "text" | "number" | "date" | "time" | "password";
   placeholder?: string;
   required?: boolean;
   min?: number;

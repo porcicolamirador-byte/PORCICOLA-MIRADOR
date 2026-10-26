@@ -321,3 +321,11 @@ html.oscuro .campo-ios::placeholder { color: #636366; }
 html.oscuro .text-sky-900 { color: #bae6fd; }
 html.oscuro .text-sky-700 { color: #7dd3fc; }
 html.oscuro .bg-sky-50\/70 { background-color: color-mix(in srgb,#0ea5e9 14%,#1c1c1e); }
+
+/* Teclado de PIN de la pantalla de entrada: sacudida al fallar */
+.pin-sacudir { animation: pin-sacudir 360ms ease-in-out both; }
+@keyframes pin-sacudir {
+  0%, 100% { transform: translateX(0) } 20% { transform: translateX(-10px) } 40% { transform: translateX(9px) }
+  60% { transform: translateX(-6px) } 80% { transform: translateX(4px) }
+}
+@media (prefers-reduced-motion: reduce) { .pin-sacudir { animation: none; } }

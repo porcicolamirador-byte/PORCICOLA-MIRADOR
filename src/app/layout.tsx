@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ModoSinConexion from "@/components/ModoSinConexion";
 import DialogoHost from "@/components/Dialogo";
+import PuertaAcceso from "@/components/PuertaAcceso";
 import { SCRIPT_TEMA } from "@/lib/tema";
 
 const geistSans = Geist({
@@ -56,7 +57,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col bg-white">
         <ModoSinConexion />
         <DialogoHost />
-        {children}
+        <PuertaAcceso>{children}</PuertaAcceso>
       </body>
     </html>
   );

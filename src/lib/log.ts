@@ -14,6 +14,8 @@ export interface EntradaLog {
   accion: AccionLog;
   modulo: string;
   detalle: string;
+  /** Nombre del usuario que lo hizo (si había sesión) */
+  usuario?: string;
 }
 
 export const CLAVE_LOG = "registro-actividad";
@@ -51,12 +53,22 @@ export function sinRegistro<T>(fn: () => T): T {
   }
 }
 
+function usuarioActual(): string {
+  try {
+    const p = JSON.parse(localStorage.getItem("nube-perfil") || "null");
+    return p?.nombre ? String(p.nombre) : "";
+  } catch {
+    return "";
+  }
+}
+
 /** Agrega entradas al registro (las más recientes primero) */
 export function registrarLog(entradas: { accion: AccionLog; modulo: string; detalle: string }[]) {
   if (typeof window === "undefined" || entradas.length === 0) return;
   try {
     const fecha = new Date().toISOString();
-    const nuevas = entradas.map((e) => ({ id: nuevoIdLog(), fecha, ...e }));
+    const usuario = usuarioActual();
+    const nuevas = entradas.map((e) => ({ id: nuevoIdLog(), fecha, ...e, ...(usuario ? { usuario } : {}) }));
     localStorage.setItem(CLAVE_LOG, JSON.stringify([...nuevas.reverse(), ...leerLog()].slice(0, MAXIMO)));
   } catch {
     // sin espacio o sin almacenamiento: el registro no debe impedir guardar los datos

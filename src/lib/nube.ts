@@ -67,7 +67,13 @@ function guardarSesion(sesion: SesionNube | null, perfil?: PerfilNube | null) {
   } catch {
     // sin almacenamiento
   }
+  try {
+    window.dispatchEvent(new Event(EVENTO_SESION));
+  } catch {}
 }
+
+/** Se emite en window cada vez que cambia la sesión o el perfil guardado */
+export const EVENTO_SESION = "nube-sesion";
 
 export function cerrarSesionNube() {
   const s = sesionGuardada();

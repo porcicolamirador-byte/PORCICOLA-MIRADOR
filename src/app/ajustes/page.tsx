@@ -20,6 +20,8 @@ import {
   useVersionDatos,
 } from "@/lib/datos";
 import { avisar as mostrarAviso, confirmar } from "@/components/Dialogo";
+import { perfilGuardado, puede, type PerfilNube } from "@/lib/nube";
+import { salirDeLaApp } from "@/components/PuertaAcceso";
 
 export default function AjustesPage() {
   const version = useVersionDatos();
@@ -37,7 +39,21 @@ export default function AjustesPage() {
   useEffect(() => setConFaceId(faceIdActivo()), []);
 
   // Con Face ID activo se pide el rostro; si falla o se cancela, se pide el código
+  const [perfil, setPerfil] = useState<PerfilNube | null>(null);
+  useEffect(() => setPerfil(perfilGuardado()), []);
+
+  const cerrarSesion = async () => {
+    if (!(await confirmar({ titulo: "Cerrar sesión", mensaje: "Para volver a entrar en este teléfono se pedirá tu usuario y tu PIN (con internet).", aceptar: "Cerrar sesión", destructivo: true }))) return;
+    registrarLog([{ accion: "Sistema", modulo: "Sesión", detalle: "Cerró sesión en este teléfono" }]);
+    salirDeLaApp();
+  };
+
   const entrar = () => {
+    // Solo el administrador o quien tenga el permiso entra a los ajustes protegidos
+    if (!puede("ajustes")) {
+      void mostrarAviso({ titulo: "Sin permiso", mensaje: "Tu usuario no tiene acceso a los ajustes protegidos. Pídeselo al administrador." });
+      return;
+    }
     if (entradaLibre()) {
       desbloquearAjustes();
       return router.push("/ajustes/avanzados");
@@ -115,6 +131,22 @@ export default function AjustesPage() {
 
   return (
     <ModuloPage titulo="Ajustes" subtitulo="Respaldo de los datos" icono="⚙️" tono="slate">
+      {perfil && (
+        <div className="flex items-center gap-3 rounded-3xl bg-white p-4 ring-1 ring-slate-200/80">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-100 text-base font-bold text-sky-800" aria-hidden="true">
+            {perfil.nombre.trim().charAt(0).toUpperCase()}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold text-slate-900">{perfil.nombre}</span>
+            <span className="block truncate text-xs text-slate-500">
+              @{perfil.usuario} · {perfil.rol === "admin" ? "Administrador" : "Trabajador"}
+            </span>
+          </span>
+          <button type="button" onClick={cerrarSesion} className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold text-rose-600 ring-1 ring-rose-200 active:bg-rose-50">
+            Cerrar sesión
+          </button>
+        </div>
+      )}
       <Tarjeta titulo="Datos">
         <p className="mb-3 text-sm text-slate-500">
           Los datos se guardan solo en este dispositivo
