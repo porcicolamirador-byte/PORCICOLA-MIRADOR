@@ -479,7 +479,7 @@ export default function CerdaDetalle() {
         <p className="text-black">Cerda no encontrada</p>
         <button
           onClick={() => router.push("/gestacion")}
-          className="rounded-2xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white"
+          className="rounded-2xl bg-sky-900 px-4 py-2 text-sm font-bold text-white"
         >
           Ir a Gestación
         </button>
@@ -801,7 +801,7 @@ export default function CerdaDetalle() {
                 </div>
                 <button
                   onClick={() => setMostrarForm(true)}
-                  className="shrink-0 whitespace-nowrap rounded-full bg-emerald-700 px-3.5 py-2 text-sm font-bold text-white transition hover:bg-emerald-800 active:scale-95"
+                  className="shrink-0 whitespace-nowrap rounded-full bg-sky-900 px-3.5 py-2 text-sm font-bold text-white transition hover:bg-sky-950 active:scale-95"
                 >
                   + Registro
                 </button>
@@ -1031,7 +1031,7 @@ export default function CerdaDetalle() {
                       }
                       agregarRegistro();
                     }}
-                    className="flex-1 bg-emerald-700 text-white py-3 rounded-2xl font-bold hover:bg-emerald-800"
+                    className="flex-1 bg-sky-900 text-white py-3 rounded-2xl font-bold hover:bg-sky-950"
                   >
                     {tipo === "Parto" ? "Registrar parto" : "Guardar"}
                   </button>
@@ -1145,7 +1145,7 @@ export default function CerdaDetalle() {
                   type="button"
                   onClick={exportarPdf}
                   disabled={exportando}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 py-3 text-sm font-bold text-white transition hover:bg-emerald-800 active:scale-[0.98] disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-sky-900 py-3 text-sm font-bold text-white transition hover:bg-sky-950 active:scale-[0.98] disabled:opacity-60"
                 >
                   <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14" />
@@ -1177,7 +1177,7 @@ export default function CerdaDetalle() {
       <button
         onClick={() => setMostrarForm(true)}
         style={{ bottom: "calc(env(safe-area-inset-bottom) + 1.5rem)" }}
-        className="fixed right-5 z-50 bg-emerald-700 w-12 h-12 rounded-full shadow-lg flex items-center justify-center text-white text-2xl hover:bg-emerald-800"
+        className="fixed right-5 z-50 bg-sky-900 w-12 h-12 rounded-full shadow-lg flex items-center justify-center text-white text-2xl hover:bg-sky-950"
         aria-label="Nuevo registro"
       >
         +

@@ -165,7 +165,7 @@ export default function RegistrarParto() {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-white px-6 text-center">
         <p className="text-black">Cerda no encontrada</p>
-        <button onClick={() => router.push("/gestacion")} className="rounded-2xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white">
+        <button onClick={() => router.push("/gestacion")} className="rounded-2xl bg-sky-900 px-4 py-2 text-sm font-bold text-white">
           Ir a Gestación
         </button>
       </main>
@@ -292,7 +292,7 @@ export default function RegistrarParto() {
             <button
               onClick={guardar}
               disabled={!historial}
-              className="flex-1 rounded-2xl bg-emerald-700 py-3 font-bold text-white hover:bg-emerald-800 disabled:opacity-50"
+              className="flex-1 rounded-2xl bg-sky-900 py-3 font-bold text-white hover:bg-sky-950 disabled:opacity-50"
             >
               Guardar parto
             </button>

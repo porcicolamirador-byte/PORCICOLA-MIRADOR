@@ -82,7 +82,7 @@ export function Boton({
   disabled?: boolean;
 }) {
   const estilos = {
-    primario: "bg-emerald-800 text-white hover:bg-emerald-900",
+    primario: "bg-sky-900 text-white hover:bg-sky-950",
     secundario: "bg-white text-slate-800 ring-1 ring-slate-300 hover:bg-slate-50",
     peligro: "bg-rose-600 text-white hover:bg-rose-700",
     suave: "bg-slate-100 text-slate-800 hover:bg-slate-200",

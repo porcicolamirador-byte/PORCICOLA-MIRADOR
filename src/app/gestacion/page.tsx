@@ -1062,7 +1062,7 @@ export default function Gestacion() {
                 <button
                   type="button"
                   onClick={() => setMostrarFormulario(false)}
-                  className="justify-self-start rounded-lg px-2.5 py-1.5 text-[17px] text-emerald-700 active:opacity-50"
+                  className="justify-self-start rounded-lg px-2.5 py-1.5 text-[17px] text-sky-700 active:opacity-50"
                 >
                   Cancelar
                 </button>
@@ -1071,7 +1071,7 @@ export default function Gestacion() {
                   type="button"
                   onClick={agregarOCrear}
                   disabled={!id.trim()}
-                  className="justify-self-end rounded-lg px-2.5 py-1.5 text-[17px] font-semibold text-emerald-700 active:opacity-50 disabled:text-slate-400"
+                  className="justify-self-end rounded-lg px-2.5 py-1.5 text-[17px] font-semibold text-sky-700 active:opacity-50 disabled:text-slate-400"
                 >
                   {editIndex !== null ? "Listo" : "Guardar"}
                 </button>

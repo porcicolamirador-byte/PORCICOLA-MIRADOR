@@ -211,7 +211,7 @@ function TarjetaCorral({ corral, onCambiar }: { corral?: Corral; onCambiar?: () 
           <p className="text-sm font-medium text-slate-600">Sin corral asignado</p>
         </div>
         {onCambiar && (
-          <button type="button" onClick={onCambiar} className="shrink-0 rounded-full bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white active:scale-95">
+          <button type="button" onClick={onCambiar} className="shrink-0 rounded-full bg-sky-900 px-3 py-1.5 text-xs font-semibold text-white active:scale-95">
             Elegir
           </button>
         )}
