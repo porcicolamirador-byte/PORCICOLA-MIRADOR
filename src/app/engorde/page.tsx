@@ -14,6 +14,8 @@ import {
   horaActual,
   kgDeCantidad,
   registrarConsumoLote,
+  editarConsumoLote,
+  eliminarConsumoLote,
   leerCorrales,
   leerSalidas,
   leerLotes,
@@ -197,9 +199,9 @@ function NuevoLote({ abierta, onCerrar }: { abierta: boolean; onCerrar: () => vo
   );
 }
 
-type Accion = "resumen" | "pesaje" | "muerte" | "alimento" | "corral";
+type Accion = "resumen" | "pesaje" | "muerte" | "alimento" | "editarAlimento" | "corral";
 
-const ICONOS_ACCION: Record<Accion, string> = { resumen: "🐖", pesaje: "⚖️", muerte: "⚠️", alimento: "🥣", corral: "🏚️" };
+const ICONOS_ACCION: Record<Accion, string> = { resumen: "🐖", pesaje: "⚖️", muerte: "⚠️", alimento: "🥣", editarAlimento: "✏️", corral: "🏚️" };
 
 /** Espacio que muestra el corral guardado del lote */
 function TarjetaCorral({ corral, onCambiar }: { corral?: Corral; onCambiar?: () => void }) {
@@ -248,11 +250,17 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   const [extra, setExtra] = useState("");
   const [productoId, setProductoId] = useState("");
   const [corralSel, setCorralSel] = useState(lote.corralId ?? "");
+  const [editIdx, setEditIdx] = useState<number | null>(null);
+  const registroEdit = accion === "editarAlimento" && editIdx !== null ? lote.alimento[editIdx] : undefined;
+  const esAlimento = accion === "alimento" || accion === "editarAlimento";
+  // Registro antiguo sin producto de bodega: solo se corrigen fecha, hora y kilos
+  const legado = accion === "editarAlimento" && !registroEdit?.productoId;
   const r = resumenLote(lote);
   const corrales = leerCorrales().sort((a, b) => a.codigo.localeCompare(b.codigo, "es", { numeric: true }));
   const corral = corrales.find((c) => c.id === lote.corralId);
   // Productos de bodega: los que tienen existencia primero; sin existencia aparecen desactivados
-  const inventario = accion === "alimento" ? calcularInventario() : [];
+  // Al editar, lo que ya se había descontado con este registro cuenta como disponible
+  const inventario = esAlimento && !legado ? calcularInventario({ excluirSalida: registroEdit?.salidaId }) : [];
   const productos = [...inventario].sort(
     (a, b) =>
       Number(b.disponible > 0) - Number(a.disponible > 0) ||
@@ -262,7 +270,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   const elegido = productos.find((p) => p.producto.id === productoId);
   const cantidadNum = Number(valor.replace(",", ".")) || 0;
   // Ajuste oculto: permite usar productos sin existencia (el inventario queda negativo)
-  const sinLimite = accion === "alimento" && leerConfig().permitirSinInventario;
+  const sinLimite = esAlimento && leerConfig().permitirSinInventario;
   const excede = !!elegido && !sinLimite && cantidadNum > elegido.disponible;
   const kgDe = (cantidad: number, unidad: string) => kgDeCantidad(cantidad, unidad, elegido?.producto.kgPorUnidad);
 
@@ -273,7 +281,34 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
     setFecha(hoy());
     setHora(horaActual());
     setCorralSel(lote.corralId ?? "");
+    setEditIdx(null);
     setAccion("resumen");
+  };
+
+  const abrirEdicion = (i: number) => {
+    const a = lote.alimento[i];
+    if (!a) return;
+    setEditIdx(i);
+    setProductoId(a.productoId ?? "");
+    setValor(String(a.productoId ? (a.cantidad ?? "") : a.kg));
+    setFecha(a.fecha);
+    setHora(a.hora ?? horaActual());
+    setAccion("editarAlimento");
+  };
+
+  const borrarRegistro = async () => {
+    if (editIdx === null) return;
+    const ok = await confirmar({
+      titulo: "Eliminar registro de alimento",
+      mensaje: registroEdit?.salidaId
+        ? "Se borrará el consumo del lote y la cantidad volverá a la bodega."
+        : "Se borrará este consumo del lote.",
+      aceptar: "Eliminar",
+      destructivo: true,
+    });
+    if (!ok) return;
+    eliminarConsumoLote(lote.id, editIdx);
+    limpiar();
   };
 
   const guardar = (e: FormEvent) => {
@@ -285,7 +320,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
       setCorralSel(corralSel);
       return;
     }
-    const n = Number(valor) || 0;
+    const n = Number(valor.replace(",", ".")) || 0;
     if (n <= 0) return;
     if (accion === "pesaje") {
       actualizarLote(lote.id, (l) => ({ ...l, pesajes: [...l.pesajes, { fecha, pesoPromedio: n }] }));
@@ -302,6 +337,15 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
       const libre = leerConfig().permitirSinInventario;
       if (!actual || (!libre && (actual.disponible <= 0 || n > actual.disponible))) return;
       registrarConsumoLote({ loteId: lote.id, productoId: actual.producto.id, cantidad: n, fecha, hora });
+    } else if (accion === "editarAlimento" && editIdx !== null) {
+      if (legado) {
+        editarConsumoLote(lote.id, editIdx, { cantidad: n, fecha, hora });
+      } else {
+        const actual = calcularInventario({ excluirSalida: registroEdit?.salidaId }).find((p) => p.producto.id === productoId);
+        const libre = leerConfig().permitirSinInventario;
+        if (!actual || (!libre && n > actual.disponible)) return;
+        editarConsumoLote(lote.id, editIdx, { productoId: actual.producto.id, cantidad: n, fecha, hora });
+      }
     }
     limpiar();
   };
@@ -323,6 +367,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
     pesaje: "Registrar pesaje",
     muerte: "Registrar muerte",
     alimento: "Registrar alimento",
+    editarAlimento: "Editar alimento",
     corral: "Corral del lote",
   };
 
@@ -379,26 +424,48 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
             <SeccionDesplegable titulo="Registros" cantidad={lote.pesajes.length + lote.mortalidad.length + lote.alimento.length}>
               <ul className="flex flex-col gap-1.5 text-sm">
                 {[
-                  ...lote.pesajes.map((p) => ({ f: p.fecha, h: "", t: `Pesaje: ${p.pesoPromedio} kg promedio` })),
-                  ...lote.alimento.map((a) => ({
+                  ...lote.pesajes.map((p) => ({ f: p.fecha, h: "", t: `Pesaje: ${p.pesoPromedio} kg promedio`, i: -1 })),
+                  ...lote.alimento.map((a, i) => ({
+                    i,
                     f: a.fecha,
                     h: a.hora ?? "",
                     t: a.producto
                       ? `Alimento: ${fmtCantidad(a.cantidad ?? 0)} ${a.unidad ?? ""} ${a.producto}${a.kg ? ` (${fmtCantidad(a.kg)} kg)` : ""}`
                       : `Alimento: ${a.kg} kg${a.costo ? ` · ${formatoPesos(a.costo)}` : ""}`,
                   })),
-                  ...lote.mortalidad.map((m) => ({ f: m.fecha, h: "", t: `Muerte: ${m.cantidad}${m.causa ? ` · ${m.causa}` : ""}` })),
+                  ...lote.mortalidad.map((m) => ({ f: m.fecha, h: "", t: `Muerte: ${m.cantidad}${m.causa ? ` · ${m.causa}` : ""}`, i: -1 })),
                 ]
                   .sort((a, b) => b.f.localeCompare(a.f) || b.h.localeCompare(a.h))
-                  .map((x, i) => (
-                    <li key={i} className="flex justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2">
-                      <span className="text-slate-700">{x.t}</span>
-                      <span className="shrink-0 text-right text-xs leading-tight text-slate-500">
-                        {formatoFecha(x.f)}
-                        {x.h && <span className="block text-[10px]">{formatoHora(x.h)}</span>}
-                      </span>
-                    </li>
-                  ))}
+                  .map((x, k) => {
+                    const contenido = (
+                      <>
+                        <span className="min-w-0 flex-1 text-slate-700">{x.t}</span>
+                        <span className="shrink-0 text-right text-xs leading-tight text-slate-500">
+                          {formatoFecha(x.f)}
+                          {x.h && <span className="block text-[10px]">{formatoHora(x.h)}</span>}
+                        </span>
+                      </>
+                    );
+                    return (
+                      <li key={k}>
+                        {x.i >= 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => abrirEdicion(x.i)}
+                            aria-label={`Editar o eliminar: ${x.t}`}
+                            className="flex w-full items-center gap-3 rounded-xl bg-slate-50 px-3 py-2 text-left active:bg-slate-100"
+                          >
+                            {contenido}
+                            <svg viewBox="0 0 20 20" className="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+                              <path d="M13.5 3.5l3 3L7 16H4v-3l9.5-9.5z" strokeLinejoin="round" />
+                            </svg>
+                          </button>
+                        ) : (
+                          <div className="flex justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2">{contenido}</div>
+                        )}
+                      </li>
+                    );
+                  })}
               </ul>
             </SeccionDesplegable>
           )}
@@ -432,7 +499,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
               </Campo>
 
             )
-          ) : accion === "alimento" ? (
+          ) : esAlimento ? (
             <div className="grid grid-cols-2 gap-3">
               <Campo etiqueta="Fecha">
                 <Entrada type="date" value={fecha} onChange={setFecha} required />
@@ -461,7 +528,12 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
               </Campo>
             </>
           )}
-          {accion === "alimento" &&
+          {legado && (
+            <Campo etiqueta="Kilos de alimento">
+              <Entrada type="number" inputMode="decimal" min={0} step="any" value={valor} onChange={setValor} required />
+            </Campo>
+          )}
+          {esAlimento && !legado &&
             (productos.length === 0 ? (
               <p className="rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-900 ring-1 ring-amber-100">
                 No hay productos en bodega. Créalos en Ajustes avanzados y carga una factura en Bodega.
@@ -516,12 +588,18 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
               type="submit"
               disabled={
                 (accion === "corral" && (!corralSel || corrales.length === 0)) ||
-                (accion === "alimento" && (!elegido || cantidadNum <= 0 || excede))
+                (esAlimento && !legado && (!elegido || cantidadNum <= 0 || excede)) ||
+                (legado && cantidadNum <= 0)
               }
             >
               Guardar
             </Boton>
           </div>
+          {accion === "editarAlimento" && (
+            <Boton variante="suave" onClick={borrarRegistro} className="w-full text-rose-600">
+              Eliminar registro
+            </Boton>
+          )}
         </form>
       )}
     </Modal>

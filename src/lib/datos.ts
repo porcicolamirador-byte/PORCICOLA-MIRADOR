@@ -424,9 +424,9 @@ export interface ExistenciaProducto {
  * kilos (o en la unidad común) y se muestra en la unidad de cada producto.
  * Ej.: 10 bultos de 40 kg y una salida de 20 kg del producto en kilos → 9,5 bultos.
  */
-export function calcularInventario(opciones: { incluirInactivos?: boolean } = {}): ExistenciaProducto[] {
+export function calcularInventario(opciones: { incluirInactivos?: boolean; excluirSalida?: string } = {}): ExistenciaProducto[] {
   const facturas = leerFacturas();
-  const salidas = leerSalidas();
+  const salidas = leerSalidas().filter((s) => !opciones.excluirSalida || s.id !== opciones.excluirSalida);
   const productos = leerProductos();
   const grupoDe = (p: ProductoBodega) => codigoDe(p) || `#${p.id}`;
   const porId = new Map(productos.map((p) => [p.id, p]));
@@ -571,6 +571,42 @@ export function registrarConsumoLote(datos: { loteId: string; productoId: string
 }
 
 /** Elimina una salida de Bodega y, si era consumo de un lote, también su registro de alimento */
+/** Borra un consumo de alimento de un lote; si salió de bodega, el producto vuelve al inventario */
+export function eliminarConsumoLote(loteId: string, indice: number) {
+  const lote = leerLotes().find((l) => l.id === loteId);
+  const registro = lote?.alimento[indice];
+  if (!lote || !registro) return;
+  if (registro.salidaId) guardarSalidas(leerSalidas().filter((s) => s.id !== registro.salidaId));
+  guardarLotes(leerLotes().map((l) => (l.id === loteId ? { ...l, alimento: l.alimento.filter((_, i) => i !== indice) } : l)));
+}
+
+/**
+ * Corrige un consumo de alimento. Si era de bodega, se devuelve lo descontado
+ * y se vuelve a descontar con los datos nuevos (producto, cantidad, fecha y hora).
+ * Los registros antiguos sin producto solo cambian fecha, hora y kilos.
+ */
+export function editarConsumoLote(
+  loteId: string,
+  indice: number,
+  datos: { productoId?: string; cantidad: number; fecha: string; hora?: string },
+) {
+  const lote = leerLotes().find((l) => l.id === loteId);
+  const registro = lote?.alimento[indice];
+  if (!lote || !registro) return false;
+  if (!datos.productoId) {
+    guardarLotes(
+      leerLotes().map((l) =>
+        l.id === loteId
+          ? { ...l, alimento: l.alimento.map((a, i) => (i === indice ? { ...a, fecha: datos.fecha, hora: datos.hora, kg: datos.cantidad } : a)) }
+          : l,
+      ),
+    );
+    return true;
+  }
+  eliminarConsumoLote(loteId, indice);
+  return registrarConsumoLote({ loteId, productoId: datos.productoId, cantidad: datos.cantidad, fecha: datos.fecha, hora: datos.hora });
+}
+
 export function eliminarSalida(salidaId: string) {
   guardarSalidas(leerSalidas().filter((s) => s.id !== salidaId));
   const lotes = leerLotes();
