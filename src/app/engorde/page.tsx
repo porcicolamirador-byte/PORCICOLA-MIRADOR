@@ -21,6 +21,9 @@ import {
   editarConsumoLote,
   eliminarConsumoLote,
   leerCorrales,
+  leerProductos,
+  codigoDe,
+  KG_POR_BULTO,
   leerCerdas,
   leerSalidas,
   leerLotes,
@@ -32,7 +35,7 @@ import {
 import { confirmar } from "@/components/Dialogo";
 import DialogoClave from "@/components/DialogoClave";
 import Modal from "@/components/Modal";
-import { leerConfig } from "@/lib/config";
+import { ETAPAS_ALIMENTACION, leerConfig } from "@/lib/config";
 
 /** Indicadores calculados de un lote */
 function resumenLote(l: Lote) {
@@ -145,6 +148,99 @@ function Mini({ titulo, valor }: { titulo: string; valor: string }) {
       <p className="text-[10px] font-medium uppercase tracking-wide text-amber-900/70">{titulo}</p>
       <p className="text-sm font-semibold text-slate-900 tabular-nums">{valor}</p>
     </div>
+  );
+}
+
+/**
+ * Consumo establecido del lote: los kilos estándar de cada etapa son por
+ * lechón, así que se multiplican por los animales vivos. Lo consumido de cada
+ * etapa sale de los registros de alimento cuyo producto tiene un código unido
+ * a esa etapa en Ajustes → Alimentación estándar.
+ */
+function consumoEstablecido(l: Lote) {
+  const config = leerConfig();
+  const codigoPorProducto = new Map(leerProductos().map((p) => [p.id, codigoDe(p)]));
+  const etapas = ETAPAS_ALIMENTACION.map(({ clave, nombre }) => {
+    const codigos = config.productosEtapa[clave];
+    const porAnimal = config.alimentacion[clave];
+    const estandar = porAnimal * l.vivos;
+    const consumido = l.alimento.reduce((s, a) => {
+      const codigo = a.productoId ? codigoPorProducto.get(a.productoId) : "";
+      return codigo && codigos.includes(codigo) ? s + (Number(a.kg) || 0) : s;
+    }, 0);
+    return { clave, nombre, porAnimal, estandar, consumido, faltan: Math.max(0, estandar - consumido), sinProductos: codigos.length === 0 };
+  });
+  const enEtapas = etapas.reduce((s, e) => s + e.consumido, 0);
+  const totalConsumido = l.alimento.reduce((s, a) => s + (Number(a.kg) || 0), 0);
+  // Etapa actual: la primera que aún no completa su estándar
+  const actual = etapas.find((e) => e.estandar > 0 && e.consumido < e.estandar)?.clave ?? null;
+  return {
+    etapas,
+    actual,
+    estandar: etapas.reduce((s, e) => s + e.estandar, 0),
+    consumido: enEtapas,
+    sinEtapa: Math.max(0, totalConsumido - enEtapas),
+  };
+}
+
+const fmtKg = (n: number) => n.toLocaleString("es-CO", { maximumFractionDigits: 1 });
+const fmtBultos = (kg: number) => {
+  const b = kg / KG_POR_BULTO;
+  return `${b.toLocaleString("es-CO", { maximumFractionDigits: 1 })} ${b === 1 ? "bulto" : "bultos"}`;
+};
+
+function ConsumoEstablecido({ lote }: { lote: Lote }) {
+  const c = consumoEstablecido(lote);
+  if (c.estandar <= 0) return null;
+  const pct = (a: number, b: number) => (b > 0 ? Math.min(100, (a / b) * 100) : 0);
+  return (
+    <section className="rounded-2xl bg-white p-3.5 ring-1 ring-slate-200">
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Consumo establecido</p>
+        <p className="text-xs text-slate-500">{lote.vivos} animales</p>
+      </div>
+      <p className="mt-1 text-lg font-bold tabular-nums text-slate-900">
+        {fmtKg(c.consumido)} <span className="text-sm font-medium text-slate-500">de {fmtKg(c.estandar)} kg</span>
+      </p>
+      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
+        <div className="h-full rounded-full bg-sky-600" style={{ width: `${pct(c.consumido, c.estandar)}%` }} />
+      </div>
+
+      <ul className="mt-3 flex flex-col gap-2.5">
+        {c.etapas.map((e) => {
+          const actual = e.clave === c.actual;
+          const completa = e.estandar > 0 && e.consumido >= e.estandar;
+          const exceso = e.consumido - e.estandar;
+          return (
+            <li key={e.clave} className={`rounded-xl px-3 py-2.5 ${actual ? "bg-sky-50 ring-1 ring-sky-100" : "bg-slate-50"}`}>
+              <div className="flex items-center gap-2">
+                <span className={`min-w-0 flex-1 truncate text-sm font-semibold ${actual ? "text-sky-900" : "text-slate-800"}`}>{e.nombre}</span>
+                {actual && <span className="shrink-0 rounded-full bg-sky-700 px-2 py-0.5 text-[10px] font-semibold text-white">Actual</span>}
+                {completa && <span className="shrink-0 text-[11px] font-semibold text-sky-700">✓ Completa</span>}
+              </div>
+              <p className="mt-0.5 text-xs text-slate-500">
+                {fmtKg(e.porAnimal)} kg × {lote.vivos} = <b className="font-semibold text-slate-700">{fmtKg(e.estandar)} kg</b> · {fmtBultos(e.estandar)}
+              </p>
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-200/70">
+                <div className={`h-full rounded-full ${completa ? "bg-sky-700" : "bg-sky-500"}`} style={{ width: `${pct(e.consumido, e.estandar)}%` }} />
+              </div>
+              <p className="mt-1 flex justify-between gap-2 text-xs tabular-nums">
+                <span className="text-slate-600">Consumido {fmtKg(e.consumido)} kg</span>
+                <span className={exceso > 0 ? "font-semibold text-amber-700" : "text-slate-600"}>
+                  {exceso > 0 ? `+${fmtKg(exceso)} kg sobre el estándar` : completa ? "Al día" : `Faltan ${fmtKg(e.faltan)} kg · ${fmtBultos(e.faltan)}`}
+                </span>
+              </p>
+              {e.sinProductos && <p className="mt-1 text-[11px] text-amber-700">Sin productos unidos en Ajustes → Alimentación estándar</p>}
+            </li>
+          );
+        })}
+      </ul>
+      {c.sinEtapa > 0 && (
+        <p className="mt-2 text-xs text-slate-500">
+          {fmtKg(c.sinEtapa)} kg registrados con productos que no están unidos a ninguna etapa.
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -468,6 +564,8 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
             <Dato titulo="Alimento" valor={`${Math.round(r.kgAlimento)} kg`} />
             <Dato titulo="Conversión" valor={r.conversion !== null ? r.conversion.toFixed(2) : "–"} detalle="kg alimento / kg ganado" />
           </div>
+
+          <ConsumoEstablecido lote={lote} />
 
           {lote.activo && (
             <div className="flex flex-col gap-2">
