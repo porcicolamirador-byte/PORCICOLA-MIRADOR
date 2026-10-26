@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
-import { Boton, Campo, Chevron, Chips, Entrada, Hoja, IconoMas, Insignia, SeccionDesplegable, Selector, Vacio } from "@/components/ui";
+import { Boton, Campo, Chevron, Chips, Entrada, Hoja, IconoMas, Insignia, SeccionDesplegable, Selector, Vacio, EntradaPesos } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
 import DialogoClave from "@/components/DialogoClave";
 import { leerConfig } from "@/lib/config";
@@ -54,13 +54,6 @@ const CATEGORIA_GASTO: Record<CategoriaBodega, string> = {
 };
 
 type Vista = "inventario" | "reponer" | "facturas";
-
-/** $1,2 M · $350 mil · $8.500 */
-function pesosCortos(n: number) {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toLocaleString("es-CO", { maximumFractionDigits: 1 })} M`;
-  if (n >= 10_000) return `$${Math.round(n / 1000).toLocaleString("es-CO")} mil`;
-  return `$${Math.round(n).toLocaleString("es-CO")}`;
-}
 
 export default function BodegaPage() {
   const router = useRouter();
@@ -114,17 +107,17 @@ export default function BodegaPage() {
         </Boton>
       }
     >
-      {/* Resumen compacto: una sola franja con cuatro cifras */}
-      <div className="grid grid-cols-4 divide-x divide-slate-200 rounded-2xl bg-white py-2 ring-1 ring-slate-200/80">
+      {/* Resumen compacto: dos filas, valores en pesos completos */}
+      <div className="grid grid-cols-2 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/80 [&>*:nth-child(odd)]:border-r [&>*:nth-child(-n+2)]:border-b [&>*]:border-slate-200">
         {[
-          { t: "Con existencia", v: datos ? `${conExistencia}/${datos.productos.length}` : "–", alerta: agotados > 0 },
+          { t: "Con existencia", v: datos ? `${conExistencia} de ${datos.productos.length}` : "–", alerta: agotados > 0 },
           { t: "Por reponer", v: datos ? String(bajos.length) : "–", alerta: bajos.length > 0 },
-          { t: "En bodega", v: datos ? pesosCortos(valorBodega) : "–", alerta: false },
-          { t: "Compras mes", v: datos ? pesosCortos(compradoMes) : "–", alerta: false },
+          { t: "En bodega", v: datos ? formatoPesos(valorBodega) : "–", alerta: false },
+          { t: "Compras del mes", v: datos ? formatoPesos(compradoMes) : "–", alerta: false },
         ].map((c) => (
-          <div key={c.t} className="min-w-0 px-1.5 text-center">
-            <p className={`truncate text-[15px] font-bold leading-tight tabular-nums ${c.alerta ? "text-red-600" : "text-slate-900"}`}>{c.v}</p>
-            <p className="truncate text-[10px] text-slate-500">{c.t}</p>
+          <div key={c.t} className="min-w-0 px-3 py-2">
+            <p className="truncate text-[11px] text-slate-500">{c.t}</p>
+            <p className={`truncate text-base font-bold leading-tight tabular-nums ${c.alerta ? "text-red-600" : "text-slate-900"}`}>{c.v}</p>
           </div>
         ))}
       </div>
@@ -463,15 +456,8 @@ function NuevaFactura({
                       onChange={(v) => cambiarLinea(l.clave, { cantidad: v })}
                     />
                   </Campo>
-                  <Campo etiqueta="Valor unitario ($)">
-                    <Entrada
-                      type="number"
-                      inputMode="numeric"
-                      min={0}
-                      step="any"
-                      value={l.valor}
-                      onChange={(v) => cambiarLinea(l.clave, { valor: v })}
-                    />
+                  <Campo etiqueta="Valor unitario">
+                    <EntradaPesos value={l.valor} onChange={(v) => cambiarLinea(l.clave, { valor: v })} />
                   </Campo>
                 </div>
                 {num(l.cantidad) > 0 && num(l.valor) > 0 && (

@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import ModuloPage from "@/components/ModuloPage";
-import { Boton, Campo, Dato, Entrada, Hoja, IconoMas, Selector, Tarjeta, Vacio } from "@/components/ui";
+import { Boton, Campo, Dato, Entrada, Hoja, IconoMas, Selector, Tarjeta, Vacio, EntradaPesos } from "@/components/ui";
 import {
   formatoFecha,
   formatoPesos,
@@ -213,8 +213,8 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
           <Entrada value={descripcion} onChange={setDescripcion} placeholder="Ej. 20 bultos de levante" />
         </Campo>
         <div className="grid grid-cols-2 gap-3">
-          <Campo etiqueta="Valor ($) *">
-            <Entrada type="number" inputMode="numeric" min={1} value={monto} onChange={setMonto} required />
+          <Campo etiqueta="Valor *">
+            <EntradaPesos value={monto} onChange={setMonto} required />
           </Campo>
           <Campo etiqueta="Fecha">
             <Entrada type="date" value={fecha} onChange={setFecha} required />

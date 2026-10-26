@@ -352,3 +352,37 @@ export function SeccionDesplegable({
     </div>
   );
 }
+
+/**
+ * Campo de valor en pesos colombianos: pone los puntos de miles mientras se
+ * escribe (95.000, 1.250.000). Guarda y devuelve solo los dígitos ("1250000").
+ */
+export function EntradaPesos({
+  value,
+  onChange,
+  placeholder = "0",
+  required,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  required?: boolean;
+}) {
+  const digitos = (value || "").replace(/\D/g, "");
+  const mostrado = digitos ? Number(digitos).toLocaleString("es-CO") : "";
+  return (
+    <div className="relative">
+      <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-base text-slate-400">$</span>
+      <input
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        value={mostrado}
+        placeholder={placeholder}
+        required={required}
+        onChange={(e) => onChange(e.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, "").slice(0, 13))}
+        className={`${claseCampo} pl-7 tabular-nums`}
+      />
+    </div>
+  );
+}
