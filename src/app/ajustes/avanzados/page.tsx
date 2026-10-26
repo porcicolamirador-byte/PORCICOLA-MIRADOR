@@ -608,7 +608,6 @@ function Alimentacion({
   const [base, setBase] = useState(actual);
   const [unidos, setUnidos] = useState<ProductosEtapa>(productosActuales);
   const [baseUnidos, setBaseUnidos] = useState(productosActuales);
-  const [eligiendo, setEligiendo] = useState<keyof AlimentacionEstandar | null>(null);
   if (base !== actual) {
     setBase(actual);
     setValores(aTexto(actual));
@@ -645,7 +644,6 @@ function Alimentacion({
     e.preventDefault();
     if (!valido) return;
     onGuardar(numeros, unidos);
-    setEligiendo(null);
     await avisar({ titulo: "Alimentación actualizada", mensaje: "Se guardaron los kilos y los productos de cada etapa." });
   };
 
@@ -667,52 +665,58 @@ function Alimentacion({
               />
               <span className="w-5 shrink-0 text-xs text-slate-500">kg</span>
             </label>
-            <div className="flex flex-wrap items-center gap-1.5 px-3.5 pt-1.5">
+            <div className="flex flex-col gap-1.5 px-3.5 pt-2">
               {unidos[clave].map((c) => (
-                <span
-                  key={c}
-                  className="inline-flex max-w-full items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-800 ring-1 ring-sky-200"
-                  title={nombreDe(c)}
-                >
-                  <span className="tabular-nums">{c}</span>
-                  {nombreDe(c) ? <span className="truncate font-normal text-sky-700/80">{nombreDe(c)}</span> : <span className="font-normal text-amber-700">sin producto</span>}
-                </span>
+                <div key={c} className="flex items-center gap-2 rounded-xl bg-sky-50 py-1.5 pl-2.5 pr-1 ring-1 ring-sky-100">
+                  <span className="shrink-0 rounded-md bg-white px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-sky-800 ring-1 ring-sky-200">{c}</span>
+                  <span className={`min-w-0 flex-1 truncate text-sm ${nombreDe(c) ? "text-slate-800" : "text-amber-700"}`}>
+                    {nombreDe(c) ?? "Sin producto en bodega"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => alternarCodigo(clave, c)}
+                    aria-label={`Quitar ${c} de ${nombre}`}
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-400 active:bg-sky-100"
+                  >
+                    <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" aria-hidden="true">
+                      <path d="M5 5l10 10M15 5L5 15" />
+                    </svg>
+                  </button>
+                </div>
               ))}
-              <button
-                type="button"
-                onClick={() => setEligiendo((e) => (e === clave ? null : clave))}
-                aria-expanded={eligiendo === clave}
-                className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-sky-700 border border-dashed border-sky-300 active:bg-sky-50"
-              >
-                {eligiendo === clave ? "Listo" : unidos[clave].length ? "Cambiar productos" : "+ Unir productos"}
-              </button>
-            </div>
-            {eligiendo === clave && (
-              <div className="mx-3.5 mt-2 rounded-xl bg-slate-50 p-2 ring-1 ring-slate-100">
-                {catalogo.length === 0 ? (
-                  <p className="px-1 py-1 text-xs text-slate-500">No hay productos con código. Asígnales un código en Productos de bodega.</p>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {catalogo.map(([c, nombre]) => {
-                      const activo = unidos[clave].includes(c);
-                      return (
-                        <button
-                          key={c}
-                          type="button"
-                          onClick={() => alternarCodigo(clave, c)}
-                          aria-pressed={activo}
-                          className={`rounded-full px-2.5 py-1 text-xs ring-1 transition active:scale-95 ${
-                            activo ? "bg-sky-700 font-semibold text-white ring-sky-700" : "bg-white text-slate-700 ring-slate-200"
-                          }`}
-                        >
-                          <span className="font-semibold tabular-nums">{c}</span> · {nombre}
-                        </button>
-                      );
-                    })}
+              {(() => {
+                const libres = catalogo.filter(([c]) => !unidos[clave].includes(c));
+                return (
+                  <div className="relative">
+                    <select
+                      value=""
+                      onChange={(e) => e.target.value && alternarCodigo(clave, e.target.value)}
+                      disabled={libres.length === 0}
+                      aria-label={`Unir producto a ${nombre}`}
+                      className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-3 pr-9 text-sm text-slate-600 outline-none focus:ring-2 focus:ring-sky-200 disabled:opacity-60"
+                    >
+                      <option value="">
+                        {catalogo.length === 0
+                          ? "No hay productos con código"
+                          : libres.length === 0
+                            ? "Todos los productos están unidos"
+                            : unidos[clave].length
+                              ? "Agregar otro producto…"
+                              : "Unir producto de bodega…"}
+                      </option>
+                      {libres.map(([c, n]) => (
+                        <option key={c} value={c}>
+                          {c} · {n}
+                        </option>
+                      ))}
+                    </select>
+                    <svg viewBox="0 0 20 20" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M5 8l5 5 5-5" />
+                    </svg>
                   </div>
-                )}
-              </div>
-            )}
+                );
+              })()}
+            </div>
           </li>
         ))}
         <li className="flex items-center justify-between bg-slate-50 px-3.5 py-2.5 text-sm">
