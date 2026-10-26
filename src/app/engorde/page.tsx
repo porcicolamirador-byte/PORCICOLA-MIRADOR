@@ -202,9 +202,17 @@ function ConsumoEstablecido({ lote }: { lote: Lote }) {
       <p className="mt-1 text-lg font-bold tabular-nums text-slate-900">
         {fmtKg(c.consumido)} <span className="text-sm font-medium text-slate-500">de {fmtKg(c.estandar)} kg</span>
       </p>
-      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
-        <div className="h-full rounded-full bg-sky-600" style={{ width: `${pct(c.consumido, c.estandar)}%` }} />
+      <div className="mt-1.5 flex items-center gap-2.5">
+        <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100">
+          <div className="h-full rounded-full bg-sky-600" style={{ width: `${pct(c.consumido, c.estandar)}%` }} />
+        </div>
+        <span className="shrink-0 text-sm font-bold tabular-nums text-sky-700">
+          {Math.floor(pct(c.consumido, c.estandar)).toLocaleString("es-CO")} %
+        </span>
       </div>
+      <p className="mt-1 text-xs text-slate-500">
+        {pct(c.consumido, c.estandar) >= 100 ? "Consumo total completo" : `Completado del total · faltan ${fmtKg(Math.max(0, c.estandar - c.consumido))} kg`}
+      </p>
 
       <ul className="mt-3 flex flex-col gap-2.5">
         {c.etapas.map((e) => {
