@@ -246,9 +246,6 @@ export default function AjustesAvanzadosPage() {
         </li>
       </Grupo>
 
-      <p className="px-1 text-center text-[11px] text-slate-400">
-        La sección se cierra sola a los 15 minutos o al cerrar la app.
-      </p>
     </ModuloPage>
   );
 }
@@ -258,8 +255,9 @@ export default function AjustesAvanzadosPage() {
 const claseCampo =
   "h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-center text-xl tracking-[0.5em] text-slate-900 outline-none placeholder:text-slate-300 placeholder:tracking-[0.5em] focus:bg-white focus:ring-2 focus:ring-sky-200";
 
-function Encabezado({ descripcion }: { icono?: string; titulo?: string; descripcion: string }) {
-  return <p className="mb-3 text-xs leading-relaxed text-slate-500">{descripcion}</p>;
+/** Las descripciones de ayuda ya no se muestran en pantalla */
+function Encabezado(_props: { icono?: string; titulo?: string; descripcion: string }) {
+  return null;
 }
 
 /** Fila que se despliega al tocarla; solo una abierta a la vez */
@@ -603,7 +601,6 @@ function Alimentacion({ actual, onGuardar }: { actual: AlimentacionEstandar; onG
 
   return (
     <form onSubmit={enviar} className="flex flex-col gap-3">
-      <p className="text-xs leading-relaxed text-slate-500">Kilos de alimento por cerdo en cada etapa.</p>
       <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-100">
         {ETAPAS_ALIMENTACION.map(({ clave, nombre }) => (
           <li key={clave}>

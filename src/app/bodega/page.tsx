@@ -246,10 +246,6 @@ export default function BodegaPage() {
         </>
       )}
 
-      <p className="px-1 text-[11px] leading-relaxed text-slate-400">
-        Las existencias se calculan con las facturas ingresadas menos las salidas por consumo. Los productos se administran
-        en Ajustes avanzados.
-      </p>
 
       {datos && (
         <>

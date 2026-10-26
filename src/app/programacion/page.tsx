@@ -106,12 +106,6 @@ export default function ProgramacionPage() {
         <Agenda eventos={activos.filter((e) => diasEntre(fechaHoy, e.fecha) <= 30)} fechaHoy={fechaHoy} onAbrir={abrir} />
       )}
 
-      <p className="px-1 text-[11px] leading-relaxed text-slate-400">
-        Cálculos de referencia: celo {CELO_TRAS_DESTETE[0]}–{CELO_TRAS_DESTETE[1]} días tras el destete, repetición de celo{" "}
-        {REPETICION_CELO[0]}–{REPETICION_CELO[1]} días tras la IA, confirmación {CONFIRMAR_GESTACION[0]}–{CONFIRMAR_GESTACION[1]} días,
-        gestación {plan ? leerAjustes().diasGestacion : 114} días, paridera desde {ANTES_PARTO_MATERNIDAD} días antes del parto hasta
-        el destete. Parideras y destete se cambian en Ajustes avanzados.
-      </p>
     </ModuloPage>
   );
 }

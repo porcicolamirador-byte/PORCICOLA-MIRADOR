@@ -186,10 +186,6 @@ export default function MonitoreoPage() {
         )}
       </Tarjeta>
 
-      <p className="px-1 text-[11px] leading-relaxed text-slate-400">
-        Rangos de referencia: maternidad 18–22 °C, gestación 16–22 °C, precebo 24–28 °C, engorde 16–24 °C;
-        humedad {HUMEDAD_MIN}–{HUMEDAD_MAX} %. Los lechones recién nacidos necesitan 30–34 °C en su nido.
-      </p>
 
       <NuevaLectura zonaInicial={nueva} onCerrar={() => setNueva(null)} />
     </ModuloPage>

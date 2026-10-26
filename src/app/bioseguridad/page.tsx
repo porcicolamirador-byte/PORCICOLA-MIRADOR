@@ -215,7 +215,7 @@ function NuevaVisita({ abierta, onCerrar }: { abierta: boolean; onCerrar: () => 
           <Campo etiqueta="Fecha">
             <Entrada type="date" value={fecha} onChange={setFecha} required />
           </Campo>
-          <Campo etiqueta="Días sin contacto con cerdos" ayuda="Se recomiendan 2 o más">
+          <Campo etiqueta="Días sin contacto con cerdos">
             <Entrada type="number" inputMode="numeric" min={0} value={dias} onChange={setDias} />
           </Campo>
         </div>

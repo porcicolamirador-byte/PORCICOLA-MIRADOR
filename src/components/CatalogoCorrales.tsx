@@ -47,7 +47,7 @@ export default function CatalogoCorrales() {
   return (
     <>
       <div className="mb-3 flex items-center gap-3">
-        <p className="min-w-0 flex-1 text-xs leading-relaxed text-slate-500">Cada corral con su identificación y la zona a la que pertenece.</p>
+        <span className="flex-1" />
         <Boton onClick={() => setEditando("nuevo")} className="shrink-0 px-3">
           <IconoMas /> Corral
         </Boton>

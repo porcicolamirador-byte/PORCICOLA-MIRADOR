@@ -1120,9 +1120,6 @@ export default function Gestacion() {
                   )}
                 </ul>
                 {(idError || razaError) && <p className="mt-1.5 px-4 text-[13px] text-red-600">{idError || razaError}</p>}
-                {!idError && !razaError && (
-                  <p className="mt-1.5 px-4 text-[13px] text-slate-500">El número del arete. Debe ser único en el hato.</p>
-                )}
 
                 {/* Llegada */}
                 <p className="mb-1.5 mt-6 px-4 text-[13px] uppercase tracking-wide text-slate-500">Llegada</p>

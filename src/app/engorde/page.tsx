@@ -372,7 +372,6 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                 <Boton variante="suave" onClick={() => setAccion("pesaje")} disabled={!corral}>Pesaje</Boton>
                 <Boton variante="suave" onClick={() => setAccion("muerte")} disabled={!corral}>Muerte</Boton>
               </div>
-              {!corral && <p className="text-center text-xs text-slate-500">Elige el corral del lote para habilitar los demás botones.</p>}
             </div>
           )}
 

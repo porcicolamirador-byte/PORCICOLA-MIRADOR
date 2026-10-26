@@ -88,7 +88,7 @@ export default function CatalogoProductos({ incrustado = false }: { incrustado?:
     <Contenedor>
       {incrustado ? (
         <div className="mb-3 flex items-center gap-3">
-          <p className="min-w-0 flex-1 text-xs leading-relaxed text-slate-500">Solo estos productos se pueden ingresar en las facturas.</p>
+          <span className="flex-1" />
           <Boton onClick={() => setEditando("nuevo")} className="shrink-0 px-3">
             <IconoMas /> Producto
           </Boton>
@@ -217,7 +217,7 @@ function FormProducto({ producto, onCerrar }: { producto: ProductoBodega | "nuev
             <Selector value={unidad} onChange={setUnidad} opciones={UNIDADES_BODEGA.map((u) => ({ valor: u, texto: u }))} />
           </Campo>
         </div>
-        <Campo etiqueta="Existencia mínima" ayuda="Bodega avisa “Reponer” cuando quede esto o menos">
+        <Campo etiqueta="Existencia mínima">
           <Entrada type="number" inputMode="decimal" min={0} step="any" value={minimo} onChange={setMinimo} placeholder="0" />
         </Campo>
         {error && <p className="text-sm font-medium text-rose-600">{error}</p>}

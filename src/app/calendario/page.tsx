@@ -331,7 +331,6 @@ export default function CalendarioPage() {
           diaElegido={seleccion.startsWith(prefijo) ? Number(seleccion.slice(8, 10)) : null}
           onElegir={(d) => setSeleccion(clave(anio, mes, d))}
         />
-        <p className="mt-1 text-center text-[10px] text-slate-400">Eventos acumulados en el mes · toca la gráfica para ver un día</p>
       </section>
     </ModuloPage>
   );
