@@ -8,7 +8,7 @@ import { avisar, confirmar } from "@/components/Dialogo";
 import DialogoClave from "@/components/DialogoClave";
 import { leerConfig } from "@/lib/config";
 import Modal from "@/components/Modal";
-import { CATEGORIAS_BODEGA, IconoCategoria } from "@/components/CatalogoProductos";
+import { CATEGORIAS_BODEGA, IconoCategoria, RecuadroCategoria } from "@/components/CatalogoProductos";
 import {
   calcularInventario,
   formatoFecha,
@@ -202,7 +202,7 @@ export default function BodegaPage() {
                 return (
                   <section key={cat}>
                     <h2 className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                      <IconoCategoria categoria={cat} className="h-4 w-4 text-[11px]" />
+                      <IconoCategoria categoria={cat} className="h-3.5 w-3.5" />
                       {cat} · {items.length}
                     </h2>
                     <div className="grid grid-cols-2 gap-2">
@@ -233,9 +233,7 @@ export default function BodegaPage() {
                             }`}
                           >
                             <div className="flex items-start justify-between gap-2">
-                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-xl">
-                                <IconoCategoria categoria={p.categoria} className="h-6 w-6 text-xl" />
-                              </span>
+                              <RecuadroCategoria categoria={p.categoria} tamano="sm" />
                               <Insignia clase={estado.c}>{estado.t}</Insignia>
                             </div>
                             <p className="line-clamp-2 text-[13px] font-semibold leading-tight text-slate-900">{p.nombre}</p>
@@ -570,7 +568,7 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
       {!salida ? (
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-3 rounded-2xl bg-sky-50/70 p-4 ring-1 ring-sky-100">
-            <IconoCategoria categoria={p.categoria} className="h-12 w-12 shrink-0 text-3xl" />
+            <RecuadroCategoria categoria={p.categoria} tamano="lg" />
             <div className="min-w-0 flex-1">
               <p className="text-xs text-slate-500">{p.categoria} · {subproducto ? "consumido (subproducto)" : "existencia"}</p>
               <p className={`text-3xl font-bold leading-tight tabular-nums ${subproducto ? "text-sky-700" : bajoMinimo ? "text-red-600" : "text-slate-900"}`}>
@@ -732,9 +730,9 @@ function DetalleFactura({ factura: f, productos, onCerrar }: { factura: Factura;
             return (
               <li key={i} className="flex items-center gap-3 px-3.5 py-3">
                 {p ? (
-                  <IconoCategoria categoria={p.categoria} className="h-7 w-7 shrink-0 text-xl" />
+                  <RecuadroCategoria categoria={p.categoria} tamano="md" />
                 ) : (
-                  <span className="text-xl" aria-hidden="true">📦</span>
+                  <RecuadroCategoria categoria="Otros" tamano="md" />
                 )}
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-slate-900">{p?.nombre ?? "Producto eliminado"}</p>

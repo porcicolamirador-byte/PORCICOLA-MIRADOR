@@ -1,7 +1,7 @@
 "use client";
 
 import Modal from "@/components/Modal";
-import { useEffect, useMemo, useState, type FormEvent, Fragment } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, Fragment } from "react";
 import { Boton, Campo, Entrada, IconoMas, Interruptor, Selector, Tarjeta } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
 import {
@@ -32,27 +32,121 @@ export const textoCategoria = (c: CategoriaBodega) => {
   return i ? `${i} ${c}` : c;
 };
 
-/** Bulto de concentrado de 40 kg (ícono de la categoría Alimento) */
-export function IconoBulto({ className = "h-6 w-6" }: { className?: string }) {
+/** Trazos de línea de cada categoría (mismo estilo que los iconos del Dashboard) */
+const TRAZOS_CATEGORIA: Record<CategoriaBodega, ReactNode> = {
+  Alimento: (
+    <>
+      <path d="M5.5 4h13l1.5 3.5-1 12.5a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 7.5z" />
+      <path d="M4 7.5h16M9 13h6M9 16.5h6" />
+    </>
+  ),
+  Medicamentos: (
+    <>
+      <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7z" />
+      <path d="m8.5 8.5 7 7" />
+    </>
+  ),
+  Vacunas: <path d="m18 2 4 4M17 7l3-3M19 9 8.5 19.5a2.1 2.1 0 0 1-3-3L16 6M9 11l4 4M5 19l-3 3M14 4l6 6" />,
+  Limpieza: (
+    <>
+      <path d="M9 3h5v3H9zM14 4h3l1.5 1.5" />
+      <path d="M10 6 8 9.5V20a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V9.5L14 6" />
+      <path d="M8 13h8" />
+    </>
+  ),
+  Otros: (
+    <>
+      <rect x="3" y="7" width="18" height="13" rx="2" />
+      <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3 13h18M10 13v2h4v-2" />
+    </>
+  ),
+};
+
+/** Ícono de línea de una categoría de bodega */
+export function IconoCategoria({ categoria, className = "h-6 w-6" }: { categoria: CategoriaBodega; className?: string }) {
   return (
-    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
-      <path d="M13 8h22v4l2 26a3 3 0 0 1-3 3H14a3 3 0 0 1-3-3l2-26z" fill="#e7c48a" />
-      <path d="M13 8h22v4H13z" fill="#a16207" />
-      <rect x="15" y="20" width="18" height="12" rx="2" fill="#fff" />
-      <text x="24" y="29.5" fontSize="7.5" fontWeight="700" textAnchor="middle" fill="#92400e" fontFamily="Arial, sans-serif">
-        40kg
-      </text>
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {TRAZOS_CATEGORIA[categoria] ?? TRAZOS_CATEGORIA.Otros}
     </svg>
   );
 }
 
-/** Ícono de una categoría: bulto dibujado para Alimento, emoji para las demás */
-export function IconoCategoria({ categoria, className = "h-6 w-6" }: { categoria: CategoriaBodega; className?: string }) {
-  if (categoria === "Alimento") return <IconoBulto className={className} />;
+/** Ícono en recuadro gris (como los del Dashboard) */
+export function RecuadroCategoria({ categoria, tamano = "md" }: { categoria: CategoriaBodega; tamano?: "sm" | "md" | "lg" }) {
+  const t = { sm: ["h-8 w-8 rounded-lg", "h-[18px] w-[18px]"], md: ["h-9 w-9 rounded-xl", "h-5 w-5"], lg: ["h-12 w-12 rounded-2xl", "h-6 w-6"] }[tamano];
   return (
-    <span className={`inline-flex items-center justify-center leading-none ${className}`} style={{ fontSize: "1.25em" }} aria-hidden="true">
-      {iconoCategoria(categoria)}
+    <span className={`flex shrink-0 items-center justify-center bg-slate-100 text-slate-700 ${t[0]}`} aria-hidden="true">
+      <IconoCategoria categoria={categoria} className={t[1]} />
     </span>
+  );
+}
+
+/** Lista desplegable de categorías con su ícono al lado */
+function SelectorCategoria({ value, onChange }: { value: CategoriaBodega; onChange: (c: CategoriaBodega) => void }) {
+  const [abierto, setAbierto] = useState(false);
+  const caja = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!abierto) return;
+    const fuera = (e: PointerEvent) => {
+      if (caja.current && !caja.current.contains(e.target as Node)) setAbierto(false);
+    };
+    document.addEventListener("pointerdown", fuera);
+    return () => document.removeEventListener("pointerdown", fuera);
+  }, [abierto]);
+  return (
+    <div ref={caja} className="relative">
+      <button
+        type="button"
+        onClick={() => setAbierto((a) => !a)}
+        aria-haspopup="listbox"
+        aria-expanded={abierto}
+        className="flex h-12 w-full items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-2.5 text-left text-base text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-sky-200"
+      >
+        <span className="text-slate-600">
+          <IconoCategoria categoria={value} className="h-5 w-5" />
+        </span>
+        <span className="min-w-0 flex-1 truncate">{value}</span>
+        <svg viewBox="0 0 20 20" className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${abierto ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M5 8l5 5 5-5" />
+        </svg>
+      </button>
+      {abierto && (
+        <ul role="listbox" aria-label="Categoría" className="absolute left-0 top-full z-30 mt-1.5 w-[calc(200%+0.75rem)] max-w-[80vw] overflow-hidden rounded-2xl bg-white py-1 shadow-xl ring-1 ring-slate-200">
+          {CATEGORIAS_BODEGA.map(({ valor }) => {
+            const elegido = valor === value;
+            return (
+              <li key={valor} role="option" aria-selected={elegido}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange(valor);
+                    setAbierto(false);
+                  }}
+                  className="flex w-full items-center gap-3 px-3 py-2.5 text-left active:bg-slate-50"
+                >
+                  <RecuadroCategoria categoria={valor} tamano="sm" />
+                  <span className={`min-w-0 flex-1 text-[15px] ${elegido ? "font-semibold text-slate-900" : "text-slate-700"}`}>{valor}</span>
+                  {elegido && (
+                    <svg viewBox="0 0 20 20" className="h-4 w-4 text-sky-600" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="m4.5 10.5 3.5 3.5 7.5-8" />
+                    </svg>
+                  )}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -127,7 +221,7 @@ export default function CatalogoProductos({ incrustado = false }: { incrustado?:
         <ul className="divide-y divide-slate-100 rounded-2xl ring-1 ring-slate-100">
           {ordenados.map(({ producto: p, existencia }) => (
             <li key={p.id} className={`flex items-center gap-3 px-3.5 py-3 ${p.activo === false ? "opacity-55" : ""}`}>
-              <IconoCategoria categoria={p.categoria} className="h-7 w-7 shrink-0 text-xl" />
+              <RecuadroCategoria categoria={p.categoria} tamano="md" />
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
                   {codigoDe(p) && (
@@ -253,7 +347,7 @@ function FormProducto({ producto, onCerrar }: { producto: ProductoBodega | "nuev
       etiqueta="Bodega"
       titulo={producto === "nuevo" ? "Nuevo producto" : "Editar producto"}
       subtitulo={nombre.trim() || undefined}
-      icono={<IconoCategoria categoria={categoria} className="h-9 w-9 text-3xl" />}
+      icono={<IconoCategoria categoria={categoria} className="h-7 w-7" />}
       onCerrar={onCerrar}
     >
       <form onSubmit={guardar} className="flex flex-col gap-3.5">
@@ -302,11 +396,7 @@ function FormProducto({ producto, onCerrar }: { producto: ProductoBodega | "nuev
         )}
         <div className="grid grid-cols-2 gap-3">
           <Campo etiqueta="Categoría">
-            <Selector
-              value={categoria}
-              onChange={(v) => setCategoria(v as CategoriaBodega)}
-              opciones={CATEGORIAS_BODEGA.map((c) => ({ valor: c.valor, texto: textoCategoria(c.valor) }))}
-            />
+            <SelectorCategoria value={categoria} onChange={setCategoria} />
           </Campo>
           <Campo etiqueta="Unidad">
             <Selector value={unidad} onChange={setUnidad} opciones={UNIDADES_BODEGA.map((u) => ({ valor: u, texto: u }))} />
