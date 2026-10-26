@@ -79,7 +79,7 @@ export default function EngordePage() {
       titulo="Engorde"
       subtitulo="Lotes, peso y alimento"
       icono="🐷"
-      tono="amber"
+      tono="sky"
       accion={
         <Boton onClick={() => setNuevo(true)} className="px-3.5">
           <IconoMas /> Lote
@@ -137,7 +137,7 @@ export default function EngordePage() {
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-2">
                       {l.codigo && (
-                        <span className="shrink-0 rounded-lg bg-amber-100 px-2 py-0.5 text-xs font-bold tabular-nums text-amber-900">{l.codigo}</span>
+                        <span className="shrink-0 rounded-lg bg-sky-100 px-2 py-0.5 text-xs font-bold tabular-nums text-sky-800">{l.codigo}</span>
                       )}
                       <div className="min-w-0">
                       {l.nombre && l.nombre !== l.codigo && <p className="truncate font-semibold text-slate-900">{l.nombre}</p>}
@@ -206,8 +206,8 @@ function DatoCompacto({ titulo, valor, detalle }: { titulo: string; valor: strin
 
 function Mini({ titulo, valor }: { titulo: string; valor: string }) {
   return (
-    <div className="rounded-xl bg-amber-50/70 px-2 py-2">
-      <p className="text-[10px] font-medium uppercase tracking-wide text-amber-900/70">{titulo}</p>
+    <div className="rounded-xl bg-sky-50/70 px-2 py-2">
+      <p className="text-[10px] font-medium uppercase tracking-wide text-sky-700">{titulo}</p>
       <p className="text-sm font-semibold text-slate-900 tabular-nums">{valor}</p>
     </div>
   );
@@ -411,9 +411,9 @@ function NuevoLote({ abierta, onCerrar }: { abierta: boolean; onCerrar: () => vo
     <Modal abierta={abierta} etiqueta="Engorde" titulo="Nuevo lote" subtitulo="Lote de engorde" icono="🐖" onCerrar={onCerrar}>
       <form onSubmit={guardar} className="flex flex-col gap-3.5">
         {abierta && (
-          <div className="flex items-center justify-between rounded-xl bg-amber-50 px-3.5 py-2.5 ring-1 ring-amber-100">
-            <span className="text-sm text-amber-900/80">Código del lote</span>
-            <span className="text-base font-bold tabular-nums text-amber-900">{siguienteCodigoLote()}</span>
+          <div className="flex items-center justify-between rounded-xl bg-sky-50 px-3.5 py-2.5 ring-1 ring-sky-100">
+            <span className="text-sm text-sky-700">Código del lote</span>
+            <span className="text-base font-bold tabular-nums text-sky-900">{siguienteCodigoLote()}</span>
           </div>
         )}
         <Campo etiqueta="Nombre del lote (opcional)">
