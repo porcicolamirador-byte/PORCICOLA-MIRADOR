@@ -183,59 +183,76 @@ function consumoEstablecido(l: Lote) {
   };
 }
 
-const fmtKg = (n: number) => n.toLocaleString("es-CO", { maximumFractionDigits: 1 });
+/** Bultos de 40 kg, con un decimal */
+const bultos = (kg: number) => kg / KG_POR_BULTO;
 const fmtBultos = (kg: number) => {
-  const b = kg / KG_POR_BULTO;
+  const b = Math.round(bultos(kg) * 10) / 10;
   return `${b.toLocaleString("es-CO", { maximumFractionDigits: 1 })} ${b === 1 ? "bulto" : "bultos"}`;
 };
+const fmtNumBultos = (kg: number) => (Math.round(bultos(kg) * 10) / 10).toLocaleString("es-CO", { maximumFractionDigits: 1 });
+
+/** Color según el avance: azul hasta 100 %, naranja hasta 115 %, rojo por encima */
+function colorAvance(porcentaje: number) {
+  if (porcentaje > 115) return { barra: "bg-red-500", texto: "text-red-600" };
+  if (porcentaje > 100) return { barra: "bg-orange-500", texto: "text-orange-600" };
+  return { barra: "bg-sky-600", texto: "text-sky-700" };
+}
 
 function ConsumoEstablecido({ lote }: { lote: Lote }) {
   const c = consumoEstablecido(lote);
   if (c.estandar <= 0) return null;
-  const pct = (a: number, b: number) => (b > 0 ? Math.min(100, (a / b) * 100) : 0);
+  // El porcentaje sigue subiendo después del 100 %; la barra se llena hasta el tope
+  const pct = (a: number, b: number) => (b > 0 ? (a / b) * 100 : 0);
+  const total = pct(c.consumido, c.estandar);
+  const colorTotal = colorAvance(total);
+  const exceso = c.consumido - c.estandar;
   return (
     <section className="rounded-2xl bg-white p-3.5 ring-1 ring-slate-200">
       <div className="flex items-baseline justify-between gap-2">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Consumo establecido</p>
-        <p className="text-xs text-slate-500">{lote.vivos} animales</p>
+        <p className="text-xs text-slate-500">{lote.vivos} animales · bultos de {KG_POR_BULTO} kg</p>
       </div>
       <p className="mt-1 text-lg font-bold tabular-nums text-slate-900">
-        {fmtKg(c.consumido)} <span className="text-sm font-medium text-slate-500">de {fmtKg(c.estandar)} kg</span>
+        {fmtNumBultos(c.consumido)} <span className="text-sm font-medium text-slate-500">de {fmtBultos(c.estandar)}</span>
       </p>
       <div className="mt-1.5 flex items-center gap-2.5">
         <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100">
-          <div className="h-full rounded-full bg-sky-600" style={{ width: `${pct(c.consumido, c.estandar)}%` }} />
+          <div className={`h-full rounded-full ${colorTotal.barra}`} style={{ width: `${Math.min(100, total)}%` }} />
         </div>
-        <span className="shrink-0 text-sm font-bold tabular-nums text-sky-700">
-          {Math.floor(pct(c.consumido, c.estandar)).toLocaleString("es-CO")} %
-        </span>
+        <span className={`shrink-0 text-sm font-bold tabular-nums ${colorTotal.texto}`}>{Math.floor(total).toLocaleString("es-CO")} %</span>
       </div>
-      <p className="mt-1 text-xs text-slate-500">
-        {pct(c.consumido, c.estandar) >= 100 ? "Consumo total completo" : `Completado del total · faltan ${fmtKg(Math.max(0, c.estandar - c.consumido))} kg`}
+      <p className={`mt-1 text-xs ${exceso > 0 ? colorTotal.texto : "text-slate-500"}`}>
+        {exceso > 0
+          ? `${fmtBultos(exceso)} por encima del total`
+          : total >= 100
+            ? "Consumo total completo"
+            : `Completado del total · faltan ${fmtBultos(c.estandar - c.consumido)}`}
       </p>
 
       <ul className="mt-3 flex flex-col gap-2.5">
         {c.etapas.map((e) => {
           const actual = e.clave === c.actual;
-          const completa = e.estandar > 0 && e.consumido >= e.estandar;
-          const exceso = e.consumido - e.estandar;
+          const avance = pct(e.consumido, e.estandar);
+          const color = colorAvance(avance);
+          const completa = e.estandar > 0 && avance >= 100;
+          const sobra = e.consumido - e.estandar;
           return (
             <li key={e.clave} className={`rounded-xl px-3 py-2.5 ${actual ? "bg-sky-50 ring-1 ring-sky-100" : "bg-slate-50"}`}>
               <div className="flex items-center gap-2">
                 <span className={`min-w-0 flex-1 truncate text-sm font-semibold ${actual ? "text-sky-900" : "text-slate-800"}`}>{e.nombre}</span>
                 {actual && <span className="shrink-0 rounded-full bg-sky-700 px-2 py-0.5 text-[10px] font-semibold text-white">Actual</span>}
-                {completa && <span className="shrink-0 text-[11px] font-semibold text-sky-700">✓ Completa</span>}
+                <span className={`shrink-0 text-xs font-bold tabular-nums ${color.texto}`}>{Math.floor(avance).toLocaleString("es-CO")} %</span>
               </div>
               <p className="mt-0.5 text-xs text-slate-500">
-                {fmtKg(e.porAnimal)} kg × {lote.vivos} = <b className="font-semibold text-slate-700">{fmtKg(e.estandar)} kg</b> · {fmtBultos(e.estandar)}
+                Estándar <b className="font-semibold text-slate-700">{fmtBultos(e.estandar)}</b> para {lote.vivos} animales
               </p>
               <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-200/70">
-                <div className={`h-full rounded-full ${completa ? "bg-sky-700" : "bg-sky-500"}`} style={{ width: `${pct(e.consumido, e.estandar)}%` }} />
+                <div className={`h-full rounded-full ${color.barra}`} style={{ width: `${Math.min(100, avance)}%` }} />
               </div>
               <p className="mt-1 flex justify-between gap-2 text-xs tabular-nums">
-                <span className="text-slate-600">Consumido {fmtKg(e.consumido)} kg</span>
-                <span className={exceso > 0 ? "font-semibold text-amber-700" : "text-slate-600"}>
-                  {exceso > 0 ? `+${fmtKg(exceso)} kg sobre el estándar` : completa ? "Al día" : `Faltan ${fmtKg(e.faltan)} kg · ${fmtBultos(e.faltan)}`}
+                <span className="text-slate-600">Consumido {fmtBultos(e.consumido)}</span>
+                <span className={sobra > 0 ? `font-semibold ${color.texto}` : "text-slate-600"}>
+                  {sobra > 0 ? `+${fmtBultos(sobra)} de más` : completa ? "✓ Completa" : `Faltan ${fmtBultos(e.faltan)}`}
                 </span>
               </p>
               {e.sinProductos && <p className="mt-1 text-[11px] text-amber-700">Sin productos unidos en Ajustes → Alimentación estándar</p>}
@@ -244,9 +261,7 @@ function ConsumoEstablecido({ lote }: { lote: Lote }) {
         })}
       </ul>
       {c.sinEtapa > 0 && (
-        <p className="mt-2 text-xs text-slate-500">
-          {fmtKg(c.sinEtapa)} kg registrados con productos que no están unidos a ninguna etapa.
-        </p>
+        <p className="mt-2 text-xs text-slate-500">{fmtBultos(c.sinEtapa)} registrados con productos que no están unidos a ninguna etapa.</p>
       )}
     </section>
   );
