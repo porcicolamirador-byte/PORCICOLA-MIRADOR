@@ -288,22 +288,27 @@ export function Chevron() {
 
 /** Interruptor tipo iPhone */
 export function Interruptor({ activo, onCambiar }: { activo: boolean; onCambiar: (v: boolean) => void }) {
+  // Solo se anima cuando la persona lo toca: así no "salta" al cargar el valor guardado
+  const [animar, setAnimar] = useState(false);
   return (
     <span className="relative inline-flex shrink-0">
       <input
         type="checkbox"
         role="switch"
         checked={activo}
-        onChange={(e) => onCambiar(e.target.checked)}
+        onChange={(e) => {
+          setAnimar(true);
+          onCambiar(e.target.checked);
+        }}
         className="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
       />
       <span
         aria-hidden="true"
-        className={`flex h-[31px] w-[51px] items-center rounded-full p-[2px] transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-sky-300 ${
+        className={`flex h-[31px] w-[51px] items-center rounded-full p-[2px] ${animar ? "transition-colors" : ""} peer-focus-visible:ring-2 peer-focus-visible:ring-sky-300 ${
           activo ? "bg-sky-600" : "bg-slate-300"
         }`}
       >
-        <span className={`h-[27px] w-[27px] rounded-full bg-white shadow transition-transform ${activo ? "translate-x-5" : ""}`} />
+        <span className={`h-[27px] w-[27px] rounded-full bg-white shadow ${animar ? "transition-transform" : ""} ${activo ? "translate-x-5" : ""}`} />
       </span>
     </span>
   );

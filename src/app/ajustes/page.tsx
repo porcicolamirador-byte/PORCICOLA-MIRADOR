@@ -28,7 +28,8 @@ export default function AjustesPage() {
   const router = useRouter();
   const [pedirCodigo, setPedirCodigo] = useState(false);
 
-  const [oscuro, setOscuro] = useState(false);
+  // La app abre en oscuro: se parte de ahí para que el interruptor no cambie al cargar
+  const [oscuro, setOscuro] = useState(true);
   useEffect(() => setOscuro(temaGuardado() === "oscuro"), []);
   const [conFaceId, setConFaceId] = useState(false);
   const [avisoFaceId, setAvisoFaceId] = useState("");
