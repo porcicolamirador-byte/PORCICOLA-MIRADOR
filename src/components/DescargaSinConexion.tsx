@@ -143,7 +143,7 @@ export default function DescargaSinConexion() {
       {estado.fase === "descargando" && (
         <div className="mt-3">
           <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
-            <div className="h-full rounded-full bg-emerald-600 transition-[width] duration-300" style={{ width: `${pct}%` }} />
+            <div className="h-full rounded-full bg-sky-600 transition-[width] duration-300" style={{ width: `${pct}%` }} />
           </div>
           <p className="mt-1 text-[11px] tabular-nums text-slate-500">
             Descargando… {estado.hechos} de {estado.total} archivos ({pct} %). No cierres la app.
@@ -154,7 +154,7 @@ export default function DescargaSinConexion() {
       {estado.fase === "listo" && (
         <p
           className={`mt-3 rounded-xl px-3 py-2 text-xs ring-1 ${
-            estado.fallidas === 0 ? "bg-emerald-50 text-emerald-900 ring-emerald-100" : "bg-amber-50 text-amber-900 ring-amber-100"
+            estado.fallidas === 0 ? "bg-sky-50 text-sky-900 ring-sky-100" : "bg-amber-50 text-amber-900 ring-amber-100"
           }`}
         >
           {estado.fallidas === 0

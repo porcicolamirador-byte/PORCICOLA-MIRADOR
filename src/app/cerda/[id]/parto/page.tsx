@@ -46,7 +46,7 @@ function calcularDiasEntre(inicio: string, fin: string) {
 }
 
 const inputBase =
-  "w-full h-12 rounded-xl border border-slate-300 bg-slate-50 px-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-200";
+  "w-full h-12 rounded-xl border border-slate-300 bg-slate-50 px-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-2 focus:ring-sky-200";
 
 /** Convierte "1,4" o "1.4" a número; vacío → null */
 function aNumero(valor: string): number | null {
@@ -256,7 +256,7 @@ export default function RegistrarParto() {
               <Campo etiqueta="Observaciones de los lechones">
                 <textarea value={observacionesLechones} onChange={(e) => setObservacionesLechones(e.target.value)}
                   placeholder="Tamaño, vitalidad, malformaciones…"
-                  className="h-20 w-full resize-none rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-base outline-none focus:ring-2 focus:ring-emerald-200" />
+                  className="h-20 w-full resize-none rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-base outline-none focus:ring-2 focus:ring-sky-200" />
               </Campo>
             </div>
           </Seccion>
@@ -277,7 +277,7 @@ export default function RegistrarParto() {
               <Campo etiqueta="Observaciones del parto">
                 <textarea value={observaciones} onChange={(e) => setObservaciones(e.target.value)}
                   placeholder="Duración, complicaciones, medicamentos…"
-                  className="h-20 w-full resize-none rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-base outline-none focus:ring-2 focus:ring-emerald-200" />
+                  className="h-20 w-full resize-none rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-base outline-none focus:ring-2 focus:ring-sky-200" />
               </Campo>
             </div>
           </Seccion>

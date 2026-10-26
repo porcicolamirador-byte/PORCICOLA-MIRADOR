@@ -112,9 +112,9 @@ export default function AjustesAvanzadosPage() {
       }
     >
       {faceId.ofrecer && (
-        <div className="rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
-          <p className="text-[15px] font-semibold text-emerald-950">¿Entrar con Face ID la próxima vez?</p>
-          <p className="mt-0.5 text-xs text-emerald-900/80">Así no tendrás que escribir el código cada vez. Si Face ID falla, se pedirá el código.</p>
+        <div className="rounded-2xl bg-sky-50 p-4 ring-1 ring-sky-100">
+          <p className="text-[15px] font-semibold text-sky-950">¿Entrar con Face ID la próxima vez?</p>
+          <p className="mt-0.5 text-xs text-sky-900/80">Así no tendrás que escribir el código cada vez. Si Face ID falla, se pedirá el código.</p>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <Boton variante="secundario" onClick={noOfrecerMas}>
               Ahora no
@@ -256,7 +256,7 @@ export default function AjustesAvanzadosPage() {
 /* ───────────────────────── Componentes ───────────────────────── */
 
 const claseCampo =
-  "h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-center text-xl tracking-[0.5em] text-slate-900 outline-none placeholder:text-slate-300 placeholder:tracking-[0.5em] focus:bg-white focus:ring-2 focus:ring-emerald-200";
+  "h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-center text-xl tracking-[0.5em] text-slate-900 outline-none placeholder:text-slate-300 placeholder:tracking-[0.5em] focus:bg-white focus:ring-2 focus:ring-sky-200";
 
 function Encabezado({ descripcion }: { icono?: string; titulo?: string; descripcion: string }) {
   return <p className="mb-3 text-xs leading-relaxed text-slate-500">{descripcion}</p>;
@@ -455,7 +455,7 @@ function DiasDestete({ min, max, onGuardar }: { min: number; max: number; onGuar
   };
 
   const campoDia =
-    "h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-center text-xl font-semibold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-200";
+    "h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-center text-xl font-semibold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-sky-200";
 
   return (
     <>
@@ -498,7 +498,7 @@ function DiasDestete({ min, max, onGuardar }: { min: number; max: number; onGuar
             />
           </label>
         </div>
-        <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-900 ring-1 ring-emerald-100">
+        <p className="rounded-xl bg-sky-50 px-3 py-2 text-sm text-sky-900 ring-1 ring-sky-100">
           {valido
             ? `El destete se calcula entre ${nMin} y ${nMax} días después del parto.`
             : "Revisa los días: el primero debe ser menor que el segundo."}
@@ -562,7 +562,7 @@ function Parideras({ actual, onGuardar }: { actual: number; onGuardar: (n: numbe
             aria-label="Número de parideras"
             value={valor}
             onChange={(e) => setValor(e.target.value.replace(/\D/g, "").slice(0, 3))}
-            className="h-12 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-center text-xl font-semibold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-200"
+            className="h-12 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-center text-xl font-semibold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-sky-200"
           />
           <button type="button" className={boton} onClick={() => cambiar(1)} aria-label="Una más">
             +
@@ -616,7 +616,7 @@ function Alimentacion({ actual, onGuardar }: { actual: AlimentacionEstandar; onG
                 onChange={(e) => setValores((v) => ({ ...v, [clave]: e.target.value.replace(/[^\d.,]/g, "").slice(0, 7) }))}
                 onFocus={(e) => e.target.select()}
                 aria-label={`${nombre} en kilos`}
-                className="h-10 w-20 shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-2 text-right text-base font-semibold tabular-nums text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-200"
+                className="h-10 w-20 shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-2 text-right text-base font-semibold tabular-nums text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-sky-200"
               />
               <span className="w-5 shrink-0 text-xs text-slate-500">kg</span>
             </label>

@@ -23,7 +23,7 @@ function estadoFecha(e: Evento, fechaHoy: string): { texto: string; clase: strin
   const dIni = diasEntre(fechaHoy, e.fecha);
   const dFin = diasEntre(fechaHoy, fin);
   if (dFin < 0) return { texto: `Vencido hace ${-dFin} d`, clase: "bg-red-50 text-red-700 ring-red-200" };
-  if (dIni <= 0) return { texto: e.hasta ? "Ahora" : "Hoy", clase: "bg-emerald-600 text-white ring-emerald-600" };
+  if (dIni <= 0) return { texto: e.hasta ? "Ahora" : "Hoy", clase: "bg-sky-600 text-white ring-sky-600" };
   if (dIni === 1) return { texto: "Mañana", clase: "bg-amber-50 text-amber-800 ring-amber-200" };
   return { texto: `En ${dIni} d`, clase: "bg-slate-100 text-slate-700 ring-slate-200" };
 }
@@ -36,7 +36,7 @@ const nombreMes = (mes: string) => `${MESES[Number(mes.slice(5, 7)) - 1]} ${mes.
 const CHIP_ESTADO: Record<string, string> = {
   Gestación: "bg-sky-50 text-sky-700",
   Lactancia: "bg-orange-50 text-orange-700",
-  Vacía: "bg-emerald-50 text-emerald-700",
+  Vacía: "bg-sky-50 text-sky-700",
   "En celo": "bg-pink-50 text-pink-700",
   "En tratamiento": "bg-amber-50 text-amber-800",
   "Sin registro": "bg-slate-100 text-slate-600",
@@ -47,7 +47,7 @@ function cuando(fecha: string, fechaHoy: string, hasta?: string) {
   const d = diasEntre(fechaHoy, fecha);
   const dFin = hasta ? diasEntre(fechaHoy, hasta) : d;
   if (dFin < 0) return { texto: `Atrasada ${-dFin} d`, clase: "bg-red-50 text-red-700" };
-  if (d <= 0) return { texto: hasta ? "Ahora" : "Hoy", clase: "bg-emerald-600 text-white" };
+  if (d <= 0) return { texto: hasta ? "Ahora" : "Hoy", clase: "bg-sky-600 text-white" };
   if (d === 1) return { texto: "Mañana", clase: "bg-amber-50 text-amber-800" };
   return { texto: `En ${d} d`, clase: "bg-slate-100 text-slate-700" };
 }
@@ -206,7 +206,7 @@ function PlanInseminacion({ plan, fechaHoy, onAbrir }: { plan: PlanProgramacion;
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-semibold text-slate-900">{nombreMes(m.mes)}</p>
                   <p className="text-xs text-slate-500">
-                    <b className="text-sky-700">{m.inseminaciones}</b> IA · <b className="text-emerald-700">{m.partos}</b> partos
+                    <b className="text-sky-700">{m.inseminaciones}</b> IA · <b className="text-sky-700">{m.partos}</b> partos
                   </p>
                 </div>
                 {!sinTotal && (
@@ -387,17 +387,17 @@ function Calculadora() {
               <span
                 aria-hidden="true"
                 className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-lg ring-4 ring-white ${
-                  p.destacado ? "bg-emerald-100" : "bg-slate-100"
+                  p.destacado ? "bg-sky-100" : "bg-slate-100"
                 }`}
               >
                 {p.icono}
               </span>
               <div
                 className={`min-w-0 flex-1 rounded-2xl px-3.5 py-2.5 ${
-                  p.destacado ? "bg-emerald-50 ring-1 ring-emerald-100" : "bg-slate-50"
+                  p.destacado ? "bg-sky-50 ring-1 ring-sky-100" : "bg-slate-50"
                 }`}
               >
-                <p className={`text-sm font-semibold ${p.destacado ? "text-emerald-900" : "text-slate-900"}`}>{p.titulo}</p>
+                <p className={`text-sm font-semibold ${p.destacado ? "text-sky-900" : "text-slate-900"}`}>{p.titulo}</p>
                 <p className="text-xs text-slate-600">
                   {formatoFecha(p.desde, true)}
                   {p.hasta ? ` – ${formatoFecha(p.hasta, true)}` : ""}

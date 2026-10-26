@@ -109,7 +109,7 @@ export default function MonitoreoPage() {
                     <Insignia
                       clase={
                         ok
-                          ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                          ? "bg-sky-50 text-sky-700 ring-sky-200"
                           : "bg-red-50 text-red-700 ring-red-200"
                       }
                     >
@@ -266,7 +266,7 @@ function NuevaLectura({ zonaInicial, onCerrar }: { zonaInicial: ZonaMonitoreo | 
               value={hora}
               onChange={(e) => setHora(e.target.value)}
               required
-              className="w-full rounded-xl bg-slate-50 px-3.5 py-2.5 text-base text-slate-900 ring-1 ring-slate-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              className="w-full rounded-xl bg-slate-50 px-3.5 py-2.5 text-base text-slate-900 ring-1 ring-slate-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-600"
             />
           </Campo>
         </div>

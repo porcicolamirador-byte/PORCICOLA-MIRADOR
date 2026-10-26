@@ -219,12 +219,12 @@ function TarjetaCorral({ corral, onCambiar }: { corral?: Corral; onCambiar?: () 
     );
   }
   return (
-    <div className="flex items-center gap-3 rounded-2xl bg-emerald-50 px-3.5 py-3 ring-1 ring-emerald-100">
-      <span className="flex h-11 min-w-[3.5rem] shrink-0 items-center justify-center rounded-xl bg-white px-2 text-base font-bold tabular-nums text-emerald-800 ring-1 ring-emerald-200">
+    <div className="flex items-center gap-3 rounded-2xl bg-sky-50 px-3.5 py-3 ring-1 ring-sky-100">
+      <span className="flex h-11 min-w-[3.5rem] shrink-0 items-center justify-center rounded-xl bg-white px-2 text-base font-bold tabular-nums text-sky-800 ring-1 ring-sky-200">
         {corral.codigo}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700/80">Corral</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-sky-700/80">Corral</p>
         <p className="truncate text-sm font-semibold text-slate-900">
           {corral.zona}
           {corral.capacidad ? ` · capacidad ${corral.capacidad}` : ""}
@@ -232,7 +232,7 @@ function TarjetaCorral({ corral, onCambiar }: { corral?: Corral; onCambiar?: () 
         {corral.nota && <p className="truncate text-xs text-slate-500">{corral.nota}</p>}
       </div>
       {onCambiar && (
-        <button type="button" onClick={onCambiar} className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold text-emerald-700 active:bg-emerald-100">
+        <button type="button" onClick={onCambiar} className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold text-sky-700 active:bg-sky-100">
           Cambiar
         </button>
       )}
@@ -366,7 +366,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                 Registrar alimento
               </Boton>
               <div className="grid grid-cols-3 gap-2">
-                <Boton variante="suave" onClick={() => setAccion("corral")} className={corral ? "" : "ring-2 ring-emerald-600"}>
+                <Boton variante="suave" onClick={() => setAccion("corral")} className={corral ? "" : "ring-2 ring-sky-600"}>
                   <span className="truncate">{corral ? corral.codigo : "Corral"}</span>
                 </Boton>
                 <Boton variante="suave" onClick={() => setAccion("pesaje")} disabled={!corral}>Pesaje</Boton>

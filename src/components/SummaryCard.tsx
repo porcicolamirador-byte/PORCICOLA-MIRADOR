@@ -38,7 +38,7 @@ export default function SummaryCard({
   valor,
   detalle,
   icon,
-  iconBg = "bg-emerald-50 text-emerald-700",
+  iconBg = "bg-sky-50 text-sky-700",
   bgColor = "#f5f5f7",
 }: CardProps) {
   const isDark = useMemo(() => isColorDark(bgColor), [bgColor]);

@@ -69,7 +69,7 @@ export default function CatalogoCorrales() {
               <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-100">
                 {g.items.map((c) => (
                   <li key={c.id} className="flex items-center gap-3 px-3 py-2.5">
-                    <span className="flex h-9 min-w-[3.25rem] shrink-0 items-center justify-center rounded-lg bg-emerald-50 px-2 text-sm font-bold tabular-nums text-emerald-800 ring-1 ring-emerald-100">
+                    <span className="flex h-9 min-w-[3.25rem] shrink-0 items-center justify-center rounded-lg bg-sky-50 px-2 text-sm font-bold tabular-nums text-sky-800 ring-1 ring-sky-100">
                       {c.codigo}
                     </span>
                     <div className="min-w-0 flex-1">
@@ -81,7 +81,7 @@ export default function CatalogoCorrales() {
                     <button
                       type="button"
                       onClick={() => setEditando(c)}
-                      className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold text-emerald-700 active:bg-emerald-50"
+                      className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold text-sky-700 active:bg-sky-50"
                     >
                       Editar
                     </button>

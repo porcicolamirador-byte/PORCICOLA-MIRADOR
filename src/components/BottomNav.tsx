@@ -6,10 +6,10 @@ import { leerCerdas, useVersionDatos } from "@/lib/datos";
 import { calcularTareasPendientes } from "@/utils/pendingTasks";
 
 /* Colores al estilo de la barra de WhatsApp */
-const PILDORA = "#d8fdd2"; // fondo verde claro de la pestaña activa
+const PILDORA = "#e0f2fe"; // fondo azul claro de la pestaña activa
 const ACTIVO = "#111b21"; // ícono y texto activos
 const INACTIVO = "#54656f"; // ícono y texto inactivos
-const GLOBO = "#25d366"; // globo con el número de pendientes
+const GLOBO = "#0369a1"; // globo con el número de pendientes
 
 /* Íconos: contorno cuando la pestaña está inactiva, rellenos cuando está activa */
 function Svg({ children }: { children: ReactNode }) {
@@ -113,12 +113,12 @@ export default function BottomNav() {
                 onClick={() => router.push(ruta)}
                 aria-current={activa ? "page" : undefined}
                 aria-label={globo ? `${nombre}, ${globo} tareas pendientes` : nombre}
-                className={`${activa ? "pestana-activa" : "pestana-inactiva"} flex w-full flex-col items-center gap-1 rounded-xl py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600`}
+                className={`${activa ? "pestana-activa" : "pestana-inactiva"} flex w-full flex-col items-center gap-1 rounded-xl py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600`}
                 style={{ color: activa ? ACTIVO : INACTIVO, WebkitTapHighlightColor: "transparent" }}
               >
                 <span
                   className="relative flex h-8 w-16 items-center justify-center rounded-full"
-                  style={{ backgroundColor: activa ? "var(--nav-pildora, #d8fdd2)" : "transparent" }}
+                  style={{ backgroundColor: activa ? "var(--nav-pildora, #e0f2fe)" : "transparent" }}
                 >
                   <Icono lleno={activa} />
                   {globo && (

@@ -241,7 +241,7 @@ export default function Gestacion() {
       case "Gestación":
         return "bg-blue-100 text-blue-800";
       case "Lactancia":
-        return "bg-green-100 text-green-800";
+        return "bg-orange-100 text-orange-800";
       case "Próxima a Celo":
         return "bg-yellow-100 text-yellow-900";
       case "Aborto":
@@ -251,7 +251,7 @@ export default function Gestacion() {
       case "Celo":
         return "bg-yellow-100 text-yellow-900";
       case "Tratamiento":
-        return "bg-emerald-100 text-emerald-800";
+        return "bg-amber-100 text-amber-800";
       case "Activa":
         return "bg-pink-100 text-pink-800";
       default:
@@ -264,7 +264,7 @@ export default function Gestacion() {
       case "Gestación":
         return "from-blue-500 to-blue-400";
       case "Lactancia":
-        return "from-green-500 to-green-400";
+        return "from-orange-500 to-orange-400";
       case "Próxima a Celo":
       case "Celo":
         return "from-yellow-500 to-yellow-400";
@@ -276,7 +276,7 @@ export default function Gestacion() {
       case "Activa":
         return "from-pink-300 to-pink-200";
       default:
-        return "from-emerald-700 to-emerald-500";
+        return "from-sky-700 to-sky-500";
     }
   }
 
@@ -292,11 +292,11 @@ export default function Gestacion() {
         };
       case "Lactancia":
         return {
-          bg: "bg-green-50",
-          border: "border-green-200",
-          title: "text-green-700",
-          content: "text-green-900",
-          secondary: "text-green-600",
+          bg: "bg-orange-50",
+          border: "border-orange-200",
+          title: "text-orange-700",
+          content: "text-orange-900",
+          secondary: "text-orange-600",
         };
       case "Próxima a Celo":
       case "Celo":
@@ -334,11 +334,11 @@ export default function Gestacion() {
         };
       default:
         return {
-          bg: "bg-emerald-50",
-          border: "border-emerald-200",
-          title: "text-emerald-700",
-          content: "text-emerald-900",
-          secondary: "text-emerald-600",
+          bg: "bg-sky-50",
+          border: "border-sky-200",
+          title: "text-sky-700",
+          content: "text-sky-900",
+          secondary: "text-sky-600",
         };
     }
   }
@@ -540,7 +540,7 @@ export default function Gestacion() {
 
   const resumen = [
     { label: "Gestantes", valor: totales.gestantes, nota: pct(totales.gestantes), tono: "text-blue-700" },
-    { label: "Lactando", valor: totales.lactando, nota: pct(totales.lactando), tono: "text-green-700" },
+    { label: "Lactando", valor: totales.lactando, nota: pct(totales.lactando), tono: "text-sky-700" },
     { label: "Próx. partos", valor: totales.proxPartos, nota: "en 14 días", tono: totales.proxPartos > 0 ? "text-amber-600" : "text-slate-900" },
     { label: "Alertas", valor: totales.alertas, nota: "por revisar", tono: totales.alertas > 0 ? "text-rose-600" : "text-slate-900" },
   ];
@@ -553,20 +553,20 @@ export default function Gestacion() {
           <button
             type="button"
             onClick={() => router.push("/dashboard")}
-            className="-ml-1 mb-1 rounded-full px-2 py-1 text-sm font-medium text-emerald-800 transition hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+            className="-ml-1 mb-1 rounded-full px-2 py-1 text-sm font-medium text-sky-800 transition hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600"
           >
             ‹ Inicio
           </button>
           <div className="flex items-center justify-between gap-3">
-            <h1 className="text-3xl font-bold tracking-tight text-emerald-900">Gestación</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-sky-900">Gestación</h1>
             {/* Cambiar entre lista y cuadrícula de 2 columnas */}
             <button
               type="button"
               onClick={cambiarVista}
               aria-pressed={cuadricula}
               aria-label={cuadricula ? "Ver como lista" : "Ver en cuadrícula de 2 columnas"}
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${
-                cuadricula ? "bg-emerald-800 text-white" : "bg-slate-100 text-slate-700"
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 ${
+                cuadricula ? "bg-sky-800 text-white" : "bg-slate-100 text-slate-700"
               }`}
             >
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill={cuadricula ? "currentColor" : "none"} stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
@@ -604,7 +604,7 @@ export default function Gestacion() {
             value={buscar}
             onChange={(e) => setBuscar(e.target.value)}
             aria-label="Buscar cerda por ID"
-            className="h-12 w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-3 text-base text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200"
+            className="h-12 w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-3 text-base text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-sky-600 focus:ring-2 focus:ring-sky-200"
           />
         </div>
 
@@ -622,9 +622,9 @@ export default function Gestacion() {
                 type="button"
                 onClick={() => setEstadoFiltro(estado)}
                 aria-pressed={activo}
-                className={`shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${
+                className={`shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 ${
                   activo
-                    ? "border-emerald-800 bg-emerald-800 text-white"
+                    ? "border-sky-800 bg-sky-800 text-white"
                     : "border-slate-200 bg-white text-slate-700"
                 }`}
               >
@@ -673,7 +673,7 @@ export default function Gestacion() {
                   key={cerda.id}
                   type="button"
                   onClick={() => router.push(`/cerda/${encodeURIComponent(cerda.id)}`)}
-                  className="relative flex min-w-0 flex-col items-start gap-2.5 overflow-hidden rounded-3xl border border-slate-200 bg-white px-3.5 py-3.5 text-left shadow-sm transition active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+                  className="relative flex min-w-0 flex-col items-start gap-2.5 overflow-hidden rounded-3xl border border-slate-200 bg-white px-3.5 py-3.5 text-left shadow-sm transition active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600"
                 >
                   <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${obtenerBarraColor(estadoLabel)}`} />
                   <div className="relative flex h-11 min-w-[3.25rem] max-w-full items-center justify-center rounded-xl bg-amber-300 px-2.5 pt-1.5 shadow-inner">
@@ -736,7 +736,7 @@ export default function Gestacion() {
                 >
                   {/* Acciones que aparecen al deslizar */}
                   <div
-                    className={`absolute inset-y-0 right-0 z-0 flex w-24 flex-col justify-center gap-2 border-l border-emerald-100 bg-emerald-50 px-2 transition-opacity duration-200 ${
+                    className={`absolute inset-y-0 right-0 z-0 flex w-24 flex-col justify-center gap-2 border-l border-sky-100 bg-sky-50 px-2 transition-opacity duration-200 ${
                       isSwiped ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
                     }`}
                   >
@@ -747,7 +747,7 @@ export default function Gestacion() {
                         setSwipedIndex(null);
                         editarCerda(indiceReal);
                       }}
-                      className="w-full rounded-lg bg-white py-2 text-xs font-semibold text-emerald-800 shadow-sm"
+                      className="w-full rounded-lg bg-white py-2 text-xs font-semibold text-sky-800 shadow-sm"
                     >
                       Editar
                     </button>
@@ -811,7 +811,7 @@ export default function Gestacion() {
                             e.stopPropagation();
                             setSwipedIndex(isSwiped ? null : index);
                           }}
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xl leading-none text-slate-400 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xl leading-none text-slate-400 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600"
                         >
                           ⋯
                         </button>
@@ -905,7 +905,7 @@ export default function Gestacion() {
           <button
             onClick={() => setMostrarMenuFlotante(!mostrarMenuFlotante)}
             style={{ bottom: "calc(env(safe-area-inset-bottom) + 1.5rem)" }}
-            className="fixed right-5 z-30 h-14 w-14 rounded-full bg-gradient-to-br from-emerald-700 to-emerald-900 text-3xl text-white shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 active:scale-95"
+            className="fixed right-5 z-30 h-14 w-14 rounded-full bg-gradient-to-br from-sky-700 to-sky-900 text-3xl text-white shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2 active:scale-95"
             aria-label="Abrir menú de opciones"
             aria-expanded={mostrarMenuFlotante}
           >
@@ -927,7 +927,7 @@ export default function Gestacion() {
                     setMostrarMenuFlotante(false);
                     router.push("/tareas");
                   }}
-                  className="group block w-full px-3 py-3 text-left transition-colors hover:bg-emerald-50"
+                  className="group block w-full px-3 py-3 text-left transition-colors hover:bg-sky-50"
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-full bg-yellow-100 transition-colors group-hover:bg-yellow-200">
@@ -948,11 +948,11 @@ export default function Gestacion() {
                     setMostrarFormulario(true);
                     setMostrarMenuFlotante(false);
                   }}
-                  className="group block w-full px-3 py-3 text-left transition-colors hover:bg-emerald-50"
+                  className="group block w-full px-3 py-3 text-left transition-colors hover:bg-sky-50"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 transition-colors group-hover:bg-emerald-200">
-                      <span className="text-base font-bold text-emerald-800">+</span>
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-100 transition-colors group-hover:bg-sky-200">
+                      <span className="text-base font-bold text-sky-800">+</span>
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-slate-900">Agregar cerda</p>
@@ -1005,7 +1005,7 @@ export default function Gestacion() {
                   placeholder="••••"
                   aria-label="Clave de confirmación"
                   className={`mt-3 h-11 w-full rounded-xl border bg-slate-50 text-center text-xl tracking-[0.6em] text-slate-900 outline-none placeholder:text-slate-300 focus:bg-white focus:ring-2 ${
-                    deletePinError ? "border-red-400 focus:ring-red-200" : "border-slate-200 focus:ring-emerald-200"
+                    deletePinError ? "border-red-400 focus:ring-red-200" : "border-slate-200 focus:ring-sky-200"
                   }`}
                 />
                 {deletePinError ? <p className="mt-2 text-[13px] font-medium text-red-600">{deletePinError}</p> : null}
@@ -1015,7 +1015,7 @@ export default function Gestacion() {
                 <button
                   type="button"
                   onClick={cancelarEliminarCerda}
-                  className="py-3 text-[17px] text-emerald-700 transition active:bg-slate-100"
+                  className="py-3 text-[17px] text-sky-700 transition active:bg-slate-100"
                 >
                   Cancelar
                 </button>

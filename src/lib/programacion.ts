@@ -46,7 +46,7 @@ export const ESTILO: Record<Clase, { icono: string; fondo: string; texto: string
   repeticion: { icono: "🔁", fondo: "bg-amber-100", texto: "text-amber-800" },
   confirmar: { icono: "✅", fondo: "bg-blue-100", texto: "text-blue-800" },
   maternidad: { icono: "🏠", fondo: "bg-violet-100", texto: "text-violet-800" },
-  parto: { icono: "🐷", fondo: "bg-emerald-100", texto: "text-emerald-800" },
+  parto: { icono: "🐷", fondo: "bg-sky-100", texto: "text-sky-800" },
   destete: { icono: "🍼", fondo: "bg-orange-100", texto: "text-orange-800" },
 };
 

@@ -46,7 +46,7 @@ export default function Home() {
             />
           </div>
 
-          <p className="splash-sub mt-1 text-center text-[13px] font-medium uppercase tracking-[0.22em] text-emerald-900/60">
+          <p className="splash-sub mt-1 text-center text-[13px] font-medium uppercase tracking-[0.22em] text-sky-900/60">
             Gestión de producción porcina
           </p>
         </section>
@@ -54,12 +54,12 @@ export default function Home() {
         {/* Progreso */}
         <section className="relative z-10 mx-auto w-full max-w-xs px-8 pb-10">
           <div
-            className="h-1.5 w-full overflow-hidden rounded-full bg-emerald-900/10"
+            className="h-1.5 w-full overflow-hidden rounded-full bg-sky-900/10"
             role="progressbar"
             aria-label="Cargando la aplicación"
           >
             <div
-              className="splash-bar h-full rounded-full bg-emerald-700"
+              className="splash-bar h-full rounded-full bg-sky-700"
               style={{ animationDuration: `${DURACION_CARGA}ms` }}
             />
           </div>

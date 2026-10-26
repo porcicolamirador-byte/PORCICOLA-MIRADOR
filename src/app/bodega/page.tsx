@@ -131,7 +131,7 @@ export default function BodegaPage() {
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             placeholder={vista === "facturas" ? "Buscar por número o proveedor" : "Buscar producto"}
-            className="w-full rounded-2xl bg-slate-100 px-4 py-3 text-base text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
+            className="w-full rounded-2xl bg-slate-100 px-4 py-3 text-base text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-600"
           />
 
           <Chips
@@ -200,14 +200,14 @@ export default function BodegaPage() {
                         const agotado = existencia <= 0;
                         const referencia = Math.max(p.minimo * 3, p.minimo + 1, 1);
                         const nivel = Math.max(0, Math.min(100, (existencia / referencia) * 100));
-                        const colorBarra = agotado || bajoMinimo ? "bg-red-500" : existencia <= p.minimo * 1.5 ? "bg-amber-400" : "bg-emerald-500";
+                        const colorBarra = agotado || bajoMinimo ? "bg-red-500" : existencia <= p.minimo * 1.5 ? "bg-amber-400" : "bg-sky-500";
                         const estado = agotado
                           ? { t: "Agotado", c: "bg-red-600 text-white ring-red-600" }
                           : bajoMinimo
                           ? { t: "Reponer", c: "bg-red-50 text-red-700 ring-red-200" }
                           : existencia <= p.minimo * 1.5
                           ? { t: "Bajo", c: "bg-amber-50 text-amber-800 ring-amber-200" }
-                          : { t: "Disponible", c: "bg-emerald-50 text-emerald-700 ring-emerald-200" };
+                          : { t: "Disponible", c: "bg-sky-50 text-sky-700 ring-sky-200" };
                         return (
                           <button
                             key={p.id}
@@ -411,7 +411,7 @@ function NuevaFactura({
             value={proveedor}
             onChange={(e) => setProveedor(e.target.value)}
             placeholder="Ej. Agropecuaria La Esperanza"
-            className="block w-full min-w-0 rounded-xl bg-slate-50 px-3.5 py-2.5 text-base text-slate-900 ring-1 ring-slate-200 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
+            className="block w-full min-w-0 rounded-xl bg-slate-50 px-3.5 py-2.5 text-base text-slate-900 ring-1 ring-slate-200 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-600"
           />
           <datalist id="proveedores-bodega">
             {proveedores.map((p) => (
@@ -478,7 +478,7 @@ function NuevaFactura({
           <button
             type="button"
             onClick={() => setLineas((ls) => [...ls, lineaVacia()])}
-            className="mt-2 w-full rounded-2xl border border-dashed border-emerald-300 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+            className="mt-2 w-full rounded-2xl border border-dashed border-sky-300 py-2.5 text-sm font-semibold text-sky-700 hover:bg-sky-50"
           >
             + Agregar otro producto
           </button>
@@ -493,7 +493,7 @@ function NuevaFactura({
           <span className="text-lg font-bold text-teal-900 tabular-nums">{formatoPesos(total)}</span>
         </div>
         <label className="flex items-center gap-2 text-sm text-slate-700">
-          <input type="checkbox" checked={comoGasto} onChange={(e) => setComoGasto(e.target.checked)} className="h-5 w-5 accent-emerald-700" />
+          <input type="checkbox" checked={comoGasto} onChange={(e) => setComoGasto(e.target.checked)} className="h-5 w-5 accent-sky-700" />
           Registrar el total como gasto en Contabilidad
         </label>
 
@@ -580,7 +580,7 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
                 {movimientos.slice(0, 40).map((m, i) => (
                   <li key={i} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 text-sm">
                     <span className="min-w-0">
-                      <span className={`font-semibold ${m.tipo === "entrada" ? "text-emerald-700" : "text-slate-800"}`}>
+                      <span className={`font-semibold ${m.tipo === "entrada" ? "text-sky-700" : "text-slate-800"}`}>
                         {m.tipo === "entrada" ? "+" : "−"}
                         {fmt(m.cantidad)} {p.unidad}
                       </span>

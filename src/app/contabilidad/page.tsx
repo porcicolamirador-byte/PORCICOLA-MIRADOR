@@ -132,7 +132,7 @@ export default function ContabilidadPage() {
               <li key={m.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
                 <span
                   className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-base font-bold ${
-                    m.tipo === "ingreso" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+                    m.tipo === "ingreso" ? "bg-sky-50 text-sky-700" : "bg-rose-50 text-rose-700"
                   }`}
                   aria-hidden="true"
                 >
@@ -145,7 +145,7 @@ export default function ContabilidadPage() {
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-col items-end">
-                  <span className={`text-sm font-semibold tabular-nums ${m.tipo === "ingreso" ? "text-emerald-700" : "text-slate-900"}`}>
+                  <span className={`text-sm font-semibold tabular-nums ${m.tipo === "ingreso" ? "text-sky-700" : "text-slate-900"}`}>
                     {m.tipo === "ingreso" ? "+" : "−"}
                     {formatoPesos(m.monto)}
                   </span>

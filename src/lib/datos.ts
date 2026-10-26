@@ -645,7 +645,7 @@ export type EstadoCerda =
 export const COLOR_ESTADO: Record<EstadoCerda, string> = {
   Gestación: "bg-sky-50 text-sky-700 ring-sky-200",
   Lactancia: "bg-orange-50 text-orange-700 ring-orange-200",
-  Vacía: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  Vacía: "bg-violet-50 text-violet-700 ring-violet-200",
   "En celo": "bg-pink-50 text-pink-700 ring-pink-200",
   "En tratamiento": "bg-amber-50 text-amber-800 ring-amber-200",
   "Sin registro": "bg-slate-100 text-slate-600 ring-slate-200",

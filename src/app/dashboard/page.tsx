@@ -255,7 +255,7 @@ export default function Dashboard() {
       valor: totalCerdos,
       detalle: "",
       icon: "🐖",
-      iconBg: "bg-emerald-50 text-emerald-700",
+      iconBg: "bg-sky-50 text-sky-700",
     },
     {
       nombre: "Gestantes en producción",
@@ -347,7 +347,7 @@ export default function Dashboard() {
             <button
               type="button"
               onClick={() => router.push(destacado.ruta)}
-              className={`col-span-2 flex items-center justify-between gap-3 rounded-3xl border px-4 py-4 text-left shadow-sm transition active:scale-[0.98] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${destacado.card}`}
+              className={`col-span-2 flex items-center justify-between gap-3 rounded-3xl border px-4 py-4 text-left shadow-sm transition active:scale-[0.98] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 ${destacado.card}`}
             >
               <div className="flex items-center gap-3">
                 <div className={`flex h-14 w-14 items-center justify-center rounded-2xl text-3xl ${destacado.tile}`}>
@@ -359,7 +359,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-2xl font-bold leading-none text-emerald-800">{gestantes}</p>
+                <p className="text-2xl font-bold leading-none text-sky-800">{gestantes}</p>
                 <p className="mt-1 text-[11px] text-slate-500">
                   {gestantes === 1 ? "gestante" : "gestantes"}
                 </p>
@@ -371,7 +371,7 @@ export default function Dashboard() {
                 key={modulo.nombre}
                 type="button"
                 onClick={() => router.push(modulo.ruta)}
-                className={`flex flex-col items-start gap-3 rounded-3xl border px-3.5 py-3.5 text-left shadow-sm transition active:scale-[0.97] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${modulo.card}`}
+                className={`flex flex-col items-start gap-3 rounded-3xl border px-3.5 py-3.5 text-left shadow-sm transition active:scale-[0.97] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 ${modulo.card}`}
               >
                 <div className={`flex h-11 w-11 items-center justify-center rounded-2xl text-2xl ${modulo.tile}`}>
                   <IconoModulo nombre={modulo.nombre} className="h-6 w-6" />
@@ -396,7 +396,7 @@ export default function Dashboard() {
           className={`fixed right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-2xl transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
             hayCriticas
               ? 'bg-rose-600 hover:bg-rose-700 focus-visible:ring-rose-600'
-              : 'bg-emerald-600 hover:bg-emerald-700 focus-visible:ring-emerald-600'
+              : 'bg-sky-600 hover:bg-sky-700 focus-visible:ring-sky-600'
           }`}
           aria-label={`Ver alertas pendientes: ${pendientes}${hayCriticas ? ", hay urgentes" : ""}`}
         >
@@ -407,7 +407,7 @@ export default function Dashboard() {
               className="pointer-events-none absolute inset-0 rounded-full bg-rose-500/50 motion-safe:animate-ping"
             />
           ) : (
-            <span aria-hidden="true" className="latido-suave pointer-events-none absolute inset-0 rounded-full bg-emerald-400/30" />
+            <span aria-hidden="true" className="latido-suave pointer-events-none absolute inset-0 rounded-full bg-sky-400/30" />
           )}
           <span className="relative text-xl">🕣</span>
           <span className="pointer-events-none absolute -right-1 top-0.5 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-slate-900 shadow-sm">

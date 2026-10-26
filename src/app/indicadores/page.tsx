@@ -22,7 +22,7 @@ import {
 const ESTADOS: { estado: EstadoCerda; color: string }[] = [
   { estado: "Gestación", color: "#2a78d6" },
   { estado: "Lactancia", color: "#eb6834" },
-  { estado: "Vacía", color: "#1baf7a" },
+  { estado: "Vacía", color: "#8b5cf6" },
   { estado: "En celo", color: "#d94f8a" },
   { estado: "En tratamiento", color: "#eda100" },
   { estado: "Sin registro", color: "#94a3b8" },

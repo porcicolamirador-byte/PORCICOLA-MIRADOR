@@ -90,21 +90,21 @@ export default function DialogoClave({
             placeholder={"•".repeat(longitud)}
             aria-label="Código de confirmación"
             className={`mt-3 h-11 w-full rounded-xl border bg-slate-50 text-center text-xl tracking-[0.6em] text-slate-900 outline-none placeholder:text-slate-300 focus:bg-white focus:ring-2 ${
-              error ? "border-red-400 focus:ring-red-200" : "border-slate-200 focus:ring-emerald-200"
+              error ? "border-red-400 focus:ring-red-200" : "border-slate-200 focus:ring-sky-200"
             }`}
           />
           {error && <p className="mt-2 text-[13px] font-medium text-red-600">{error}</p>}
         </div>
 
         <div className="grid grid-cols-2 divide-x divide-slate-200 border-t border-slate-200">
-          <button type="button" onClick={onCerrar} className="py-3 text-[17px] text-emerald-700 transition active:bg-slate-100">
+          <button type="button" onClick={onCerrar} className="py-3 text-[17px] text-sky-700 transition active:bg-slate-100">
             Cancelar
           </button>
           <button
             type="button"
             onClick={enviar}
             disabled={codigo.length === 0}
-            className="py-3 text-[17px] font-semibold text-emerald-700 transition active:bg-slate-100 disabled:text-slate-300"
+            className="py-3 text-[17px] font-semibold text-sky-700 transition active:bg-slate-100 disabled:text-slate-300"
           >
             {aceptar}
           </button>

@@ -257,7 +257,7 @@ export default function CalendarioPage() {
                     ))}
                   </span>
                 )}
-                {esHoy && !principal && <span className="absolute bottom-0.5 h-1 w-1 rounded-full bg-emerald-600" aria-hidden="true" />}
+                {esHoy && !principal && <span className="absolute bottom-0.5 h-1 w-1 rounded-full bg-sky-600" aria-hidden="true" />}
               </button>
             );
           })}
@@ -272,7 +272,7 @@ export default function CalendarioPage() {
             @keyframes cal-izquierda { from { transform: translateX(-40%); opacity: 0 } to { transform: none; opacity: 1 } }
             @media (prefers-reduced-motion: reduce) { .entrada-derecha, .entrada-izquierda { animation: none } }
           `}</style>
-          <button type="button" onClick={irAHoy} className="rounded-full px-3 py-1 text-xs font-semibold text-emerald-700 active:bg-emerald-50">
+          <button type="button" onClick={irAHoy} className="rounded-full px-3 py-1 text-xs font-semibold text-sky-700 active:bg-sky-50">
             Hoy
           </button>
         </div>

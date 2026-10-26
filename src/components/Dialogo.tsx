@@ -108,7 +108,7 @@ export default function DialogoHost() {
             <button
               type="button"
               onClick={() => cerrar(false)}
-              className="py-3 text-[17px] text-emerald-700 transition active:bg-slate-100"
+              className="py-3 text-[17px] text-sky-700 transition active:bg-slate-100"
             >
               {cancelar}
             </button>
@@ -118,7 +118,7 @@ export default function DialogoHost() {
             type="button"
             onClick={() => cerrar(true)}
             className={`py-3 text-[17px] font-semibold transition active:bg-slate-100 focus-visible:outline-none ${
-              destructivo ? "text-red-600" : "text-emerald-700"
+              destructivo ? "text-red-600" : "text-sky-700"
             }`}
           >
             {aceptar}

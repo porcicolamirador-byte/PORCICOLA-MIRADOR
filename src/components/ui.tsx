@@ -92,7 +92,7 @@ export function Boton({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-semibold transition active:scale-95 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 ${estilos} ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-semibold transition active:scale-95 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2 ${estilos} ${className}`}
     >
       {children}
     </button>
@@ -101,7 +101,7 @@ export function Boton({
 
 /* Los campos usan text-base (16px) para que el iPhone no haga zoom al escribir. */
 const claseCampo =
-  "block w-full min-w-0 max-w-full appearance-none rounded-xl bg-slate-50 px-3.5 py-2.5 text-base text-slate-900 ring-1 ring-slate-200 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600";
+  "block w-full min-w-0 max-w-full appearance-none rounded-xl bg-slate-50 px-3.5 py-2.5 text-base text-slate-900 ring-1 ring-slate-200 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-600";
 
 export function Campo({
   etiqueta,
@@ -299,8 +299,8 @@ export function Interruptor({ activo, onCambiar }: { activo: boolean; onCambiar:
       />
       <span
         aria-hidden="true"
-        className={`flex h-[31px] w-[51px] items-center rounded-full p-[2px] transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-emerald-300 ${
-          activo ? "bg-emerald-600" : "bg-slate-300"
+        className={`flex h-[31px] w-[51px] items-center rounded-full p-[2px] transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-sky-300 ${
+          activo ? "bg-sky-600" : "bg-slate-300"
         }`}
       >
         <span className={`h-[27px] w-[27px] rounded-full bg-white shadow transition-transform ${activo ? "translate-x-5" : ""}`} />
@@ -334,7 +334,7 @@ export function SeccionDesplegable({
         {cantidad !== undefined && (
           <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-slate-700">{cantidad}</span>
         )}
-        <span className="text-xs font-medium text-emerald-700">{abierta ? "Ocultar" : "Ver"}</span>
+        <span className="text-xs font-medium text-sky-700">{abierta ? "Ocultar" : "Ver"}</span>
         <svg
           viewBox="0 0 24 24"
           aria-hidden="true"

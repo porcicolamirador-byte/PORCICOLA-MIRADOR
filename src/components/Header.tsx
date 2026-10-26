@@ -51,7 +51,7 @@ export default function Header({
 
   const textColor = isDark ? "text-white" : "text-slate-950";
   const subtitleColor = isDark ? "text-gray-300" : "text-slate-500";
-  const iconBgColor = isDark ? "bg-white/20" : "bg-emerald-900/10";
+  const iconBgColor = isDark ? "bg-white/20" : "bg-sky-900/10";
   const borderColor = isDark ? "border-white/20" : "border-white/40";
 
   return (

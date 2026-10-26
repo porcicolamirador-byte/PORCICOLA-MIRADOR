@@ -63,7 +63,7 @@ function obtenerColorPorTipo(tipo: string): string {
     case "Inseminación":
       return "bg-blue-500";
     case "Parto":
-      return "bg-green-500";
+      return "bg-sky-500";
     case "Destete":
       return "bg-orange-500";
     case "Celo":
@@ -112,7 +112,7 @@ function infoTipo(tipo: string): { icono: string; fondo: string; borde: string; 
     case "Celo":
       return { icono: "🔥", fondo: "bg-amber-100", borde: "border-amber-100", texto: "text-amber-800" };
     case "Parto":
-      return { icono: "🐷", fondo: "bg-emerald-100", borde: "border-emerald-100", texto: "text-emerald-800" };
+      return { icono: "🐷", fondo: "bg-sky-100", borde: "border-sky-100", texto: "text-sky-800" };
     case "Destete":
       return { icono: "🍼", fondo: "bg-orange-100", borde: "border-orange-100", texto: "text-orange-800" };
     case "Aborto":
@@ -494,7 +494,7 @@ export default function CerdaDetalle() {
       : estado === "Gestación"
       ? "bg-blue-100 text-blue-600"
       : estado === "Lactancia"
-      ? "bg-green-100 text-green-600"
+      ? "bg-sky-100 text-sky-600"
       : "bg-pink-100 text-pink-600";
 
   const ultimaInseminacion = registros.find((r) => r.tipo === "Inseminación");
@@ -577,7 +577,7 @@ export default function CerdaDetalle() {
             <button onClick={() => setSelectedRegistro(null)} aria-label="Cerrar" className="absolute right-2 top-2 z-20 flex h-11 w-11 touch-manipulation items-center justify-center rounded-full text-slate-500 hover:text-slate-900 active:bg-slate-100">✕</button>
             <h3 className="text-lg font-bold text-black">Resumen del parto</h3>
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-700 sm:grid-cols-3">
-              <div className="rounded-lg bg-emerald-50 p-2"><b>Lote</b><p>{selectedRegistro.codigoParto || "-"}</p></div>
+              <div className="rounded-lg bg-sky-50 p-2"><b>Lote</b><p>{selectedRegistro.codigoParto || "-"}</p></div>
               <div className="rounded-lg bg-slate-100 p-2"><b>Fecha</b><p>{selectedRegistro.fecha ? formatearFechaCorta(selectedRegistro.fecha) : "-"}</p></div>
               <div className="rounded-lg bg-slate-100 p-2"><b>Hora</b><p>{selectedRegistro.horaInicio || "-"}</p></div>
               <div className="rounded-lg bg-slate-100 p-2"><b>Tipo</b><p>{selectedRegistro.tipoParto || "-"}</p></div>
@@ -654,7 +654,7 @@ export default function CerdaDetalle() {
                 </button>
               </div>
               <div className="flex gap-2 mt-1 text-xs">
-                <span className="px-2 py-0.5 rounded-full font-bold bg-green-100 text-green-600">ACTIVA</span>
+                <span className="px-2 py-0.5 rounded-full font-bold bg-sky-100 text-sky-600">ACTIVA</span>
                 <span className={`px-2 py-0.5 rounded-full font-bold ${estadoColor}`}>{estado === 'Gestación' ? 'GESTACIÓN' : estado.toUpperCase()}</span>
               </div>
             </div>
@@ -739,7 +739,7 @@ export default function CerdaDetalle() {
 
             {/* TARJETAS DE ESTADÍSTICAS */}
             <div className="grid grid-cols-3 gap-2 mt-3 text-xs">
-              <div className="bg-green-50 rounded-xl p-2 text-center">
+              <div className="bg-sky-50 rounded-xl p-2 text-center">
                 <p className="text-xl">📅</p>
                 <p className="text-black font-bold mt-1">{diasGestacion}</p>
                 <p className="text-gray-500 text-[11px]">Días desde IA</p>
@@ -909,7 +909,7 @@ export default function CerdaDetalle() {
 
                                     {r.tipo === "Parto" && (
                                       <div className="mt-2 flex flex-wrap gap-1.5">
-                                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+                                        <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-800">
                                           {r.vivos ?? 0} vivos
                                         </span>
                                         {Number(r.muertos) > 0 && (
@@ -939,7 +939,7 @@ export default function CerdaDetalle() {
                                           e.stopPropagation();
                                           setSelectedRegistro(r);
                                         }}
-                                        className="mt-2 text-xs font-semibold text-emerald-700 hover:underline"
+                                        className="mt-2 text-xs font-semibold text-sky-700 hover:underline"
                                       >
                                         Ver detalle del parto ›
                                       </button>
@@ -1121,10 +1121,10 @@ export default function CerdaDetalle() {
                   <div
                     key={c.titulo}
                     className={`flex flex-col justify-center rounded-2xl px-2 py-3 text-center ${
-                      c.destacado ? "bg-emerald-50 ring-1 ring-emerald-100" : "bg-slate-50 ring-1 ring-slate-100"
+                      c.destacado ? "bg-sky-50 ring-1 ring-sky-100" : "bg-slate-50 ring-1 ring-slate-100"
                     }`}
                   >
-                    <p className={`text-xl font-bold leading-tight tabular-nums ${c.destacado ? "text-emerald-800" : "text-slate-900"}`}>
+                    <p className={`text-xl font-bold leading-tight tabular-nums ${c.destacado ? "text-sky-800" : "text-slate-900"}`}>
                       {c.valor}
                     </p>
                     <p className="mt-0.5 text-[11px] font-medium leading-tight text-slate-500">{c.titulo}</p>

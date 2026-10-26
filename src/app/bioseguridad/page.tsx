@@ -144,7 +144,7 @@ export default function BioseguridadPage() {
                         clase={
                           riesgo
                             ? "bg-amber-50 text-amber-800 ring-amber-200"
-                            : "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                            : "bg-sky-50 text-sky-700 ring-sky-200"
                         }
                       >
                         {riesgo ? "Revisar" : "Cumple"}
@@ -224,7 +224,7 @@ function NuevaVisita({ abierta, onCerrar }: { abierta: boolean; onCerrar: () => 
             type="checkbox"
             checked={ducha}
             onChange={(e) => setDucha(e.target.checked)}
-            className="h-5 w-5 accent-emerald-700"
+            className="h-5 w-5 accent-sky-700"
           />
           Se duchó y usó ropa de la granja
         </label>

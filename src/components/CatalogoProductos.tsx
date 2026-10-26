@@ -128,7 +128,7 @@ export default function CatalogoProductos({ incrustado = false }: { incrustado?:
               <button
                 type="button"
                 onClick={() => setEditando(p)}
-                className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+                className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-50"
               >
                 Editar
               </button>
