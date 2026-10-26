@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import usePageBackground from "@/hooks/usePageBackground";
 import { cargarLogoJpeg, entregarPdf, generarPdfFicha, type LogoJpeg } from "@/lib/pdfFicha";
 import { confirmar } from "@/components/Dialogo";
+import { eliminarLotesDePartos, lotesDeParto, nombreLote } from "@/lib/datos";
 import { leerConfig } from "@/lib/config";
 
 const DIAS_GESTACION = 114;
@@ -228,17 +229,24 @@ export default function CerdaDetalle() {
   }
 
   function eliminarRegistro(index: number) {
+    const r = registros[index];
     const nuevos = registros.filter((_, i) => i !== index);
     guardar(nuevos);
+    // El lote de engorde creado con ese parto se borra junto con el parto
+    if (r?.tipo === "Parto" && r.codigoParto) eliminarLotesDePartos({ codigos: [String(r.codigoParto)] });
   }
 
   async function pedirEliminarRegistro(index: number) {
     const r = registros[index];
     setSwipedIndex(null);
     if (!r) return;
+    const lotes = r.tipo === "Parto" && r.codigoParto ? lotesDeParto(String(r.codigoParto)) : [];
+    const base = r.fecha ? `Se borrará el registro del ${formatearFechaCorta(r.fecha)}.` : "Se borrará este registro.";
     const ok = await confirmar({
       titulo: `Eliminar ${String(r.tipo || "registro").toLowerCase()}`,
-      mensaje: r.fecha ? `Se borrará el registro del ${formatearFechaCorta(r.fecha)}.` : "Se borrará este registro.",
+      mensaje: lotes.length
+        ? `${base} También se eliminará de Engorde el ${lotes.map(nombreLote).join(", ")} con sus pesajes, alimento y mortalidad.`
+        : base,
       aceptar: "Eliminar",
       destructivo: true,
     });
@@ -247,8 +255,9 @@ export default function CerdaDetalle() {
 
   async function eliminarHistorialCompleto() {
     setMostrarMenu(false);
-    if (!(await confirmar({ titulo: "Eliminar historial", mensaje: "Se borrarán todos los registros de esta cerda. Esta acción no se puede deshacer.", aceptar: "Eliminar", destructivo: true }))) return;
+    if (!(await confirmar({ titulo: "Eliminar historial", mensaje: "Se borrarán todos los registros de esta cerda y los lotes de Engorde creados con sus partos. Esta acción no se puede deshacer.", aceptar: "Eliminar", destructivo: true }))) return;
     localStorage.removeItem(`historial-${id}`);
+    eliminarLotesDePartos({ cerdaId: String(id) });
     setRegistros([]);
     setMostrarMenu(false);
   }

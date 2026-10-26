@@ -317,6 +317,22 @@ export function crearLoteDesdeParto(datos: {
   return lote;
 }
 
+/** Lotes creados automáticamente desde un parto (por código de parto) */
+export const lotesDeParto = (codigoParto: string) => leerLotes().filter((l) => l.origen?.codigoParto === codigoParto);
+
+/**
+ * Borra los lotes automáticos de los partos indicados (o de todos los partos
+ * de una cerda). Devuelve los lotes borrados.
+ */
+export function eliminarLotesDePartos(filtro: { codigos?: string[]; cerdaId?: string }): Lote[] {
+  const lotes = leerLotes();
+  const borrar = lotes.filter(
+    (l) => l.origen && ((filtro.codigos && filtro.codigos.includes(l.origen.codigoParto)) || (filtro.cerdaId && l.origen.cerdaId === filtro.cerdaId)),
+  );
+  if (borrar.length) guardarLotes(lotes.filter((l) => !borrar.includes(l)));
+  return borrar;
+}
+
 /** Tratamientos */
 export const leerTratamientos = () => leer<Tratamiento[]>(CLAVES.tratamientos, []);
 export const guardarTratamientos = (t: Tratamiento[]) => escribir(CLAVES.tratamientos, t);

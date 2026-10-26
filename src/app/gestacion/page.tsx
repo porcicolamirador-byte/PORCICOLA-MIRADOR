@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import PageShell from "@/components/PageShell";
 import { confirmar } from "@/components/Dialogo";
 import { leerConfig } from "@/lib/config";
+import { eliminarLotesDePartos } from "@/lib/datos";
 
 const ESTADOS = [
   "Todos",
@@ -174,6 +175,7 @@ export default function Gestacion() {
     guardar(nuevas);
 
     localStorage.removeItem(`historial-${cerdaAEliminar.id}`);
+    eliminarLotesDePartos({ cerdaId: cerdaAEliminar.id });
 
     setConfirmDeleteIndex(null);
     setDeletePinInput("");
@@ -988,7 +990,7 @@ export default function Gestacion() {
                   Eliminar cerda {cerdas[confirmDeleteIndex]?.id || ""}
                 </h2>
                 <p className="mt-1.5 text-[13px] leading-snug text-slate-600">
-                  Se borrarán la cerda y todo su historial.{claveEliminarActiva ? " Escribe la clave para confirmar." : ""}
+                  Se borrarán la cerda, todo su historial y los lotes de Engorde creados con sus partos.{claveEliminarActiva ? " Escribe la clave para confirmar." : ""}
                 </p>
 
                 {claveEliminarActiva && (<>
