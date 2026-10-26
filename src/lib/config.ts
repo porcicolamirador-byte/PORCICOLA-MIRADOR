@@ -32,6 +32,8 @@ export interface ConfigGranja {
   claveEliminar: string;
   /** Clave para cargar una factura en Bodega */
   claveFacturas: string;
+  /** Clave para eliminar un lote en Engorde (3 números) */
+  claveLotes: string;
   /** Días después del parto: inicio y fin de la ventana de destete */
   desteteMin: number;
   desteteMax: number;
@@ -49,6 +51,7 @@ export const CONFIG_POR_DEFECTO: ConfigGranja = {
   claveAjustes: "0030",
   claveEliminar: "0030",
   claveFacturas: "0030",
+  claveLotes: "000",
   desteteMin: 21,
   desteteMax: 28,
   parideras: 0,
@@ -81,6 +84,7 @@ export function leerConfig(): ConfigGranja {
       claveAjustes: esClave(c.claveAjustes) ? c.claveAjustes : CONFIG_POR_DEFECTO.claveAjustes,
       claveEliminar: esClave(c.claveEliminar) ? c.claveEliminar : CONFIG_POR_DEFECTO.claveEliminar,
       claveFacturas: esClave(c.claveFacturas) ? c.claveFacturas : CONFIG_POR_DEFECTO.claveFacturas,
+      claveLotes: typeof c.claveLotes === "string" && /^\d{3}$/.test(c.claveLotes) ? c.claveLotes : CONFIG_POR_DEFECTO.claveLotes,
       desteteMin: min,
       desteteMax: max,
       parideras:

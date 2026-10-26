@@ -20,6 +20,7 @@ import {
   useVersionDatos,
   type Tratamiento,
   type TipoTratamiento,
+  nombreLote,
 } from "@/lib/datos";
 import { confirmar } from "@/components/Dialogo";
 
@@ -39,7 +40,7 @@ export default function TratamientosPage() {
     const lotes = leerLotes();
     const cerdas = leerCerdas();
     const nombreDe = (t: Tratamiento) => {
-      if (t.objetivo === "lote") return lotes.find((l) => l.id === t.objetivoId)?.nombre ?? "Lote eliminado";
+      if (t.objetivo === "lote") return (() => { const l = lotes.find((x) => x.id === t.objetivoId); return l ? nombreLote(l) : "Lote eliminado"; })();
       const c = cerdas.find((x) => x.id === t.objetivoId);
       return c ? `Cerda ${nombreCerda(c)}` : `Cerda ${t.objetivoId}`;
     };
@@ -162,7 +163,7 @@ function NuevoTratamiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: (
         .map((c) => ({ valor: c.id, texto: `Cerda ${nombreCerda(c)}` })),
       lotes: leerLotes()
         .filter((l) => l.activo)
-        .map((l) => ({ valor: l.id, texto: l.nombre })),
+        .map((l) => ({ valor: l.id, texto: nombreLote(l) })),
     };
   }, [abierta]);
   const lista = objetivo === "cerda" ? opciones.cerdas : opciones.lotes;

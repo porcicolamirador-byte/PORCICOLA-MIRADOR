@@ -38,6 +38,7 @@ import {
   registrarConsumoLote,
   formatoHora,
   horaActual,
+  nombreLote,
 } from "@/lib/datos";
 
 const num = (v: string) => {
@@ -645,7 +646,7 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
                   const c = corrales.find((x) => x.id === l.corralId);
                   return {
                     valor: l.id,
-                    texto: c ? `${l.nombre} · corral ${c.codigo} · ${l.vivos} animales` : `${l.nombre} · sin corral asignado`,
+                    texto: c ? `${nombreLote(l)} · corral ${c.codigo} · ${l.vivos} animales` : `${nombreLote(l)} · sin corral asignado`,
                     deshabilitado: !c,
                   };
                 }),

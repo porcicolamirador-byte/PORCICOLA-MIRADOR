@@ -17,6 +17,7 @@ import {
   useVersionDatos,
   type EstadoCerda,
   type RegistroCerda,
+  nombreLote,
 } from "@/lib/datos";
 
 const ESTADOS: { estado: EstadoCerda; color: string }[] = [
@@ -158,7 +159,7 @@ export default function IndicadoresPage() {
       graficaPartos: grupo(partosMes, insemMes),
       graficaLechones: grupo(vivosMes, destetadosMes),
       graficaEconomia: grupo(ingresosMes, gastosMes),
-      lotesGrafica: activos.map((l) => ({ nombre: l.nombre, vivos: l.vivos, peso: pesoActual(l) || 0 })),
+      lotesGrafica: activos.map((l) => ({ nombre: nombreLote(l), vivos: l.vivos, peso: pesoActual(l) || 0 })),
       activas,
       conteo,
       partos,

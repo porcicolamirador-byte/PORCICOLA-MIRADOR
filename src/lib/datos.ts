@@ -9,6 +9,7 @@ export const CLAVES = {
   cerdas: "cerdas",
   historial: (id: string) => `historial-${id}`,
   lotes: "engorde-lotes",
+  secuenciaLotes: "engorde-secuencia-lotes",
   tratamientos: "tratamientos",
   bioChecks: "bioseguridad-checks",
   bioVisitas: "bioseguridad-visitas",
@@ -83,6 +84,8 @@ export interface Alimento {
 }
 export interface Lote {
   id: string;
+  /** Código consecutivo del lote: LP-00, LP-01, … */
+  codigo?: string;
   nombre: string;
   fechaIngreso: string;
   cantidadInicial: number;
@@ -207,9 +210,60 @@ export function agregarEvento(cerdaId: string, evento: RegistroCerda) {
 }
 
 /** Engorde */
+const numeroLote = (codigo?: string) => {
+  const m = /^LP-(\d+)$/.exec(codigo ?? "");
+  return m ? Number(m[1]) : -1;
+};
+const formatoCodigoLote = (n: number) => `LP-${String(n).padStart(2, "0")}`;
+function leerSecuenciaLotes(): number {
+  const n = Number(typeof window === "undefined" ? 0 : localStorage.getItem(CLAVES.secuenciaLotes));
+  return Number.isInteger(n) && n > 0 ? n : 0;
+}
+
+/** Próximo número de la secuencia (no reutiliza números de lotes eliminados) */
+function proximoNumeroLote(lotes: Lote[]): number {
+  return Math.max(leerSecuenciaLotes(), ...lotes.map((l) => numeroLote(l.codigo) + 1), 0);
+}
+
+/** Código que recibirá el próximo lote (solo para mostrarlo) */
+export const siguienteCodigoLote = () => formatoCodigoLote(proximoNumeroLote(leerLotes()));
+
+/** Reserva el próximo código de la secuencia */
+export function tomarCodigoLote(): string {
+  const n = proximoNumeroLote(leerLotes());
+  localStorage.setItem(CLAVES.secuenciaLotes, String(n + 1));
+  return formatoCodigoLote(n);
+}
+
+/** Nombre para mostrar: "LP-03" o "LP-03 · Camada P-12" */
+export function nombreLote(l: Pick<Lote, "codigo" | "nombre">): string {
+  const nombre = (l.nombre ?? "").trim();
+  if (!l.codigo) return nombre || "Lote";
+  return !nombre || nombre === l.codigo ? l.codigo : `${l.codigo} · ${nombre}`;
+}
+
 export function leerLotes(): Lote[] {
+  const lotes = leerLotesSinCodigo();
+  // Los lotes creados antes de la secuencia reciben su código por orden de ingreso
+  const sinCodigo = lotes.filter((l) => !l.codigo);
+  if (sinCodigo.length && typeof window !== "undefined") {
+    let n = Math.max(leerSecuenciaLotes(), ...lotes.map((l) => numeroLote(l.codigo) + 1), 0);
+    const orden = [...sinCodigo].sort((a, b) => a.fechaIngreso.localeCompare(b.fechaIngreso));
+    for (const l of orden) l.codigo = formatoCodigoLote(n++);
+    try {
+      localStorage.setItem(CLAVES.lotes, JSON.stringify(lotes));
+      localStorage.setItem(CLAVES.secuenciaLotes, String(n));
+    } catch {
+      // sin almacenamiento: los códigos se recalculan la próxima vez
+    }
+  }
+  return lotes;
+}
+
+function leerLotesSinCodigo(): Lote[] {
   return leer<Partial<Lote>[]>(CLAVES.lotes, []).map((l) => ({
     id: l.id ?? nuevoId(),
+    codigo: typeof l.codigo === "string" && l.codigo ? l.codigo : undefined,
     nombre: l.nombre ?? "Lote",
     fechaIngreso: l.fechaIngreso ?? hoy(),
     cantidadInicial: Number(l.cantidadInicial) || Number(l.vivos) || 0,
@@ -247,6 +301,7 @@ export function crearLoteDesdeParto(datos: {
   if (existente) return existente;
   const lote: Lote = {
     id: nuevoId(),
+    codigo: tomarCodigoLote(),
     nombre: `Camada ${datos.codigoParto}`,
     fechaIngreso: datos.fecha,
     cantidadInicial: vivos,
@@ -539,7 +594,7 @@ export function registrarConsumoLote(datos: { loteId: string; productoId: string
       fecha: datos.fecha,
       hora,
       cantidad: datos.cantidad,
-      nota: `${lote.nombre}${corral ? ` · corral ${corral.codigo}` : ""}`,
+      nota: `${nombreLote(lote)}${corral ? ` · corral ${corral.codigo}` : ""}`,
       loteId: lote.id,
     },
   ]);

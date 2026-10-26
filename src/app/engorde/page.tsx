@@ -14,6 +14,9 @@ import {
   horaActual,
   kgDeCantidad,
   registrarConsumoLote,
+  nombreLote,
+  siguienteCodigoLote,
+  tomarCodigoLote,
   editarConsumoLote,
   eliminarConsumoLote,
   leerCorrales,
@@ -25,6 +28,7 @@ import {
   type Lote,
 } from "@/lib/datos";
 import { confirmar } from "@/components/Dialogo";
+import DialogoClave from "@/components/DialogoClave";
 import Modal from "@/components/Modal";
 import { leerConfig } from "@/lib/config";
 
@@ -102,11 +106,16 @@ export default function EngordePage() {
                   className="w-full rounded-3xl bg-white p-4 text-left ring-1 ring-slate-200/80 transition hover:shadow-md active:scale-[0.99]"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold text-slate-900">{l.nombre}</p>
+                    <div className="flex min-w-0 items-center gap-2">
+                      {l.codigo && (
+                        <span className="shrink-0 rounded-lg bg-amber-100 px-2 py-0.5 text-xs font-bold tabular-nums text-amber-900">{l.codigo}</span>
+                      )}
+                      <div className="min-w-0">
+                      {l.nombre && l.nombre !== l.codigo && <p className="truncate font-semibold text-slate-900">{l.nombre}</p>}
                       {l.origen && (
                         <p className="truncate text-xs text-slate-500">🐖 De la cerda {l.origen.cerdaId} · parto automático</p>
                       )}
+                      </div>
                     </div>
                     <span className="text-xs text-slate-500">Día {r.dias}</span>
                   </div>
@@ -153,11 +162,13 @@ function NuevoLote({ abierta, onCerrar }: { abierta: boolean; onCerrar: () => vo
     e.preventDefault();
     const n = Number(cantidad) || 0;
     if (n <= 0) return;
+    const codigo = tomarCodigoLote();
     guardarLotes([
       ...leerLotes(),
       {
         id: nuevoId(),
-        nombre: nombre.trim() || `Lote ${formatoFecha(fecha)}`,
+        codigo,
+        nombre: nombre.trim() || codigo,
         fechaIngreso: fecha,
         cantidadInicial: n,
         vivos: n,
@@ -177,7 +188,13 @@ function NuevoLote({ abierta, onCerrar }: { abierta: boolean; onCerrar: () => vo
   return (
     <Modal abierta={abierta} etiqueta="Engorde" titulo="Nuevo lote" subtitulo="Lote de engorde" icono="🐖" onCerrar={onCerrar}>
       <form onSubmit={guardar} className="flex flex-col gap-3.5">
-        <Campo etiqueta="Nombre del lote">
+        {abierta && (
+          <div className="flex items-center justify-between rounded-xl bg-amber-50 px-3.5 py-2.5 ring-1 ring-amber-100">
+            <span className="text-sm text-amber-900/80">Código del lote</span>
+            <span className="text-base font-bold tabular-nums text-amber-900">{siguienteCodigoLote()}</span>
+          </div>
+        )}
+        <Campo etiqueta="Nombre del lote (opcional)">
           <Entrada value={nombre} onChange={setNombre} placeholder="Ej. Corral 3 – octubre" />
         </Campo>
         <Campo etiqueta="Fecha de ingreso">
@@ -351,19 +368,20 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   };
 
   const cerrarLote = async () => {
-    if (!(await confirmar({ titulo: `Cerrar ${lote.nombre}`, mensaje: "El lote pasará a la lista de lotes cerrados. Puedes reabrirlo después.", aceptar: "Cerrar lote" }))) return;
+    if (!(await confirmar({ titulo: `Cerrar ${nombreLote(lote)}`, mensaje: "El lote pasará a la lista de lotes cerrados. Puedes reabrirlo después.", aceptar: "Cerrar lote" }))) return;
     actualizarLote(lote.id, (l) => ({ ...l, activo: false, fechaSalida: hoy() }));
     onCerrar();
   };
   const reabrir = () => actualizarLote(lote.id, (l) => ({ ...l, activo: true, fechaSalida: undefined }));
+  const [pedirClave, setPedirClave] = useState(false);
   const eliminar = async () => {
-    if (!(await confirmar({ titulo: `Eliminar ${lote.nombre}`, mensaje: "Se borrarán el lote y todos sus pesajes, alimento y mortalidad.", aceptar: "Eliminar", destructivo: true }))) return;
+    if (!(await confirmar({ titulo: `Eliminar ${nombreLote(lote)}`, mensaje: "Se borrarán el lote y todos sus pesajes, alimento y mortalidad.", aceptar: "Eliminar", destructivo: true }))) return;
     guardarLotes(leerLotes().filter((l) => l.id !== lote.id));
     onCerrar();
   };
 
   const titulos: Record<Accion, string> = {
-    resumen: lote.nombre,
+    resumen: nombreLote(lote),
     pesaje: "Registrar pesaje",
     muerte: "Registrar muerte",
     alimento: "Registrar alimento",
@@ -372,9 +390,10 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   };
 
   return (
+    <>
     <Modal
       abierta
-      etiqueta={accion === "resumen" ? "Lote de engorde" : lote.nombre}
+      etiqueta={accion === "resumen" ? "Lote de engorde" : nombreLote(lote)}
       titulo={titulos[accion]}
       subtitulo={accion === "resumen" ? `${lote.vivos} animales · ${lote.activo ? "activo" : "cerrado"}` : undefined}
       icono={ICONOS_ACCION[accion]}
@@ -476,7 +495,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
             ) : (
               <Boton variante="secundario" onClick={reabrir}>Reabrir lote</Boton>
             )}
-            <Boton variante="suave" onClick={eliminar} disabled={!corral} className="text-rose-600">Eliminar</Boton>
+            <Boton variante="suave" onClick={() => setPedirClave(true)} disabled={!corral} className="text-rose-600">Eliminar</Boton>
           </div>
         </div>
       ) : (
@@ -603,5 +622,20 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
         </form>
       )}
     </Modal>
+          <DialogoClave
+            abierto={pedirClave}
+            titulo="Clave de lotes"
+            mensaje={`Ingresa la clave para eliminar ${nombreLote(lote)}.`}
+            longitud={3}
+            aceptar="Continuar"
+            onValidar={(codigo) => {
+              if (codigo !== leerConfig().claveLotes) return false;
+              setPedirClave(false);
+              void eliminar();
+              return true;
+            }}
+            onCerrar={() => setPedirClave(false)}
+          />
+    </>
   );
 }

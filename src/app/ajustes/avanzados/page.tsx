@@ -171,6 +171,16 @@ export default function AjustesAvanzadosPage() {
             onGuardar={(clave) => guardar({ claveFacturas: clave })}
           />
         </Desplegable>
+        <Desplegable icono="🐷" titulo="Clave de lotes" resumen="Engorde" abierto={abierto === "lotes"} onAlternar={() => alternar("lotes")}>
+          <CambiarClave
+            titulo="Clave de lotes"
+            descripcion="Se pide en Engorde para eliminar un lote. Tiene 3 números."
+            icono="🐷"
+            longitud={3}
+            actual={config.claveLotes}
+            onGuardar={(clave) => guardar({ claveLotes: clave })}
+          />
+        </Desplegable>
       </Grupo>
 
       <Grupo titulo="Granja">
@@ -326,24 +336,27 @@ function CambiarClave({
   icono,
   actual,
   onGuardar,
+  longitud = 4,
 }: {
   titulo: string;
   descripcion: string;
   icono: string;
   actual: string;
   onGuardar: (clave: string) => void;
+  longitud?: number;
 }) {
   const [claveActual, setClaveActual] = useState("");
   const [nueva, setNueva] = useState("");
   const [repetir, setRepetir] = useState("");
   const [error, setError] = useState("");
 
-  const solo4 = (v: string) => v.replace(/\D/g, "").slice(0, 4);
+  const solo4 = (v: string) => v.replace(/\D/g, "").slice(0, longitud);
+  const puntos = "•".repeat(longitud);
 
   const enviar = async (e: FormEvent) => {
     e.preventDefault();
     if (claveActual !== actual) return setError("La clave actual no es correcta.");
-    if (!/^\d{4}$/.test(nueva)) return setError("La nueva clave debe tener 4 números.");
+    if (!new RegExp(`^\\d{${longitud}}$`).test(nueva)) return setError(`La nueva clave debe tener ${longitud} números.`);
     if (nueva !== repetir) return setError("Las claves nuevas no coinciden.");
     if (nueva === actual) return setError("La nueva clave es igual a la actual.");
     if (!(await confirmar({ titulo: `Cambiar ${titulo.toLowerCase()}`, mensaje: "A partir de ahora se pedirá la nueva clave.", aceptar: "Cambiar" }))) return;
@@ -370,7 +383,7 @@ function CambiarClave({
               setClaveActual(solo4(e.target.value));
               setError("");
             }}
-            placeholder="••••"
+            placeholder={puntos}
             className={claseCampo}
           />
         </label>
@@ -386,7 +399,7 @@ function CambiarClave({
                 setNueva(solo4(e.target.value));
                 setError("");
               }}
-              placeholder="••••"
+              placeholder={puntos}
               className={claseCampo}
             />
           </label>
@@ -401,7 +414,7 @@ function CambiarClave({
                 setRepetir(solo4(e.target.value));
                 setError("");
               }}
-              placeholder="••••"
+              placeholder={puntos}
               className={claseCampo}
             />
           </label>
