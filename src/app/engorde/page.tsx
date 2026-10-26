@@ -61,7 +61,16 @@ export default function EngordePage() {
 
   const lotes = useMemo(() => (version < 0 ? null : leerLotes()), [version]);
   const activos = lotes?.filter((l) => l.activo) ?? [];
-  const visibles = (lotes ?? []).filter((l) => (vista === "activos" ? l.activo : !l.activo));
+  const [busqueda, setBusqueda] = useState("");
+  // Busca por código o nombre del lote, por la madre (número o nombre) y por el código del parto
+  const q = busqueda.trim().toLowerCase();
+  const nombresMadres = useMemo(() => (version < 0 ? new Map<string, string>() : new Map(leerCerdas().map((c) => [c.id, c.nombre ?? ""]))), [version]);
+  const coincide = (l: Lote) =>
+    !q ||
+    [l.codigo, l.nombre, l.origen?.cerdaId, l.origen?.codigoParto, l.origen ? nombresMadres.get(l.origen.cerdaId) : ""]
+      .filter(Boolean)
+      .some((t) => String(t).toLowerCase().includes(q));
+  const visibles = (lotes ?? []).filter((l) => (vista === "activos" ? l.activo : !l.activo) && coincide(l));
   const animales = activos.reduce((s, l) => s + l.vivos, 0);
   const lote = lotes?.find((l) => l.id === seleccionado) ?? null;
 
@@ -82,6 +91,21 @@ export default function EngordePage() {
         <Dato titulo="Animales en engorde" valor={lotes ? animales : "–"} />
       </div>
 
+      <div className="relative">
+        <svg viewBox="0 0 24 24" className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.5-3.5" />
+        </svg>
+        <input
+          type="search"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          placeholder="Buscar lote, nombre o madre"
+          aria-label="Buscar lote, nombre o madre"
+          className="w-full rounded-2xl bg-slate-100 py-3 pl-10 pr-4 text-base text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-600"
+        />
+      </div>
+
       <Chips
         opciones={[
           { valor: "activos", texto: "Activos" },
@@ -95,9 +119,9 @@ export default function EngordePage() {
         <div className="h-40 animate-pulse rounded-3xl bg-slate-100" />
       ) : visibles.length === 0 ? (
         <Vacio
-          titulo={vista === "activos" ? "No hay lotes activos" : "No hay lotes cerrados"}
-          texto="Crea un lote cuando ingresen lechones a engorde para seguir su peso, mortalidad y alimento."
-          accion={vista === "activos" ? <Boton onClick={() => setNuevo(true)}>Crear lote</Boton> : undefined}
+          titulo={q ? "Ningún lote coincide" : vista === "activos" ? "No hay lotes activos" : "No hay lotes cerrados"}
+          texto={q ? `No hay lotes ${vista} con “${busqueda.trim()}”. Prueba con el código (LP-03), el nombre o el número de la madre.` : "Crea un lote cuando ingresen lechones a engorde para seguir su peso, mortalidad y alimento."}
+          accion={!q && vista === "activos" ? <Boton onClick={() => setNuevo(true)}>Crear lote</Boton> : undefined}
         />
       ) : (
         <ul className="flex flex-col gap-2.5">
