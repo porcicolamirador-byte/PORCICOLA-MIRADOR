@@ -142,6 +142,17 @@ export default function EngordePage() {
   );
 }
 
+/** Dato pequeño para la ficha del lote (3 por fila) */
+function DatoCompacto({ titulo, valor, detalle }: { titulo: string; valor: string; detalle?: string }) {
+  return (
+    <div className="min-w-0 rounded-xl bg-white px-2.5 py-2 ring-1 ring-slate-200">
+      <p className="truncate text-[10px] font-medium uppercase tracking-wide text-slate-400">{titulo}</p>
+      <p className="truncate text-[15px] font-bold leading-tight tabular-nums text-slate-900">{valor}</p>
+      {detalle && <p className="truncate text-[10px] text-slate-500">{detalle}</p>}
+    </div>
+  );
+}
+
 function Mini({ titulo, valor }: { titulo: string; valor: string }) {
   return (
     <div className="rounded-xl bg-amber-50/70 px-2 py-2">
@@ -208,12 +219,12 @@ function ConsumoEstablecido({ lote }: { lote: Lote }) {
   const colorTotal = colorAvance(total);
   const exceso = c.consumido - c.estandar;
   return (
-    <section className="rounded-2xl bg-white p-3.5 ring-1 ring-slate-200">
+    <section className="rounded-xl bg-white px-3 py-2.5 ring-1 ring-slate-200">
       <div className="flex items-baseline justify-between gap-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Consumo establecido</p>
-        <p className="text-xs text-slate-500">{lote.vivos} animales · bultos de {KG_POR_BULTO} kg</p>
+        <p className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-wider text-slate-400">Consumo establecido</p>
+        <p className="truncate text-[11px] text-slate-500">{lote.vivos} animales · bulto {KG_POR_BULTO} kg</p>
       </div>
-      <p className="mt-1 text-lg font-bold tabular-nums text-slate-900">
+      <p className="mt-0.5 text-base font-bold tabular-nums text-slate-900">
         {fmtNumBultos(c.consumido)} <span className="text-sm font-medium text-slate-500">de {fmtBultos(c.estandar)}</span>
       </p>
       <div className="mt-1.5 flex items-center gap-2.5">
@@ -234,7 +245,7 @@ function ConsumoEstablecido({ lote }: { lote: Lote }) {
         type="button"
         onClick={() => setVerEtapas((v) => !v)}
         aria-expanded={verEtapas}
-        className="mt-3 flex w-full items-center gap-2 rounded-xl bg-slate-50 px-3 py-2.5 text-left active:bg-slate-100"
+        className="mt-2 flex w-full items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-left active:bg-slate-100"
       >
         <span className="min-w-0 flex-1 text-sm font-semibold text-slate-800">Alimento por etapa</span>
         {c.actual && !verEtapas && (
@@ -384,7 +395,7 @@ const ICONOS_ACCION: Record<Accion, string> = { resumen: "🐖", pesaje: "⚖️
 function TarjetaCorral({ corral, onCambiar }: { corral?: Corral; onCambiar?: () => void }) {
   if (!corral) {
     return (
-      <div className="flex items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-3.5 py-3">
+      <div className="flex items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2">
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Corral</p>
           <p className="text-sm font-medium text-slate-600">Sin corral asignado</p>
@@ -398,8 +409,8 @@ function TarjetaCorral({ corral, onCambiar }: { corral?: Corral; onCambiar?: () 
     );
   }
   return (
-    <div className="flex items-center gap-3 rounded-2xl bg-sky-50 px-3.5 py-3 ring-1 ring-sky-100">
-      <span className="flex h-11 min-w-[3.5rem] shrink-0 items-center justify-center rounded-xl bg-white px-2 text-base font-bold tabular-nums text-sky-800 ring-1 ring-sky-200">
+    <div className="flex items-center gap-3 rounded-xl bg-sky-50 px-3 py-2 ring-1 ring-sky-100">
+      <span className="flex h-9 min-w-[3.25rem] shrink-0 items-center justify-center rounded-lg bg-white px-2 text-sm font-bold tabular-nums text-sky-800 ring-1 ring-sky-200">
         {corral.codigo}
       </span>
       <div className="min-w-0 flex-1">
@@ -566,15 +577,15 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
       {accion === "resumen" ? (
         <div className="flex flex-col gap-4">
           <TarjetaCorral corral={corral} onCambiar={lote.activo ? () => setAccion("corral") : undefined} />
-          <div className={`grid gap-2 ${lote.origen ? "grid-cols-2" : "grid-cols-1"}`}>
+          <div className={`grid gap-1.5 ${lote.origen ? "grid-cols-2" : "grid-cols-1"}`}>
             {lote.origen && (
               <button
                 type="button"
                 onClick={() => router.push(`/cerda/${encodeURIComponent(lote.origen!.cerdaId)}`)}
-                className="min-w-0 rounded-2xl bg-white p-3.5 text-left ring-1 ring-slate-200 active:bg-slate-50"
+                className="min-w-0 rounded-xl bg-white px-3 py-2 text-left ring-1 ring-slate-200 active:bg-slate-50"
               >
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Madre</p>
-                <p className="mt-0.5 truncate text-lg font-bold text-slate-900">
+                <p className="truncate text-base font-bold text-slate-900">
                   {lote.origen.cerdaId} <span className="text-sky-700">›</span>
                 </p>
                 <p className="truncate text-xs text-slate-500">
@@ -582,28 +593,28 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                 </p>
               </button>
             )}
-            <div className="min-w-0 rounded-2xl bg-white p-3.5 ring-1 ring-slate-200">
+            <div className="min-w-0 rounded-xl bg-white px-3 py-2 ring-1 ring-slate-200">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                 {lote.origen ? "Edad" : "Tiempo en el lote"}
               </p>
-              <p className="mt-0.5 text-lg font-bold tabular-nums text-slate-900">{textoEdad(edad)}</p>
+              <p className="text-base font-bold tabular-nums text-slate-900">{textoEdad(edad)}</p>
               <p className="truncate text-xs text-slate-500">
                 {lote.origen ? "Nació" : "Ingresó"} el {formatoFecha(lote.fechaIngreso, true)}
                 {!lote.activo && lote.fechaSalida ? ` · cerrado el ${formatoFecha(lote.fechaSalida, true)}` : ""}
               </p>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <Dato titulo="Animales vivos" valor={`${lote.vivos} / ${lote.cantidadInicial}`} />
-            <Dato titulo="Mortalidad" valor={`${r.mortalidad.toFixed(1)} %`} detalle={`${r.muertes} animales`} />
-            <Dato
-              titulo="Peso promedio"
+          <div className="grid grid-cols-3 gap-1.5">
+            <DatoCompacto titulo="Vivos" valor={`${lote.vivos}/${lote.cantidadInicial}`} />
+            <DatoCompacto titulo="Mortalidad" valor={`${r.mortalidad.toFixed(1)} %`} detalle={`${r.muertes} muertes`} />
+            <DatoCompacto
+              titulo="Peso prom."
               valor={r.pesoActual ? `${r.pesoActual.toFixed(1)} kg` : "–"}
-              detalle={lote.pesoInicial ? `Inició en ${lote.pesoInicial} kg` : undefined}
+              detalle={lote.pesoInicial ? `inició ${lote.pesoInicial} kg` : undefined}
             />
-            <Dato titulo="Ganancia diaria" valor={r.gdp !== null ? `${Math.round(r.gdp)} g` : "–"} detalle="por animal" />
-            <Dato titulo="Alimento" valor={`${Math.round(r.kgAlimento)} kg`} />
-            <Dato titulo="Conversión" valor={r.conversion !== null ? r.conversion.toFixed(2) : "–"} detalle="kg alimento / kg ganado" />
+            <DatoCompacto titulo="Ganancia" valor={r.gdp !== null ? `${Math.round(r.gdp)} g` : "–"} detalle="por día" />
+            <DatoCompacto titulo="Alimento" valor={`${Math.round(r.kgAlimento)} kg`} />
+            <DatoCompacto titulo="Conversión" valor={r.conversion !== null ? r.conversion.toFixed(2) : "–"} detalle="kg/kg" />
           </div>
 
           <ConsumoEstablecido lote={lote} />
