@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Boton, Campo, Chips, Dato, Entrada, IconoMas, SeccionDesplegable, Selector, Vacio } from "@/components/ui";
 import {
@@ -20,6 +21,7 @@ import {
   editarConsumoLote,
   eliminarConsumoLote,
   leerCorrales,
+  leerCerdas,
   leerSalidas,
   leerLotes,
   nuevoId,
@@ -144,6 +146,27 @@ function Mini({ titulo, valor }: { titulo: string; valor: string }) {
       <p className="text-sm font-semibold text-slate-900 tabular-nums">{valor}</p>
     </div>
   );
+}
+
+/** Edad entre dos fechas (AAAA-MM-DD) en meses y días de calendario */
+function edadMesesDias(desde: string, hasta: string): { meses: number; dias: number } {
+  const [a1, m1, d1] = desde.split("-").map(Number);
+  const [a2, m2, d2] = hasta.split("-").map(Number);
+  if (!a1 || !a2 || hasta < desde) return { meses: 0, dias: 0 };
+  let meses = (a2 - a1) * 12 + (m2 - m1);
+  let dias = d2 - d1;
+  if (dias < 0) {
+    meses -= 1;
+    // días del mes anterior a la fecha final
+    dias += new Date(a2, m2 - 1, 0).getDate();
+  }
+  return { meses: Math.max(0, meses), dias: Math.max(0, dias) };
+}
+
+function textoEdad({ meses, dias }: { meses: number; dias: number }) {
+  const m = `${meses} ${meses === 1 ? "mes" : "meses"}`;
+  const d = `${dias} ${dias === 1 ? "día" : "días"}`;
+  return meses > 0 ? `${m} y ${d}` : d;
 }
 
 const fmtCantidad = (n: number) => n.toLocaleString("es-CO", { maximumFractionDigits: 2 });
@@ -273,6 +296,10 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   // Registro antiguo sin producto de bodega: solo se corrigen fecha, hora y kilos
   const legado = accion === "editarAlimento" && !registroEdit?.productoId;
   const r = resumenLote(lote);
+  const router = useRouter();
+  const madre = lote.origen ? leerCerdas().find((c) => c.id === lote.origen?.cerdaId) : undefined;
+  const fechaFin = lote.activo ? hoy() : lote.fechaSalida || hoy();
+  const edad = edadMesesDias(lote.fechaIngreso, fechaFin);
   const corrales = leerCorrales().sort((a, b) => a.codigo.localeCompare(b.codigo, "es", { numeric: true }));
   const corral = corrales.find((c) => c.id === lote.corralId);
   // Productos de bodega: los que tienen existencia primero; sin existencia aparecen desactivados
@@ -401,16 +428,34 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
     >
       {accion === "resumen" ? (
         <div className="flex flex-col gap-4">
-          {lote.origen && (
-            <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-100">
-              Lote creado automáticamente con la camada del parto {lote.origen.codigoParto} (cerda {lote.origen.cerdaId}).
-            </p>
-          )}
           <TarjetaCorral corral={corral} onCambiar={lote.activo ? () => setAccion("corral") : undefined} />
-          <p className="text-sm text-slate-500">
-            Ingresó el {formatoFecha(lote.fechaIngreso, true)} · {r.dias} días
-            {!lote.activo && lote.fechaSalida ? ` · cerrado el ${formatoFecha(lote.fechaSalida, true)}` : ""}
-          </p>
+          <div className={`grid gap-2 ${lote.origen ? "grid-cols-2" : "grid-cols-1"}`}>
+            {lote.origen && (
+              <button
+                type="button"
+                onClick={() => router.push(`/cerda/${encodeURIComponent(lote.origen!.cerdaId)}`)}
+                className="min-w-0 rounded-2xl bg-white p-3.5 text-left ring-1 ring-slate-200 active:bg-slate-50"
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Madre</p>
+                <p className="mt-0.5 truncate text-lg font-bold text-slate-900">
+                  {lote.origen.cerdaId} <span className="text-sky-700">›</span>
+                </p>
+                <p className="truncate text-xs text-slate-500">
+                  {madre?.nombre ? `${madre.nombre} · ` : ""}parto {lote.origen.codigoParto}
+                </p>
+              </button>
+            )}
+            <div className="min-w-0 rounded-2xl bg-white p-3.5 ring-1 ring-slate-200">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                {lote.origen ? "Edad" : "Tiempo en el lote"}
+              </p>
+              <p className="mt-0.5 text-lg font-bold tabular-nums text-slate-900">{textoEdad(edad)}</p>
+              <p className="truncate text-xs text-slate-500">
+                {lote.origen ? "Nació" : "Ingresó"} el {formatoFecha(lote.fechaIngreso, true)}
+                {!lote.activo && lote.fechaSalida ? ` · cerrado el ${formatoFecha(lote.fechaSalida, true)}` : ""}
+              </p>
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <Dato titulo="Animales vivos" valor={`${lote.vivos} / ${lote.cantidadInicial}`} />
             <Dato titulo="Mortalidad" valor={`${r.mortalidad.toFixed(1)} %`} detalle={`${r.muertes} animales`} />
