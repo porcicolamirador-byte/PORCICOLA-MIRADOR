@@ -20,6 +20,8 @@ import {
   leerFacturas,
   leerMovimientos,
   leerProductos,
+  leerProductosActivos,
+  factorKg,
   leerSalidas,
   migrarBodegaAnterior,
   nuevoId,
@@ -74,7 +76,7 @@ export default function BodegaPage() {
     if (version < 0) return null;
     const inventario = calcularInventario();
     const facturas = leerFacturas().sort((a, b) => b.fecha.localeCompare(a.fecha) || b.numero.localeCompare(a.numero));
-    return { inventario, facturas, productos: leerProductos() };
+    return { inventario, facturas, productos: leerProductos(), activos: leerProductosActivos() };
   }, [version]);
 
   const q = busqueda.trim().toLowerCase();
@@ -91,7 +93,7 @@ export default function BodegaPage() {
   const conExistencia = datos?.inventario.filter((i) => i.existencia > 0).length ?? 0;
   const agotados = datos?.inventario.filter((i) => i.existencia <= 0).length ?? 0;
   const valorBodega = datos?.inventario.reduce((s, i) => s + Math.max(0, i.existencia) * i.ultimoPrecio, 0) ?? 0;
-  const sinCatalogo = datos !== null && datos.productos.length === 0;
+  const sinCatalogo = datos !== null && datos.activos.length === 0;
   const producto = datos?.inventario.find((i) => i.producto.id === productoSel) ?? null;
   const factura = datos?.facturas.find((f) => f.id === facturaSel) ?? null;
 
@@ -110,7 +112,7 @@ export default function BodegaPage() {
       {/* Resumen compacto: dos filas, valores en pesos completos */}
       <div className="grid grid-cols-2 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/80 [&>*:nth-child(odd)]:border-r [&>*:nth-child(-n+2)]:border-b [&>*]:border-slate-200">
         {[
-          { t: "Con existencia", v: datos ? `${conExistencia} de ${datos.productos.length}` : "–", alerta: agotados > 0 },
+          { t: "Con existencia", v: datos ? `${conExistencia} de ${datos.inventario.length}` : "–", alerta: agotados > 0 },
           { t: "Por reponer", v: datos ? String(bajos.length) : "–", alerta: bajos.length > 0 },
           { t: "En bodega", v: datos ? formatoPesos(valorBodega) : "–", alerta: false },
           { t: "Compras del mes", v: datos ? formatoPesos(compradoMes) : "–", alerta: false },
@@ -236,6 +238,7 @@ export default function BodegaPage() {
                             </div>
                             <p className="text-[10px] leading-tight text-slate-500">
                               Mín. {fmt(p.minimo)} {p.unidad}
+                              {p.unidad === "bultos" && existencia > 0 ? ` · ${fmt(existencia * factorKg(p))} kg` : ""}
                               {ultimoPrecio > 0 && existencia > 0 ? ` · ${formatoPesos(existencia * ultimoPrecio)}` : ""}
                             </p>
                           </button>
@@ -268,7 +271,7 @@ export default function BodegaPage() {
         />
         <NuevaFactura
           abierta={nuevaFactura}
-          productos={datos.productos}
+          productos={datos.activos}
           facturas={datos.facturas}
           onCerrar={() => setNuevaFactura(false)}
         />
@@ -646,9 +649,9 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
               <Entrada value={nota} onChange={setNota} placeholder="Ej. cerdas de gestación" />
             </Campo>
           )}
-          {destino && destino !== "otro" && num(cantidad) > 0 && kgDeCantidad(num(cantidad), p.unidad) > 0 && (
+          {destino && destino !== "otro" && num(cantidad) > 0 && kgDeCantidad(num(cantidad), p.unidad, p.kgPorUnidad) > 0 && (
             <p className="text-xs text-slate-500">
-              Se registrarán {fmt(kgDeCantidad(num(cantidad), p.unidad))} kg de alimento en el lote.
+              Se registrarán {fmt(kgDeCantidad(num(cantidad), p.unidad, p.kgPorUnidad))} kg de alimento en el lote.
             </p>
           )}
           {error && <p className="text-sm font-medium text-rose-600">{error}</p>}

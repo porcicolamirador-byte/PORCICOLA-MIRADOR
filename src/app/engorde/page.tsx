@@ -264,7 +264,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   // Ajuste oculto: permite usar productos sin existencia (el inventario queda negativo)
   const sinLimite = accion === "alimento" && leerConfig().permitirSinInventario;
   const excede = !!elegido && !sinLimite && cantidadNum > elegido.existencia;
-  const kgDe = kgDeCantidad;
+  const kgDe = (cantidad: number, unidad: string) => kgDeCantidad(cantidad, unidad, elegido?.producto.kgPorUnidad);
 
   const limpiar = () => {
     setValor("");

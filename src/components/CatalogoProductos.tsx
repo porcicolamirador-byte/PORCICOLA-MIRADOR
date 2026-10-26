@@ -2,10 +2,12 @@
 
 import Modal from "@/components/Modal";
 import { useEffect, useMemo, useState, type FormEvent, Fragment } from "react";
-import { Boton, Campo, Entrada, IconoMas, Selector, Tarjeta } from "@/components/ui";
+import { Boton, Campo, Entrada, IconoMas, Interruptor, Selector, Tarjeta } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
 import {
   calcularInventario,
+  codigoDe,
+  factorKg,
   guardarProductos,
   leerProductos,
   migrarBodegaAnterior,
@@ -65,10 +67,17 @@ export default function CatalogoProductos({ incrustado = false }: { incrustado?:
     if (version >= 0) migrarBodegaAnterior();
   }, [version]);
 
-  const inventario = useMemo(() => (version < 0 ? null : calcularInventario()), [version]);
+  const inventario = useMemo(() => (version < 0 ? null : calcularInventario({ incluirInactivos: true })), [version]);
+  // Primero los preestablecidos, luego los demás por categoría y nombre
   const ordenados = [...(inventario ?? [])].sort(
-    (a, b) => a.producto.categoria.localeCompare(b.producto.categoria) || a.producto.nombre.localeCompare(b.producto.nombre, "es")
+    (a, b) =>
+      Number(!!b.producto.preestablecido) - Number(!!a.producto.preestablecido) ||
+      a.producto.categoria.localeCompare(b.producto.categoria) ||
+      a.producto.nombre.localeCompare(b.producto.nombre, "es")
   );
+
+  const alternar = (p: ProductoBodega, activo: boolean) =>
+    guardarProductos(leerProductos().map((x) => (x.id === p.id ? { ...x, activo } : x)));
 
   const eliminar = async (p: ProductoBodega) => {
     const uso = inventario?.find((i) => i.producto.id === p.id);
@@ -117,14 +126,23 @@ export default function CatalogoProductos({ incrustado = false }: { incrustado?:
       ) : (
         <ul className="divide-y divide-slate-100 rounded-2xl ring-1 ring-slate-100">
           {ordenados.map(({ producto: p, existencia }) => (
-            <li key={p.id} className="flex items-center gap-3 px-3.5 py-3">
+            <li key={p.id} className={`flex items-center gap-3 px-3.5 py-3 ${p.activo === false ? "opacity-55" : ""}`}>
               <IconoCategoria categoria={p.categoria} className="h-7 w-7 shrink-0 text-xl" />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-slate-900">{p.nombre}</p>
+                <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
+                  {codigoDe(p) && (
+                    <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-slate-600">{codigoDe(p)}</span>
+                  )}
+                  <span className="truncate">{p.nombre}</span>
+                </p>
                 <p className="truncate text-xs text-slate-500">
-                  {p.categoria} · {p.unidad} · mínimo {fmt(p.minimo)} · hay {fmt(existencia)}
+                  {p.unidad}
+                  {p.unidad === "bultos" ? ` de ${fmt(factorKg(p))} kg` : ""} · mínimo {fmt(p.minimo)} · hay {fmt(existencia)}
                 </p>
               </div>
+              {p.preestablecido && (
+                <Interruptor activo={p.activo !== false} onCambiar={(v) => alternar(p, v)} />
+              )}
               <button
                 type="button"
                 onClick={() => setEditando(p)}
@@ -132,13 +150,15 @@ export default function CatalogoProductos({ incrustado = false }: { incrustado?:
               >
                 Editar
               </button>
-              <button
-                type="button"
-                onClick={() => eliminar(p)}
-                className="shrink-0 rounded-full px-2 py-1 text-xs text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-              >
-                Quitar
-              </button>
+              {!p.preestablecido && (
+                <button
+                  type="button"
+                  onClick={() => eliminar(p)}
+                  className="shrink-0 rounded-full px-2 py-1 text-xs text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                >
+                  Quitar
+                </button>
+              )}
             </li>
           ))}
         </ul>
@@ -154,6 +174,8 @@ function FormProducto({ producto, onCerrar }: { producto: ProductoBodega | "nuev
   const [categoria, setCategoria] = useState<CategoriaBodega>("Alimento");
   const [unidad, setUnidad] = useState("bultos");
   const [minimo, setMinimo] = useState("");
+  const [codigo, setCodigo] = useState("");
+  const [kgBulto, setKgBulto] = useState("40");
   const [error, setError] = useState("");
   const [cargado, setCargado] = useState<ProductoBodega | "nuevo" | null>(null);
 
@@ -165,11 +187,15 @@ function FormProducto({ producto, onCerrar }: { producto: ProductoBodega | "nuev
       setCategoria(producto.categoria);
       setUnidad(producto.unidad);
       setMinimo(String(producto.minimo));
+      setCodigo(producto.codigo ?? "");
+      setKgBulto(String(producto.kgPorUnidad ?? 40));
     } else {
       setNombre("");
       setCategoria("Alimento");
       setUnidad("bultos");
       setMinimo("");
+      setCodigo("");
+      setKgBulto("40");
     }
     setError("");
   }
@@ -184,10 +210,20 @@ function FormProducto({ producto, onCerrar }: { producto: ProductoBodega | "nuev
       return setError("Ya existe un producto con ese nombre.");
     }
     const min = Math.max(0, Number(minimo.replace(",", ".")) || 0);
+    const cod = codigo.trim().toUpperCase() || undefined;
+    const kg = unidad === "bultos" ? Math.max(1, Number(kgBulto.replace(",", ".")) || 40) : undefined;
+    // Con el mismo código, las unidades deben poder convertirse (bultos/kg) o ser iguales
+    if (cod) {
+      const otros = todos.filter((p) => p.id !== id && (p.codigo ?? "").trim().toUpperCase() === cod);
+      const convertible = (u: string) => u === "bultos" || u === "kg";
+      if (otros.some((o) => !(convertible(o.unidad) && convertible(unidad)) && o.unidad !== unidad)) {
+        return setError(`El código ${cod} ya lo usa un producto en ${otros[0].unidad}; solo se pueden unir bultos con kilos o la misma unidad.`);
+      }
+    }
     if (id) {
-      guardarProductos(todos.map((p) => (p.id === id ? { ...p, nombre: limpio, categoria, unidad, minimo: min } : p)));
+      guardarProductos(todos.map((p) => (p.id === id ? { ...p, nombre: limpio, categoria, unidad, minimo: min, codigo: cod, kgPorUnidad: kg } : p)));
     } else {
-      guardarProductos([...todos, { id: nuevoId(), nombre: limpio, categoria, unidad, minimo: min }]);
+      guardarProductos([...todos, { id: nuevoId(), nombre: limpio, categoria, unidad, minimo: min, codigo: cod, kgPorUnidad: kg, activo: true }]);
     }
     onCerrar();
   };
@@ -202,9 +238,14 @@ function FormProducto({ producto, onCerrar }: { producto: ProductoBodega | "nuev
       onCerrar={onCerrar}
     >
       <form onSubmit={guardar} className="flex flex-col gap-3.5">
-        <Campo etiqueta="Nombre *">
-          <Entrada value={nombre} onChange={setNombre} placeholder="Ej. Concentrado levante 40 kg" required />
-        </Campo>
+        <div className="grid grid-cols-[7rem_1fr] gap-3">
+          <Campo etiqueta="Código">
+            <Entrada value={codigo} onChange={(v) => setCodigo(v.toUpperCase().slice(0, 12))} placeholder="PR-01" />
+          </Campo>
+          <Campo etiqueta="Nombre *">
+            <Entrada value={nombre} onChange={setNombre} placeholder="Ej. Preiniciación kilos" required />
+          </Campo>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <Campo etiqueta="Categoría">
             <Selector
@@ -217,6 +258,11 @@ function FormProducto({ producto, onCerrar }: { producto: ProductoBodega | "nuev
             <Selector value={unidad} onChange={setUnidad} opciones={UNIDADES_BODEGA.map((u) => ({ valor: u, texto: u }))} />
           </Campo>
         </div>
+        {unidad === "bultos" && (
+          <Campo etiqueta="Kilos por bulto">
+            <Entrada type="number" inputMode="decimal" min={1} step="any" value={kgBulto} onChange={setKgBulto} placeholder="40" />
+          </Campo>
+        )}
         <Campo etiqueta="Existencia mínima">
           <Entrada type="number" inputMode="decimal" min={0} step="any" value={minimo} onChange={setMinimo} placeholder="0" />
         </Campo>

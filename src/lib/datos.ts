@@ -303,7 +303,23 @@ export interface ProductoBodega {
   categoria: CategoriaBodega;
   unidad: string;
   minimo: number;
+  /** Código compartido: productos con el mismo código usan un solo inventario */
+  codigo?: string;
+  /** Kilos que trae cada unidad (para bultos; 40 por defecto) */
+  kgPorUnidad?: number;
+  /** false = desactivado (no aparece en Bodega, facturas ni consumos) */
+  activo?: boolean;
+  /** Producto de la lista fija de la granja (no se puede eliminar) */
+  preestablecido?: boolean;
 }
+
+/** Productos preestablecidos de la granja */
+export const PRODUCTOS_PREESTABLECIDOS: ProductoBodega[] = [
+  { id: "pre-PR-01", codigo: "PR-01", nombre: "Preiniciación Cerdos", categoria: "Alimento", unidad: "bultos", kgPorUnidad: 40, minimo: 2, activo: true, preestablecido: true },
+  { id: "pre-IN-01", codigo: "IN-01", nombre: "Iniciación Cerdos", categoria: "Alimento", unidad: "bultos", kgPorUnidad: 40, minimo: 2, activo: true, preestablecido: true },
+  { id: "pre-ML-01", codigo: "ML-01", nombre: "Maxi lechones 337", categoria: "Alimento", unidad: "bultos", kgPorUnidad: 40, minimo: 2, activo: true, preestablecido: true },
+  { id: "pre-MC-01", codigo: "MC-01", nombre: "Maxi Cerdos 337 Fin.", categoria: "Alimento", unidad: "bultos", kgPorUnidad: 40, minimo: 2, activo: true, preestablecido: true },
+];
 export interface LineaFactura {
   productoId: string;
   cantidad: number;
@@ -346,7 +362,25 @@ export interface Corral {
 export const leerCorrales = () => leer<Corral[]>(CLAVES.corrales, []);
 export const guardarCorrales = (c: Corral[]) => escribir(CLAVES.corrales, c);
 
-export const leerProductos = () => leer<ProductoBodega[]>(CLAVES.productos, []);
+/** Todos los productos (los preestablecidos siempre están, activos o no) */
+export function leerProductos(): ProductoBodega[] {
+  const guardados = leer<ProductoBodega[]>(CLAVES.productos, []);
+  const faltan = PRODUCTOS_PREESTABLECIDOS.filter((pre) => !guardados.some((g) => g.id === pre.id));
+  return [
+    ...guardados.map((g) => {
+      const pre = PRODUCTOS_PREESTABLECIDOS.find((x) => x.id === g.id);
+      // Los preestablecidos conservan nombre, código y unidad de la lista
+      return pre ? { ...g, nombre: pre.nombre, codigo: pre.codigo, unidad: pre.unidad, categoria: pre.categoria, preestablecido: true } : g;
+    }),
+    ...faltan,
+  ];
+}
+/** Solo los productos activos */
+export const leerProductosActivos = () => leerProductos().filter((p) => p.activo !== false);
+/** Código normalizado (vacío = el producto no comparte inventario) */
+export const codigoDe = (p: ProductoBodega) => (p.codigo ?? "").trim().toUpperCase();
+/** Kilos por unidad del producto: kg = 1, bultos = kgPorUnidad (40), otras unidades = 1 */
+export const factorKg = (p: ProductoBodega) => (p.unidad === "bultos" ? Number(p.kgPorUnidad) || KG_POR_BULTO : 1);
 export const guardarProductos = (p: ProductoBodega[]) => escribir(CLAVES.productos, p);
 export function leerFacturas(): Factura[] {
   return leer<Factura[]>(CLAVES.facturas, []).map((f) => ({
@@ -379,39 +413,89 @@ export interface ExistenciaProducto {
   ultimoPrecio: number;
 }
 
-/** Existencias calculadas: entradas por facturas menos salidas registradas */
-export function calcularInventario(): ExistenciaProducto[] {
+/**
+ * Existencias calculadas: entradas por facturas menos salidas registradas.
+ * Los productos con el mismo código comparten inventario: todo se suma en
+ * kilos (o en la unidad común) y se muestra en la unidad de cada producto.
+ * Ej.: 10 bultos de 40 kg y una salida de 20 kg del producto en kilos → 9,5 bultos.
+ */
+export function calcularInventario(opciones: { incluirInactivos?: boolean } = {}): ExistenciaProducto[] {
   const facturas = leerFacturas();
   const salidas = leerSalidas();
-  return leerProductos().map((producto) => {
-    const movimientos: MovimientoInventario[] = [];
-    let ultimoPrecio = 0;
-    let fechaPrecio = "";
-    for (const f of facturas) {
-      for (const l of f.lineas) {
-        if (l.productoId !== producto.id) continue;
-        if (Number(l.valorUnitario) > 0 && f.fecha >= fechaPrecio) {
-          ultimoPrecio = Number(l.valorUnitario);
-          fechaPrecio = f.fecha;
+  const productos = leerProductos();
+  const grupoDe = (p: ProductoBodega) => codigoDe(p) || `#${p.id}`;
+  const porId = new Map(productos.map((p) => [p.id, p]));
+
+  // Movimientos de cada grupo, en la unidad base (kilos para bultos/kg)
+  type Base = MovimientoInventario & { base: number; origen: ProductoBodega; precioBase?: number };
+  const grupos = new Map<string, Base[]>();
+  const agregar = (p: ProductoBodega, m: Base) => {
+    const k = grupoDe(p);
+    grupos.set(k, [...(grupos.get(k) ?? []), m]);
+  };
+  for (const f of facturas) {
+    for (const l of f.lineas) {
+      const p = porId.get(l.productoId);
+      if (!p) continue;
+      const cantidad = Number(l.cantidad) || 0;
+      const valor = Number(l.valorUnitario) || 0;
+      agregar(p, {
+        fecha: f.fecha,
+        tipo: "entrada",
+        cantidad,
+        base: cantidad * factorKg(p),
+        detalle: `Factura ${f.numero}${f.proveedor ? ` · ${f.proveedor}` : ""}`,
+        facturaId: f.id,
+        origen: p,
+        precioBase: valor > 0 ? valor / factorKg(p) : undefined,
+      });
+    }
+  }
+  for (const sd of salidas) {
+    const p = porId.get(sd.productoId);
+    if (!p) continue;
+    const cantidad = Number(sd.cantidad) || 0;
+    agregar(p, {
+      fecha: sd.fecha,
+      hora: sd.hora,
+      tipo: "salida",
+      cantidad,
+      base: cantidad * factorKg(p),
+      detalle: sd.nota || "Salida",
+      salidaId: sd.id,
+      origen: p,
+    });
+  }
+
+  return productos
+    .filter((p) => opciones.incluirInactivos || p.activo !== false)
+    .map((producto) => {
+      const f = factorKg(producto);
+      const lista = grupos.get(grupoDe(producto)) ?? [];
+      // Último precio de compra, pasado a la unidad de este producto
+      let ultimoPrecio = 0;
+      let fechaPrecio = "";
+      for (const m of lista) {
+        if (m.precioBase !== undefined && m.fecha >= fechaPrecio) {
+          ultimoPrecio = m.precioBase * f;
+          fechaPrecio = m.fecha;
         }
-        movimientos.push({
-          fecha: f.fecha,
-          tipo: "entrada",
-          cantidad: Number(l.cantidad) || 0,
-          detalle: `Factura ${f.numero}${f.proveedor ? ` · ${f.proveedor}` : ""}`,
-          facturaId: f.id,
-        });
       }
-    }
-    for (const sd of salidas) {
-      if (sd.productoId !== producto.id) continue;
-      movimientos.push({ fecha: sd.fecha, hora: sd.hora, tipo: "salida", cantidad: Number(sd.cantidad) || 0, detalle: sd.nota || "Salida", salidaId: sd.id });
-    }
-    movimientos.sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.hora ?? "").localeCompare(a.hora ?? ""));
-    const existencia = movimientos.reduce((s, m) => s + (m.tipo === "entrada" ? m.cantidad : -m.cantidad), 0);
-    return { producto, existencia, bajoMinimo: existencia <= producto.minimo, movimientos, ultimoPrecio };
-  });
+      const movimientos: MovimientoInventario[] = lista.map((m) => ({
+        fecha: m.fecha,
+        hora: m.hora,
+        tipo: m.tipo,
+        cantidad: m.base / f,
+        detalle: m.origen.id === producto.id ? m.detalle : `${m.detalle} · ${fmtNum(m.cantidad)} ${m.origen.unidad} de ${m.origen.nombre}`,
+        facturaId: m.facturaId,
+        salidaId: m.salidaId,
+      }));
+      movimientos.sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.hora ?? "").localeCompare(a.hora ?? ""));
+      const existencia = lista.reduce((s, m) => s + (m.tipo === "entrada" ? m.base : -m.base), 0) / f;
+      return { producto, existencia, bajoMinimo: existencia <= producto.minimo, movimientos, ultimoPrecio };
+    });
 }
+const fmtNum = (n: number) => n.toLocaleString("es-CO", { maximumFractionDigits: 2 });
 
 /**
  * Pasa los artículos del formato anterior de Bodega al catálogo nuevo:
@@ -420,8 +504,8 @@ export function calcularInventario(): ExistenciaProducto[] {
  */
 /** Kilos que trae cada bulto de alimento */
 export const KG_POR_BULTO = 40;
-export const kgDeCantidad = (cantidad: number, unidad: string) =>
-  unidad === "bultos" ? cantidad * KG_POR_BULTO : unidad === "kg" ? cantidad : 0;
+export const kgDeCantidad = (cantidad: number, unidad: string, kgPorUnidad?: number) =>
+  unidad === "bultos" ? cantidad * (Number(kgPorUnidad) || KG_POR_BULTO) : unidad === "kg" ? cantidad : 0;
 
 /**
  * Consumo de un producto de bodega por un lote de engorde: crea la salida en
@@ -458,7 +542,7 @@ export function registrarConsumoLote(datos: { loteId: string; productoId: string
               {
                 fecha: datos.fecha,
                 hora,
-                kg: kgDeCantidad(datos.cantidad, p.unidad),
+                kg: kgDeCantidad(datos.cantidad, p.unidad, p.kgPorUnidad),
                 costo: costo || undefined,
                 productoId: p.id,
                 producto: p.nombre,
