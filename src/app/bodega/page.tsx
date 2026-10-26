@@ -93,7 +93,7 @@ export default function BodegaPage() {
 
   const principales = datos?.inventario.filter((i) => !i.subproducto) ?? [];
   const conExistencia = principales.filter((i) => i.existencia > 0).length;
-  const agotados = principales.filter((i) => i.existencia <= 0).length;
+  const agotados = principales.filter((i) => !i.sinCompras && i.existencia <= 0).length;
   const valorBodega = principales.reduce((s, i) => s + Math.max(0, i.existencia) * i.ultimoPrecio, 0);
   const sinCatalogo = datos !== null && datos.activos.length === 0;
   const producto = datos?.inventario.find((i) => i.producto.id === productoSel) ?? null;
@@ -114,7 +114,7 @@ export default function BodegaPage() {
       {/* Resumen compacto: dos filas, valores en pesos completos */}
       <div className="grid grid-cols-2 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/80 [&>*:nth-child(odd)]:border-r [&>*:nth-child(-n+2)]:border-b [&>*]:border-slate-200">
         {[
-          { t: "Con existencia", v: datos ? `${conExistencia} de ${principales.length}` : "–", alerta: agotados > 0 },
+          { t: "Con existencia", v: datos ? String(conExistencia) : "–", alerta: agotados > 0 },
           { t: "Por reponer", v: datos ? String(bajos.length) : "–", alerta: bajos.length > 0 },
           { t: "En bodega", v: datos ? formatoPesos(valorBodega) : "–", alerta: false },
           { t: "Compras del mes", v: datos ? formatoPesos(compradoMes) : "–", alerta: false },
@@ -204,13 +204,16 @@ export default function BodegaPage() {
                       {cat} · {items.length}
                     </h2>
                     <div className="grid grid-cols-2 gap-2">
-                      {items.map(({ producto: p, existencia, disponible, subproducto, bajoMinimo, ultimoPrecio }) => {
-                        const agotado = !subproducto && existencia <= 0;
+                      {items.map(({ producto: p, existencia, disponible, subproducto, bajoMinimo, sinCompras, ultimoPrecio }) => {
+                        const nuevo = !subproducto && sinCompras;
+                        const agotado = !subproducto && !nuevo && existencia <= 0;
                         const referencia = Math.max(p.minimo * 3, p.minimo + 1, 1);
                         const nivel = Math.max(0, Math.min(100, (existencia / referencia) * 100));
                         const colorBarra = agotado || bajoMinimo ? "bg-red-500" : existencia <= p.minimo * 1.5 ? "bg-amber-400" : "bg-sky-500";
                         const estado = subproducto
                           ? { t: "Subproducto", c: "bg-sky-50 text-sky-700 ring-sky-200" }
+                          : nuevo
+                          ? { t: "Sin compras", c: "bg-slate-100 text-slate-500 ring-slate-200" }
                           : agotado
                           ? { t: "Agotado", c: "bg-red-600 text-white ring-red-600" }
                           : bajoMinimo

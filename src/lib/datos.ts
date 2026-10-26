@@ -467,7 +467,10 @@ export interface ExistenciaProducto {
   disponible: number;
   /** Si es subproducto (kilos que se descuentan del bulto con el mismo código) */
   subproducto?: { principal: string };
+  /** Se compró alguna vez y ahora está en el mínimo o por debajo (va a "Por reponer") */
   bajoMinimo: boolean;
+  /** Nunca ha tenido entradas: no cuenta como agotado ni por reponer */
+  sinCompras: boolean;
   movimientos: MovimientoInventario[];
   /** Valor unitario de la compra más reciente con precio (0 si no hay) */
   ultimoPrecio: number;
@@ -556,10 +559,11 @@ export function calcularInventario(opciones: { incluirInactivos?: boolean; exclu
       movimientos.sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.hora ?? "").localeCompare(a.hora ?? ""));
       const neto = (l: typeof lista) => l.reduce((s, m) => s + (m.tipo === "entrada" ? m.base : -m.base), 0) / f;
       const disponible = neto(lista);
+      const sinCompras = !lista.some((m) => m.tipo === "entrada");
       if (principal) {
-        return { producto, existencia: neto(propios), disponible, subproducto: { principal: principal.nombre }, bajoMinimo: false, movimientos, ultimoPrecio };
+        return { producto, existencia: neto(propios), disponible, subproducto: { principal: principal.nombre }, bajoMinimo: false, sinCompras, movimientos, ultimoPrecio };
       }
-      return { producto, existencia: disponible, disponible, bajoMinimo: disponible <= producto.minimo, movimientos, ultimoPrecio };
+      return { producto, existencia: disponible, disponible, bajoMinimo: !sinCompras && disponible <= producto.minimo, sinCompras, movimientos, ultimoPrecio };
     });
 }
 const fmtNum = (n: number) => n.toLocaleString("es-CO", { maximumFractionDigits: 2 });
