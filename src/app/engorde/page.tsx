@@ -129,6 +129,7 @@ export default function EngordePage() {
                     <Mini titulo="Peso prom." valor={r.pesoActual ? `${r.pesoActual.toFixed(1)} kg` : "–"} />
                     <Mini titulo="Ganancia" valor={r.gdp !== null ? `${Math.round(r.gdp)} g/d` : "–"} />
                   </div>
+                  <BarraConsumo lote={l} />
                 </button>
               </li>
             );
@@ -139,6 +140,27 @@ export default function EngordePage() {
       <NuevoLote abierta={nuevo} onCerrar={() => setNuevo(false)} />
       {lote && <DetalleLote lote={lote} onCerrar={() => setSeleccionado(null)} />}
     </ModuloPage>
+  );
+}
+
+/** Línea del consumo establecido general, para la tarjeta del lote en la lista */
+function BarraConsumo({ lote }: { lote: Lote }) {
+  const c = consumoEstablecido(lote);
+  if (c.estandar <= 0) return null;
+  const total = (c.consumido / c.estandar) * 100;
+  const color = colorAvance(total);
+  return (
+    <div className="mt-3">
+      <div className="mb-1 flex items-baseline justify-between gap-2 text-[11px]">
+        <span className="font-medium uppercase tracking-wide text-slate-400">Consumo establecido</span>
+        <span className="tabular-nums text-slate-500">
+          {fmtNumBultos(c.consumido)} de {fmtBultos(c.estandar)} · <b className={`font-bold ${color.texto}`}>{Math.floor(total).toLocaleString("es-CO")} %</b>
+        </span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+        <div className={`h-full rounded-full ${color.barra}`} style={{ width: `${Math.min(100, total)}%` }} />
+      </div>
+    </div>
   );
 }
 
