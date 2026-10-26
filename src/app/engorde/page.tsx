@@ -540,7 +540,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
             ) : (
               <Boton variante="secundario" onClick={reabrir}>Reabrir lote</Boton>
             )}
-            <Boton variante="suave" onClick={() => setPedirClave(true)} disabled={!corral} className="text-rose-600">Eliminar</Boton>
+            <Boton variante="suave" onClick={() => (leerConfig().claveLotesActiva ? setPedirClave(true) : void eliminar())} disabled={!corral} className="text-rose-600">Eliminar</Boton>
           </div>
         </div>
       ) : (

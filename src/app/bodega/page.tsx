@@ -65,6 +65,8 @@ export default function BodegaPage() {
   const [busqueda, setBusqueda] = useState("");
   const [nuevaFactura, setNuevaFactura] = useState(false);
   const [pedirClave, setPedirClave] = useState(false);
+  // Si la clave de facturas está desactivada en ajustes, se abre directo
+  const abrirFactura = () => (leerConfig().claveFacturasActiva ? setPedirClave(true) : setNuevaFactura(true));
   const [productoSel, setProductoSel] = useState<string | null>(null);
   const [facturaSel, setFacturaSel] = useState<string | null>(null);
 
@@ -106,7 +108,7 @@ export default function BodegaPage() {
       icono="📦"
       tono="teal"
       accion={
-        <Boton onClick={() => setPedirClave(true)} className="px-3.5" disabled={sinCatalogo}>
+        <Boton onClick={abrirFactura} className="px-3.5" disabled={sinCatalogo}>
           <IconoMas /> Factura
         </Boton>
       }
@@ -159,7 +161,7 @@ export default function BodegaPage() {
               <Vacio
                 titulo="Sin facturas"
                 texto="Ingresa la factura de cada compra para que las existencias se actualicen solas."
-                accion={<Boton onClick={() => setPedirClave(true)}>Ingresar factura</Boton>}
+                accion={<Boton onClick={abrirFactura}>Ingresar factura</Boton>}
               />
             ) : (
               <ul className="divide-y divide-slate-100 overflow-hidden rounded-3xl bg-white ring-1 ring-slate-200/80">

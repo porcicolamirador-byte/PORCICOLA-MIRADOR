@@ -154,7 +154,12 @@ export default function AjustesAvanzadosPage() {
             onGuardar={(clave) => guardar({ claveAjustes: clave })}
           />
         </Desplegable>
-        <Desplegable icono="🗑️" titulo="Clave de eliminación" resumen="Gestación" abierto={abierto === "eliminar"} onAlternar={() => alternar("eliminar")}>
+        <Desplegable icono="🗑️" titulo="Clave de eliminación" resumen={config.claveEliminarActiva ? "Activa" : "Desactivada"} abierto={abierto === "eliminar"} onAlternar={() => alternar("eliminar")}>
+          <ActivarClave
+            activa={config.claveEliminarActiva}
+            donde="Gestación al eliminar una cerda"
+            onCambiar={(v) => guardar({ claveEliminarActiva: v })}
+          />
           <CambiarClave
             titulo="Clave de eliminación"
             descripcion="Se pide en Gestación para eliminar una cerda."
@@ -163,7 +168,12 @@ export default function AjustesAvanzadosPage() {
             onGuardar={(clave) => guardar({ claveEliminar: clave })}
           />
         </Desplegable>
-        <Desplegable icono="🧾" titulo="Clave de facturas" resumen="Bodega" abierto={abierto === "facturas"} onAlternar={() => alternar("facturas")}>
+        <Desplegable icono="🧾" titulo="Clave de facturas" resumen={config.claveFacturasActiva ? "Activa" : "Desactivada"} abierto={abierto === "facturas"} onAlternar={() => alternar("facturas")}>
+          <ActivarClave
+            activa={config.claveFacturasActiva}
+            donde="Bodega al cargar una factura"
+            onCambiar={(v) => guardar({ claveFacturasActiva: v })}
+          />
           <CambiarClave
             titulo="Clave de facturas"
             descripcion="Se pide en Bodega para cargar una factura."
@@ -172,7 +182,12 @@ export default function AjustesAvanzadosPage() {
             onGuardar={(clave) => guardar({ claveFacturas: clave })}
           />
         </Desplegable>
-        <Desplegable icono="🐷" titulo="Clave de lotes" resumen="Engorde" abierto={abierto === "lotes"} onAlternar={() => alternar("lotes")}>
+        <Desplegable icono="🐷" titulo="Clave de lotes" resumen={config.claveLotesActiva ? "Activa" : "Desactivada"} abierto={abierto === "lotes"} onAlternar={() => alternar("lotes")}>
+          <ActivarClave
+            activa={config.claveLotesActiva}
+            donde="Engorde al eliminar un lote"
+            onCambiar={(v) => guardar({ claveLotesActiva: v })}
+          />
           <CambiarClave
             titulo="Clave de lotes"
             descripcion="Se pide en Engorde para eliminar un lote. Tiene 3 números."
@@ -333,6 +348,21 @@ function Grupo({ titulo, children }: { titulo: string; children: ReactNode }) {
 
 function Etiqueta({ children }: { children: ReactNode }) {
   return <span className="mb-1 block text-[13px] font-medium text-slate-700">{children}</span>;
+}
+
+/** Interruptor para pedir o no una clave */
+function ActivarClave({ activa, donde, onCambiar }: { activa: boolean; donde: string; onCambiar: (v: boolean) => void }) {
+  return (
+    <label className="mb-3 flex cursor-pointer items-center gap-3 rounded-2xl bg-white px-3.5 py-3 ring-1 ring-slate-100">
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-medium text-slate-900">Pedir clave</span>
+        <span className="block text-xs text-slate-500">
+          {activa ? `Activada: se pide en ${donde}` : `Desactivada: no se pide en ${donde}`}
+        </span>
+      </span>
+      <Interruptor activo={activa} onCambiar={onCambiar} />
+    </label>
+  );
 }
 
 function CambiarClave({

@@ -52,6 +52,8 @@ export default function Gestacion() {
   const [confirmDeleteIndex, setConfirmDeleteIndex] = useState<number | null>(null);
   const [deletePinInput, setDeletePinInput] = useState("");
   const [deletePinError, setDeletePinError] = useState("");
+  // En ajustes se puede desactivar la clave para eliminar cerdas
+  const claveEliminarActiva = confirmDeleteIndex !== null ? leerConfig().claveEliminarActiva : true;
 
   const [id, setId] = useState("");
   const [idError, setIdError] = useState("");
@@ -159,7 +161,8 @@ export default function Gestacion() {
   function confirmarEliminarCerda() {
     if (confirmDeleteIndex === null) return;
 
-    if (deletePinInput !== leerConfig().claveEliminar) {
+    const pideClave = leerConfig().claveEliminarActiva;
+    if (pideClave && deletePinInput !== leerConfig().claveEliminar) {
       setDeletePinError("Clave incorrecta");
       return;
     }
@@ -985,9 +988,10 @@ export default function Gestacion() {
                   Eliminar cerda {cerdas[confirmDeleteIndex]?.id || ""}
                 </h2>
                 <p className="mt-1.5 text-[13px] leading-snug text-slate-600">
-                  Se borrarán la cerda y todo su historial. Escribe la clave para confirmar.
+                  Se borrarán la cerda y todo su historial.{claveEliminarActiva ? " Escribe la clave para confirmar." : ""}
                 </p>
 
+                {claveEliminarActiva && (<>
                 <input
                   type="password"
                   inputMode="numeric"
@@ -1009,6 +1013,7 @@ export default function Gestacion() {
                   }`}
                 />
                 {deletePinError ? <p className="mt-2 text-[13px] font-medium text-red-600">{deletePinError}</p> : null}
+                </>)}
               </div>
 
               <div className="grid grid-cols-2 divide-x divide-slate-200 border-t border-slate-200">
