@@ -200,7 +200,16 @@ function FormProducto({ producto, onCerrar }: { producto: ProductoBodega | "nuev
     setError("");
   }
 
-  const guardar = (e: FormEvent) => {
+  // Productos con el mismo código (para asociar inventarios)
+  const idActual = producto && producto !== "nuevo" ? producto.id : null;
+  const esPreestablecido = !!(producto && producto !== "nuevo" && producto.preestablecido);
+  const codigoLimpio = codigo.trim().toUpperCase();
+  const todosProductos = producto !== null ? leerProductos() : [];
+  const coincidencias = codigoLimpio ? todosProductos.filter((p) => p.id !== idActual && codigoDe(p) === codigoLimpio) : [];
+  const codigosDisponibles = todosProductos.filter((p) => p.preestablecido && p.id !== idActual);
+  const describir = (p: ProductoBodega) => `${p.nombre} (${p.unidad}${p.unidad === "bultos" ? ` de ${fmt(factorKg(p))} kg` : ""})`;
+
+  const guardar = async (e: FormEvent) => {
     e.preventDefault();
     const limpio = nombre.trim();
     if (!limpio) return setError("Escribe el nombre del producto.");
@@ -218,6 +227,16 @@ function FormProducto({ producto, onCerrar }: { producto: ProductoBodega | "nuev
       const convertible = (u: string) => u === "bultos" || u === "kg";
       if (otros.some((o) => !(convertible(o.unidad) && convertible(unidad)) && o.unidad !== unidad)) {
         return setError(`El código ${cod} ya lo usa un producto en ${otros[0].unidad}; solo se pueden unir bultos con kilos o la misma unidad.`);
+      }
+      // Preguntar antes de asociar (al crear o al cambiar el código)
+      const codigoAntes = producto && producto !== "nuevo" ? (producto.codigo ?? "").trim().toUpperCase() : "";
+      if (otros.length && cod !== codigoAntes) {
+        const ok = await confirmar({
+          titulo: "¿Asociar productos?",
+          mensaje: `El código ${cod} pertenece a ${otros.map(describir).join(", ")}. ¿Quieres asociar «${limpio}» para que compartan el mismo inventario?`,
+          aceptar: "Asociar",
+        });
+        if (!ok) return setError("No se guardó. Cambia el código o déjalo vacío para no asociarlo.");
       }
     }
     if (id) {
@@ -240,12 +259,47 @@ function FormProducto({ producto, onCerrar }: { producto: ProductoBodega | "nuev
       <form onSubmit={guardar} className="flex flex-col gap-3.5">
         <div className="grid grid-cols-[7rem_1fr] gap-3">
           <Campo etiqueta="Código">
-            <Entrada value={codigo} onChange={(v) => setCodigo(v.toUpperCase().slice(0, 12))} placeholder="PR-01" />
+            {esPreestablecido ? (
+              <p className="flex h-[46px] items-center rounded-xl bg-slate-100 px-3.5 text-base font-bold tabular-nums text-slate-700">{codigo}</p>
+            ) : (
+              <Entrada
+                value={codigo}
+                onChange={(v) => {
+                  setCodigo(v.toUpperCase().slice(0, 12));
+                  setError("");
+                }}
+                placeholder="PR-01"
+              />
+            )}
           </Campo>
           <Campo etiqueta="Nombre *">
             <Entrada value={nombre} onChange={setNombre} placeholder="Ej. Preiniciación kilos" required />
           </Campo>
         </div>
+        {!esPreestablecido && codigosDisponibles.length > 0 && (
+          <div className="-mt-1 flex flex-wrap gap-1.5">
+            {codigosDisponibles.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => {
+                  setCodigo(codigoDe(p));
+                  setError("");
+                }}
+                className={`rounded-full px-2.5 py-1 text-[11px] font-bold tabular-nums ring-1 transition active:scale-95 ${
+                  codigoLimpio === codigoDe(p) ? "bg-sky-900 text-white ring-sky-900" : "bg-white text-slate-600 ring-slate-200"
+                }`}
+              >
+                {codigoDe(p)}
+              </button>
+            ))}
+          </div>
+        )}
+        {!esPreestablecido && coincidencias.length > 0 && (
+          <p className="rounded-xl bg-sky-50 px-3 py-2 text-xs text-sky-900 ring-1 ring-sky-100">
+            🔗 Se asociará con {coincidencias.map(describir).join(", ")}
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <Campo etiqueta="Categoría">
             <Selector
