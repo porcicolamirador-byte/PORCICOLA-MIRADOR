@@ -45,6 +45,8 @@ export interface ConfigGranja {
   /** Clave para eliminar un lote en Engorde (3 números) */
   claveLotes: string;
   /** Si cada clave se pide o no (desactivada = la acción no pide clave) */
+  /** Desactivada = la clave de ajustes solo se pide la primera vez en este teléfono */
+  claveAjustesActiva: boolean;
   claveEliminarActiva: boolean;
   claveFacturasActiva: boolean;
   claveLotesActiva: boolean;
@@ -68,6 +70,7 @@ export const CONFIG_POR_DEFECTO: ConfigGranja = {
   claveEliminar: "0030",
   claveFacturas: "0030",
   claveLotes: "000",
+  claveAjustesActiva: true,
   claveEliminarActiva: true,
   claveFacturasActiva: true,
   claveLotesActiva: true,
@@ -116,6 +119,7 @@ export function leerConfig(): ConfigGranja {
       claveAjustes: esClave(c.claveAjustes) ? c.claveAjustes : CONFIG_POR_DEFECTO.claveAjustes,
       claveEliminar: esClave(c.claveEliminar) ? c.claveEliminar : CONFIG_POR_DEFECTO.claveEliminar,
       claveFacturas: esClave(c.claveFacturas) ? c.claveFacturas : CONFIG_POR_DEFECTO.claveFacturas,
+      claveAjustesActiva: c.claveAjustesActiva !== false,
       claveEliminarActiva: c.claveEliminarActiva !== false,
       claveFacturasActiva: c.claveFacturasActiva !== false,
       claveLotesActiva: c.claveLotesActiva !== false,

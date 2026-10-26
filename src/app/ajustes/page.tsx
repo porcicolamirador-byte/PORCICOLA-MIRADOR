@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Boton, Chevron, Tarjeta, Interruptor } from "@/components/ui";
 import DialogoClave from "@/components/DialogoClave";
-import { codigoValido, desbloquearAjustes } from "@/lib/acceso";
+import { codigoValido, desbloquearAjustes, entradaLibre } from "@/lib/acceso";
 import { aplicarTema, temaGuardado } from "@/lib/tema";
 import DescargaSinConexion from "@/components/DescargaSinConexion";
 import { faceIdActivo, motivoFalloFaceId, verificarFaceId } from "@/lib/faceid";
@@ -36,6 +36,10 @@ export default function AjustesPage() {
 
   // Con Face ID activo se pide el rostro; si falla o se cancela, se pide el código
   const entrar = () => {
+    if (entradaLibre()) {
+      desbloquearAjustes();
+      return router.push("/ajustes/avanzados");
+    }
     if (!faceIdActivo()) return setPedirCodigo(true);
     verificarFaceId().then((ok) => {
       if (!ok) {

@@ -145,7 +145,13 @@ export default function AjustesAvanzadosPage() {
       </Grupo>
 
       <Grupo titulo="Claves">
-        <Desplegable icono="🔐" titulo="Clave de ajustes" resumen="4 dígitos" abierto={abierto === "ajustes"} onAlternar={() => alternar("ajustes")}>
+        <Desplegable icono="🔐" titulo="Clave de ajustes" resumen={config.claveAjustesActiva ? "Activa" : "Solo la primera vez"} abierto={abierto === "ajustes"} onAlternar={() => alternar("ajustes")}>
+          <ActivarClave
+            activa={config.claveAjustesActiva}
+            donde="al entrar a los ajustes protegidos"
+            textoDesactivada="Desactivada: solo se pide la primera vez en este teléfono"
+            onCambiar={(v) => guardar({ claveAjustesActiva: v })}
+          />
           <CambiarClave
             titulo="Clave de ajustes"
             descripcion="Es el código que se pide para abrir esta sección."
@@ -351,13 +357,23 @@ function Etiqueta({ children }: { children: ReactNode }) {
 }
 
 /** Interruptor para pedir o no una clave */
-function ActivarClave({ activa, donde, onCambiar }: { activa: boolean; donde: string; onCambiar: (v: boolean) => void }) {
+function ActivarClave({
+  activa,
+  donde,
+  textoDesactivada,
+  onCambiar,
+}: {
+  activa: boolean;
+  donde: string;
+  textoDesactivada?: string;
+  onCambiar: (v: boolean) => void;
+}) {
   return (
     <label className="mb-3 flex cursor-pointer items-center gap-3 rounded-2xl bg-white px-3.5 py-3 ring-1 ring-slate-100">
       <span className="min-w-0 flex-1">
         <span className="block text-[15px] font-medium text-slate-900">Pedir clave</span>
         <span className="block text-xs text-slate-500">
-          {activa ? `Activada: se pide en ${donde}` : `Desactivada: no se pide en ${donde}`}
+          {activa ? `Activada: se pide ${donde.startsWith("al ") ? donde : `en ${donde}`}` : textoDesactivada ?? `Desactivada: no se pide en ${donde}`}
         </span>
       </span>
       <Interruptor activo={activa} onCambiar={onCambiar} />
