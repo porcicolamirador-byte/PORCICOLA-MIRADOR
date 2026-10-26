@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
-import { Boton, Campo, Chevron, Chips, Dato, Entrada, Hoja, IconoMas, Insignia, SeccionDesplegable, Selector, Vacio } from "@/components/ui";
+import { Boton, Campo, Chevron, Chips, Entrada, Hoja, IconoMas, Insignia, SeccionDesplegable, Selector, Vacio } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
 import DialogoClave from "@/components/DialogoClave";
 import { leerConfig } from "@/lib/config";
@@ -54,6 +54,13 @@ const CATEGORIA_GASTO: Record<CategoriaBodega, string> = {
 };
 
 type Vista = "inventario" | "reponer" | "facturas";
+
+/** $1,2 M · $350 mil · $8.500 */
+function pesosCortos(n: number) {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toLocaleString("es-CO", { maximumFractionDigits: 1 })} M`;
+  if (n >= 10_000) return `$${Math.round(n / 1000).toLocaleString("es-CO")} mil`;
+  return `$${Math.round(n).toLocaleString("es-CO")}`;
+}
 
 export default function BodegaPage() {
   const router = useRouter();
@@ -107,15 +114,19 @@ export default function BodegaPage() {
         </Boton>
       }
     >
-      <div className="grid grid-cols-2 gap-2">
-        <Dato
-          titulo="Productos con existencia"
-          valor={datos ? `${conExistencia} / ${datos.productos.length}` : "–"}
-          detalle={agotados ? `${agotados} ${agotados === 1 ? "agotado" : "agotados"}` : "Ninguno agotado"}
-        />
-        <Dato titulo="Por reponer" valor={datos ? bajos.length : "–"} detalle={bajos.length ? "En el mínimo o menos" : "Todo en orden"} />
-        <Dato titulo="Valor en bodega" valor={datos ? formatoPesos(valorBodega) : "–"} detalle="Según el último precio de compra" />
-        <Dato titulo="Compras del mes" valor={datos ? formatoPesos(compradoMes) : "–"} />
+      {/* Resumen compacto: una sola franja con cuatro cifras */}
+      <div className="grid grid-cols-4 divide-x divide-slate-200 rounded-2xl bg-white py-2 ring-1 ring-slate-200/80">
+        {[
+          { t: "Con existencia", v: datos ? `${conExistencia}/${datos.productos.length}` : "–", alerta: agotados > 0 },
+          { t: "Por reponer", v: datos ? String(bajos.length) : "–", alerta: bajos.length > 0 },
+          { t: "En bodega", v: datos ? pesosCortos(valorBodega) : "–", alerta: false },
+          { t: "Compras mes", v: datos ? pesosCortos(compradoMes) : "–", alerta: false },
+        ].map((c) => (
+          <div key={c.t} className="min-w-0 px-1.5 text-center">
+            <p className={`truncate text-[15px] font-bold leading-tight tabular-nums ${c.alerta ? "text-red-600" : "text-slate-900"}`}>{c.v}</p>
+            <p className="truncate text-[10px] text-slate-500">{c.t}</p>
+          </div>
+        ))}
       </div>
 
       {sinCatalogo ? (
