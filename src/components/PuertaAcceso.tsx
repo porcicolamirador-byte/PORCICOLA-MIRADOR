@@ -14,9 +14,9 @@ import {
   perfilGuardado,
   type PerfilNube,
 } from "@/lib/nube";
-import { estaDesbloqueada, marcarDesbloqueada, olvidarPinLocal, pinLocalCorrecto, recordarPinLocal, tocarDesbloqueo } from "@/lib/bloqueo";
+import { bloqueoActivo, estaDesbloqueada, marcarDesbloqueada, olvidarPinLocal, pinLocalCorrecto, recordarPinLocal, tocarDesbloqueo } from "@/lib/bloqueo";
 import { sincronizar } from "@/lib/sincronizar";
-import { activarFaceId, CLAVE_FACEID_APP, desactivarFaceId, faceIdActivo, faceIdDisponible, verificarFaceId } from "@/lib/faceid";
+import { CLAVE_FACEID_APP, desactivarFaceId, faceIdActivo, verificarFaceId } from "@/lib/faceid";
 
 /*
  * Puerta de entrada de la app: nadie ve los datos sin haber iniciado sesión.
@@ -55,14 +55,14 @@ export default function PuertaAcceso({ children }: { children: ReactNode }) {
   const cliente = useSyncExternalStore(sinSuscripcion, () => true, () => false);
   const textoSesion = useSyncExternalStore(suscribirSesion, leerSesionTexto, () => "");
   const conSesion = textoSesion.startsWith("1");
-  const [abierta, setAbierta] = useState(() => (typeof window === "undefined" ? false : estaDesbloqueada()));
-  const [ofrecerFaceId, setOfrecerFaceId] = useState(false);
+  // Sin bloqueo (por defecto) la app abre directo; con bloqueo pide Face ID o PIN
+  const [abierta, setAbierta] = useState(() => (typeof window === "undefined" ? false : !bloqueoActivo() || estaDesbloqueada()));
 
   // Bloquea otra vez si la app estuvo un rato en segundo plano
   useEffect(() => {
     const cambio = () => {
       if (document.visibilityState === "hidden") tocarDesbloqueo();
-      else if (!estaDesbloqueada()) setAbierta(false);
+      else if (bloqueoActivo() && !estaDesbloqueada()) setAbierta(false);
     };
     document.addEventListener("visibilitychange", cambio);
     return () => document.removeEventListener("visibilitychange", cambio);
@@ -106,7 +106,6 @@ export default function PuertaAcceso({ children }: { children: ReactNode }) {
     if (pinUsado) await recordarPinLocal(pinUsado.usuario, pinUsado.pin);
     marcarDesbloqueada();
     setAbierta(true);
-    if (!faceIdActivo(CLAVE_FACEID_APP) && (await faceIdDisponible())) setOfrecerFaceId(true);
   }, []);
 
   // La pantalla de bienvenida no se bloquea
@@ -116,12 +115,7 @@ export default function PuertaAcceso({ children }: { children: ReactNode }) {
   if (!conSesion) return <PantallaEntrar onEntrar={alEntrar} />;
   if (!abierta) return <PantallaDesbloquear perfil={perfilGuardado()} onAbrir={() => void alEntrar()} />;
 
-  return (
-    <>
-      {children}
-      {ofrecerFaceId && <OfertaFaceId nombre={perfilGuardado()?.nombre ?? ""} onCerrar={() => setOfrecerFaceId(false)} />}
-    </>
-  );
+  return <>{children}</>;
 }
 
 /* ───────────── Piezas de las pantallas ───────────── */
@@ -457,30 +451,5 @@ function PantallaDesbloquear({ perfil, onAbrir }: { perfil: PerfilNube | null; o
         Entrar con otro usuario
       </button>
     </Marco>
-  );
-}
-
-/* ───────────── Ofrecer Face ID después de entrar ───────────── */
-
-function OfertaFaceId({ nombre, onCerrar }: { nombre: string; onCerrar: () => void }) {
-  const activar = () => {
-    // Directo desde el toque (requisito del iPhone)
-    activarFaceId(CLAVE_FACEID_APP, `El Mirador · ${nombre || "usuario"}`).then(onCerrar);
-  };
-  return (
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-[95] flex items-end justify-center bg-slate-950/40 p-4 sm:items-center">
-      <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl" style={{ marginBottom: "env(safe-area-inset-bottom)" }}>
-        <p className="text-lg font-bold text-slate-900">¿Entrar con Face ID?</p>
-        <p className="mt-1 text-sm text-slate-500">La próxima vez abrirás la app con tu rostro. Si falla, puedes usar tu PIN.</p>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <button type="button" onClick={onCerrar} className="h-12 rounded-xl bg-slate-100 font-semibold text-slate-700 active:scale-[0.99]">
-            Ahora no
-          </button>
-          <button type="button" onClick={activar} className="h-12 rounded-xl bg-sky-900 font-semibold text-white active:scale-[0.99]">
-            Activar
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }

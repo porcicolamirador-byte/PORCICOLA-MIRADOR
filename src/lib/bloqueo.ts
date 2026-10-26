@@ -1,12 +1,30 @@
 /*
- * Bloqueo de la app en este teléfono.
- * Después de iniciar sesión una vez, la app se abre con Face ID. Si Face ID
- * falla, se puede usar el PIN: se comprueba contra un resumen (PBKDF2) guardado
- * aquí, así funciona aunque no haya internet. El PIN nunca se guarda tal cual.
+ * Bloqueo de la app en este teléfono (opcional, como en WhatsApp).
+ * Por defecto, después de iniciar sesión una vez la app abre directo.
+ * Si se activa "Pedir Face ID al abrir", se pide el rostro; si falla, el PIN,
+ * que se comprueba contra un resumen (PBKDF2) guardado aquí, así funciona sin
+ * internet. El PIN nunca se guarda tal cual.
  */
 
 const CLAVE_PIN = "app-pin-local";
 const CLAVE_ABIERTA = "app-desbloqueada";
+/** "1" si en este teléfono se pidió bloquear la app con Face ID (apagado por defecto, como WhatsApp) */
+const CLAVE_BLOQUEO = "app-bloqueo";
+
+export function bloqueoActivo(): boolean {
+  try {
+    return localStorage.getItem(CLAVE_BLOQUEO) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function ponerBloqueo(activo: boolean) {
+  try {
+    if (activo) localStorage.setItem(CLAVE_BLOQUEO, "1");
+    else localStorage.removeItem(CLAVE_BLOQUEO);
+  } catch {}
+}
 /** Al volver a la app después de este tiempo en segundo plano, se pide Face ID otra vez */
 export const BLOQUEO_TRAS_MS = 5 * 60 * 1000;
 
@@ -48,6 +66,7 @@ export async function pinLocalCorrecto(pin: string): Promise<boolean> {
 export function olvidarPinLocal() {
   try {
     localStorage.removeItem(CLAVE_PIN);
+    localStorage.removeItem(CLAVE_BLOQUEO);
     sessionStorage.removeItem(CLAVE_ABIERTA);
   } catch {}
 }

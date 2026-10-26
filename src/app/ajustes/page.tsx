@@ -9,7 +9,8 @@ import DialogoClave from "@/components/DialogoClave";
 import { codigoValido, desbloquearAjustes, entradaLibre } from "@/lib/acceso";
 import { aplicarTema, temaGuardado } from "@/lib/tema";
 import DescargaSinConexion from "@/components/DescargaSinConexion";
-import { faceIdActivo, motivoFalloFaceId, verificarFaceId } from "@/lib/faceid";
+import { activarFaceId, CLAVE_FACEID_APP, faceIdActivo, motivoFalloFaceId, verificarFaceId } from "@/lib/faceid";
+import { bloqueoActivo, marcarDesbloqueada, ponerBloqueo } from "@/lib/bloqueo";
 import {
   clavesDeLaApp,
   hoy,
@@ -41,7 +42,30 @@ export default function AjustesPage() {
 
   // Con Face ID activo se pide el rostro; si falla o se cancela, se pide el código
   const [perfil, setPerfil] = useState<PerfilNube | null>(null);
-  useEffect(() => setPerfil(perfilGuardado()), []);
+  const [conBloqueo, setConBloqueo] = useState(false);
+  useEffect(() => {
+    setPerfil(perfilGuardado());
+    setConBloqueo(bloqueoActivo());
+  }, []);
+
+  // Se llama directo desde el toque (el iPhone solo muestra Face ID así)
+  const cambiarBloqueo = (activar: boolean) => {
+    if (!activar) {
+      ponerBloqueo(false);
+      setConBloqueo(false);
+      return;
+    }
+    const encender = () => {
+      ponerBloqueo(true);
+      marcarDesbloqueada();
+      setConBloqueo(true);
+    };
+    if (faceIdActivo(CLAVE_FACEID_APP)) return encender();
+    activarFaceId(CLAVE_FACEID_APP, `El Mirador · ${perfil?.nombre ?? "usuario"}`).then((ok) => {
+      if (ok) encender();
+      else void mostrarAviso({ titulo: "No se activó Face ID", mensaje: "Se canceló o el teléfono no lo permitió. La app seguirá abriendo directo." });
+    });
+  };
 
   const cerrarSesion = async () => {
     if (!(await confirmar({ titulo: "Cerrar sesión", mensaje: "Para volver a entrar en este teléfono se pedirá tu usuario y tu PIN (con internet).", aceptar: "Cerrar sesión", destructivo: true, requiere: null }))) return;
@@ -165,6 +189,25 @@ export default function AjustesPage() {
 
       {/* Descargar la app completa para usarla sin conexión */}
       <DescargaSinConexion />
+
+      {/* Bloqueo de la app con Face ID (opcional, como WhatsApp) */}
+      {perfil && (
+        <label className="flex w-full cursor-pointer items-center gap-3 rounded-3xl bg-white p-4 ring-1 ring-slate-200/80">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-200 text-slate-800" aria-hidden="true">
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2" />
+              <path d="M9 9.5v1M15 9.5v1M12 9.5V13h-1M9.5 16a3.5 3.5 0 0 0 5 0" />
+            </svg>
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-slate-900">Pedir Face ID al abrir</span>
+            <span className="block text-xs text-slate-500">
+              {conBloqueo ? "La app pide tu rostro (o tu PIN) al abrirla en este teléfono" : "La app abre directo en este teléfono"}
+            </span>
+          </span>
+          <Interruptor activo={conBloqueo} onCambiar={cambiarBloqueo} />
+        </label>
+      )}
 
       {/* Apariencia: modo oscuro */}
       <label className="flex w-full cursor-pointer items-center gap-3 rounded-3xl bg-white p-4 ring-1 ring-slate-200/80">
