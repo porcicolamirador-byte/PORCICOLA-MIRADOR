@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import SummaryCard from "@/components/SummaryCard";
@@ -23,7 +23,7 @@ const modulos = [
     descripcion: "Control de partos e inseminación",
     ruta: "/gestacion",
     icon: "🐖",
-    tile: "bg-emerald-100 text-emerald-800",
+    tile: "bg-slate-100 text-slate-700",
     card: "bg-white border-slate-200",
   },
   {
@@ -31,7 +31,7 @@ const modulos = [
     descripcion: "Peso y alimentación",
     ruta: "/engorde",
     icon: "🐷",
-    tile: "bg-amber-100 text-amber-800",
+    tile: "bg-slate-100 text-slate-700",
     card: "bg-white border-slate-200",
   },
   {
@@ -39,7 +39,7 @@ const modulos = [
     descripcion: "Temperatura y humedad",
     ruta: "/monitoreo",
     icon: "🌡️",
-    tile: "bg-orange-100 text-orange-800",
+    tile: "bg-slate-100 text-slate-700",
     card: "bg-white border-slate-200",
   },
   {
@@ -47,7 +47,7 @@ const modulos = [
     descripcion: "Salud y medicamentos",
     ruta: "/tratamientos",
     icon: "🩺",
-    tile: "bg-rose-100 text-rose-800",
+    tile: "bg-slate-100 text-slate-700",
     card: "bg-white border-slate-200",
   },
   {
@@ -55,7 +55,7 @@ const modulos = [
     descripcion: "Inventario de insumos",
     ruta: "/bodega",
     icon: "📦",
-    tile: "bg-teal-100 text-teal-800",
+    tile: "bg-slate-100 text-slate-700",
     card: "bg-white border-slate-200",
   },
   {
@@ -63,7 +63,7 @@ const modulos = [
     descripcion: "Protocolos sanitarios",
     ruta: "/bioseguridad",
     icon: "🛡️",
-    tile: "bg-sky-100 text-sky-800",
+    tile: "bg-slate-100 text-slate-700",
     card: "bg-white border-slate-200",
   },
   {
@@ -71,7 +71,7 @@ const modulos = [
     descripcion: "Estadísticas y rendimiento",
     ruta: "/indicadores",
     icon: "📊",
-    tile: "bg-violet-100 text-violet-800",
+    tile: "bg-slate-100 text-slate-700",
     card: "bg-white border-slate-200",
   },
   {
@@ -79,7 +79,7 @@ const modulos = [
     descripcion: "Ingresos y gastos",
     ruta: "/contabilidad",
     icon: "💼",
-    tile: "bg-stone-200 text-stone-800",
+    tile: "bg-slate-100 text-slate-700",
     card: "bg-white border-slate-200",
   },
   {
@@ -87,10 +87,84 @@ const modulos = [
     descripcion: "Inseminación y partos",
     ruta: "/programacion",
     icon: "🐖",
-    tile: "bg-pink-100 text-pink-800",
+    tile: "bg-slate-100 text-slate-700",
     card: "bg-white border-slate-200",
   },
 ];
+
+/* Íconos de línea de los módulos (estilo gris minimal) */
+const TRAZOS: Record<string, ReactNode> = {
+  Gestación: (
+    <>
+      <path d="M5 12.5c0-3.6 3.1-6 7-6 1.7 0 3.2.4 4.4 1.2l1.9-1.4.4 2.6c.8.9 1.3 2 1.3 3.3v.3h1.5v2H20c-.5 1.5-1.6 2.6-3 3.2V20h-2.2v-1.6H9.2V20H7v-2.2c-1.2-.9-2-2.2-2-3.8" />
+      <circle cx="16.5" cy="11" r=".6" fill="currentColor" />
+      <path d="M5 12.5H3.5" />
+    </>
+  ),
+  Engorde: (
+    <>
+      <path d="M6 7h12l2 13H4z" />
+      <path d="M9 7a3 3 0 0 1 6 0" />
+      <path d="M12 12v3l1.5 1" />
+    </>
+  ),
+  Monitoreo: (
+    <>
+      <path d="M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0z" />
+      <path d="M12 9v7" />
+    </>
+  ),
+  Tratamientos: <path d="m18 2 4 4M17 7l3-3M19 9 8.5 19.5a2.1 2.1 0 0 1-3-3L16 6M9 11l4 4M5 19l-3 3M14 4l6 6" />,
+  Bodega: (
+    <>
+      <path d="M21 8 12 3 3 8v8l9 5 9-5z" />
+      <path d="m3 8 9 5 9-5M12 13v8" />
+    </>
+  ),
+  Bioseguridad: (
+    <>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      <path d="m9 12 2 2 4-4" />
+    </>
+  ),
+  Indicadores: (
+    <>
+      <path d="M3 3v18h18" />
+      <path d="M7 16v-4M11 16V8M15 16v-6M19 16V5" />
+    </>
+  ),
+  Contabilidad: (
+    <>
+      <rect x="2.5" y="6" width="19" height="13" rx="2.5" />
+      <path d="M16 12.5h2M2.5 10h19" />
+      <path d="M6 6V4.5h11V6" />
+    </>
+  ),
+  Programación: (
+    <>
+      <rect x="3" y="4" width="18" height="17" rx="2.5" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+      <path d="M12 13v3l2 1.2" />
+    </>
+  ),
+};
+
+function IconoModulo({ nombre, className }: { nombre: string; className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {TRAZOS[nombre]}
+    </svg>
+  );
+}
 
 function obtenerEstadoActual(historial: unknown[]) {
   if (!Array.isArray(historial) || historial.length === 0) {
@@ -285,7 +359,7 @@ export default function Dashboard() {
             >
               <div className="flex items-center gap-3">
                 <div className={`flex h-14 w-14 items-center justify-center rounded-2xl text-3xl ${destacado.tile}`}>
-                  {destacado.icon}
+                  <IconoModulo nombre={destacado.nombre} className="h-7 w-7" />
                 </div>
                 <div>
                   <p className="text-base font-bold text-slate-950">{destacado.nombre}</p>
@@ -308,7 +382,7 @@ export default function Dashboard() {
                 className={`flex flex-col items-start gap-3 rounded-3xl border px-3.5 py-3.5 text-left shadow-sm transition active:scale-[0.97] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${modulo.card}`}
               >
                 <div className={`flex h-11 w-11 items-center justify-center rounded-2xl text-2xl ${modulo.tile}`}>
-                  {modulo.icon}
+                  <IconoModulo nombre={modulo.nombre} className="h-6 w-6" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-slate-950">{modulo.nombre}</p>
