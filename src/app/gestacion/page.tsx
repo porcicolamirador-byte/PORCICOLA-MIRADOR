@@ -1,5 +1,6 @@
 "use client";
 
+import { borrarConRegistro, guardarConRegistro } from "@/lib/log";
 import { useEffect, useMemo, useState, type TouchEvent } from "react";
 import { useRouter } from "next/navigation";
 import PageShell from "@/components/PageShell";
@@ -137,7 +138,7 @@ export default function Gestacion() {
   function guardar(nuevas: any[]) {
     setCerdas(nuevas);
 
-    localStorage.setItem("cerdas", JSON.stringify(nuevas));
+    guardarConRegistro("cerdas", nuevas);
   }
 
   function resetForm() {
@@ -174,7 +175,7 @@ export default function Gestacion() {
 
     guardar(nuevas);
 
-    localStorage.removeItem(`historial-${cerdaAEliminar.id}`);
+    borrarConRegistro(`historial-${cerdaAEliminar.id}`);
     eliminarLotesDePartos({ cerdaId: cerdaAEliminar.id });
 
     setConfirmDeleteIndex(null);

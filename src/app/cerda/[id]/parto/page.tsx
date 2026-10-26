@@ -1,5 +1,6 @@
 "use client";
 
+import { guardarConRegistro } from "@/lib/log";
 import { useEffect, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import usePageBackground from "@/hooks/usePageBackground";
@@ -147,7 +148,7 @@ export default function RegistrarParto() {
       mensaje: `Destete entre ${formatearFechaCorta(d21)} y ${formatearFechaCorta(d28)}`,
     };
 
-    localStorage.setItem(`historial-${id}`, JSON.stringify([nuevo, ...historial]));
+    guardarConRegistro(`historial-${id}`, [nuevo, ...historial]);
     // La camada pasa automáticamente a Engorde como un lote nuevo
     crearLoteDesdeParto({
       cerdaId: id,

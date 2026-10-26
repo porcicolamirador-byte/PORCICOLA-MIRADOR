@@ -1,5 +1,6 @@
 "use client";
 
+import { leerLog, registrarLog } from "@/lib/log";
 import { useEffect, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
@@ -94,6 +95,7 @@ export default function AjustesAvanzadosPage() {
     if (!(await confirmar({ titulo: "Borrar todos los datos", mensaje: "Se borrará toda la información de la granja guardada en este dispositivo.", aceptar: "Continuar", destructivo: true }))) return;
     if (!(await confirmar({ titulo: "¿Estás seguro?", mensaje: "Esta acción no se puede deshacer. Te recomendamos exportar un respaldo antes desde Ajustes.", aceptar: "Borrar todo", destructivo: true }))) return;
     for (const k of clavesDeLaApp()) localStorage.removeItem(k);
+    registrarLog([{ accion: "Eliminación", modulo: "Datos", detalle: "Se borraron todos los datos de la granja" }]);
     notificarCambio();
     setConfig(leerConfig());
     await avisar({ titulo: "Datos borrados", mensaje: "Se borró la información de la granja en este teléfono." });
@@ -288,6 +290,21 @@ export default function AjustesAvanzadosPage() {
 
       <Grupo titulo="Datos">
         <li>
+          <button type="button" onClick={() => router.push("/ajustes/registro")} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-50">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700" aria-hidden="true">
+              <IconoAjuste nombre="registro" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-medium text-slate-900">Registro de actividad</span>
+              <span className="block text-xs text-slate-500">Creaciones, cambios y eliminaciones</span>
+            </span>
+            <span className="shrink-0 text-sm text-slate-500">{cliente ? leerLog().length : ""}</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+              <path d="m9 6 6 6-6 6" />
+            </svg>
+          </button>
+        </li>
+        <li>
           <button type="button" onClick={borrarTodo} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-rose-50">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-600" aria-hidden="true">
               <IconoAjuste nombre="papelera" />
@@ -372,6 +389,12 @@ const TRAZOS_AJUSTES = {
     <>
       <path d="M21 8 12 3 3 8v8l9 5 9-5z" />
       <path d="m3 8 9 5 9-5M12 13v8" />
+    </>
+  ),
+  registro: (
+    <>
+      <path d="M8 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+      <path d="M9.5 8h5M9.5 12h5M9.5 16h3" />
     </>
   ),
   candado: (

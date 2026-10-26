@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { guardarConRegistro, registrarLog, sinRegistro } from "@/lib/log";
 import type { Cerda, Registro } from "@/utils/pendingTasks";
 
 /* ═════════════════════ Claves de almacenamiento ═════════════════════
@@ -191,7 +192,7 @@ function leer<T>(clave: string, porDefecto: T): T {
 }
 
 function escribir(clave: string, valor: unknown) {
-  localStorage.setItem(clave, JSON.stringify(valor));
+  guardarConRegistro(clave, valor);
   notificarCambio();
 }
 
@@ -688,8 +689,21 @@ export function editarConsumoLote(
     );
     return true;
   }
-  eliminarConsumoLote(loteId, indice);
-  return registrarConsumoLote({ loteId, productoId: datos.productoId, cantidad: datos.cantidad, fecha: datos.fecha, hora: datos.hora });
+  const antes = `${registro.cantidad ?? registro.kg} ${registro.unidad ?? "kg"} ${registro.producto ?? ""}`.trim();
+  // Una sola entrada en el registro de actividad para la corrección
+  const ok = sinRegistro(() => {
+    eliminarConsumoLote(loteId, indice);
+    return registrarConsumoLote({ loteId, productoId: datos.productoId!, cantidad: datos.cantidad, fecha: datos.fecha, hora: datos.hora });
+  });
+  const nuevo = leerProductos().find((p) => p.id === datos.productoId);
+  registrarLog([
+    {
+      accion: "Modificación",
+      modulo: "Engorde",
+      detalle: `Alimento editado en ${nombreLote(lote)}: ${antes} → ${datos.cantidad} ${nuevo?.unidad ?? ""} ${nuevo?.nombre ?? ""}`.replace(/\s+/g, " ").trim(),
+    },
+  ]);
+  return ok;
 }
 
 export function eliminarSalida(salidaId: string) {

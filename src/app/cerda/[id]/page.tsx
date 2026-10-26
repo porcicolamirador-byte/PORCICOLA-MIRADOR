@@ -1,5 +1,6 @@
 "use client";
 
+import { borrarConRegistro, guardarConRegistro } from "@/lib/log";
 import { useEffect, useRef, useState, type TouchEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import usePageBackground from "@/hooks/usePageBackground";
@@ -194,7 +195,7 @@ export default function CerdaDetalle() {
 
   function guardar(nuevos: any[]) {
     setRegistros(nuevos);
-    localStorage.setItem(`historial-${id}`, JSON.stringify(nuevos));
+    guardarConRegistro(`historial-${id}`, nuevos);
   }
 
   useEffect(() => {
@@ -256,7 +257,7 @@ export default function CerdaDetalle() {
   async function eliminarHistorialCompleto() {
     setMostrarMenu(false);
     if (!(await confirmar({ titulo: "Eliminar historial", mensaje: "Se borrarán todos los registros de esta cerda y los lotes de Engorde creados con sus partos. Esta acción no se puede deshacer.", aceptar: "Eliminar", destructivo: true }))) return;
-    localStorage.removeItem(`historial-${id}`);
+    borrarConRegistro(`historial-${id}`);
     eliminarLotesDePartos({ cerdaId: String(id) });
     setRegistros([]);
     setMostrarMenu(false);

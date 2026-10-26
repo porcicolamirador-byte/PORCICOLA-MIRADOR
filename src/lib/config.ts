@@ -3,6 +3,8 @@
  * claves y rango de días para el destete. Se guarda en este dispositivo.
  */
 
+import { registrarCambio } from "@/lib/log";
+
 /** Alimentación estándar: kilos de alimento por cerdo en cada etapa */
 export interface AlimentacionEstandar {
   preiniciadorCerdos: number;
@@ -140,7 +142,9 @@ export function leerConfig(): ConfigGranja {
 }
 
 export function guardarConfig(cambios: Partial<ConfigGranja>) {
-  const nueva = { ...leerConfig(), ...cambios };
+  const antes = leerConfig();
+  const nueva = { ...antes, ...cambios };
   localStorage.setItem(CLAVE_CONFIG, JSON.stringify(nueva));
+  registrarCambio(CLAVE_CONFIG, antes, nueva);
   return nueva;
 }

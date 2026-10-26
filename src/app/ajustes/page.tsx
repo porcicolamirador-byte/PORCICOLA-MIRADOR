@@ -1,5 +1,6 @@
 "use client";
 
+import { registrarLog } from "@/lib/log";
 import { useRef, useState, type ChangeEvent, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
@@ -103,6 +104,7 @@ export default function AjustesPage() {
       if (!(await confirmar({ titulo: "Restaurar respaldo", mensaje: "Se reemplazarán los datos actuales por los del respaldo.", aceptar: "Restaurar", destructivo: true }))) return;
       for (const k of clavesDeLaApp()) localStorage.removeItem(k);
       for (const [k, v] of Object.entries(json.datos)) localStorage.setItem(k, JSON.stringify(v));
+      registrarLog([{ accion: "Sistema", modulo: "Datos", detalle: `Respaldo restaurado: ${f.name}` }]);
       notificarCambio();
       avisar("Respaldo restaurado");
     } catch {
