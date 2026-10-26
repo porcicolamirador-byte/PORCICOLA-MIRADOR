@@ -18,6 +18,16 @@ export const ETAPAS_ALIMENTACION: { clave: keyof AlimentacionEstandar; nombre: s
   { clave: "engorde", nombre: "Etapa engorde" },
 ];
 
+/** Códigos de productos de bodega unidos a cada etapa (para el consumo establecido) */
+export type ProductosEtapa = Record<keyof AlimentacionEstandar, string[]>;
+
+export const PRODUCTOS_ETAPA_POR_DEFECTO: ProductosEtapa = {
+  preiniciadorCerdos: [],
+  iniciacionCerdos: [],
+  levante: [],
+  engorde: [],
+};
+
 export const ALIMENTACION_POR_DEFECTO: AlimentacionEstandar = {
   preiniciadorCerdos: 10,
   iniciacionCerdos: 20,
@@ -41,6 +51,8 @@ export interface ConfigGranja {
   parideras: number;
   /** Kilos de alimento por cerdo en cada etapa */
   alimentacion: AlimentacionEstandar;
+  /** Productos de bodega (por código) unidos a cada etapa de alimentación */
+  productosEtapa: ProductosEtapa;
   /** Permite usar productos de bodega sin existencia (el inventario puede quedar negativo) */
   permitirSinInventario: boolean;
 }
@@ -56,6 +68,7 @@ export const CONFIG_POR_DEFECTO: ConfigGranja = {
   desteteMax: 28,
   parideras: 0,
   alimentacion: ALIMENTACION_POR_DEFECTO,
+  productosEtapa: PRODUCTOS_ETAPA_POR_DEFECTO,
   permitirSinInventario: false,
 };
 
@@ -70,6 +83,18 @@ function leerAlimentacion(a: unknown): AlimentacionEstandar {
   for (const { clave } of ETAPAS_ALIMENTACION) {
     const v = o[clave];
     if (esKilos(v)) r[clave] = v;
+  }
+  return r;
+}
+
+function leerProductosEtapa(p: unknown): ProductosEtapa {
+  const o = (p && typeof p === "object" ? p : {}) as Partial<Record<keyof AlimentacionEstandar, unknown>>;
+  const r = { ...PRODUCTOS_ETAPA_POR_DEFECTO };
+  for (const { clave } of ETAPAS_ALIMENTACION) {
+    const v = o[clave];
+    if (Array.isArray(v)) {
+      r[clave] = [...new Set(v.filter((c): c is string => typeof c === "string" && !!c.trim()).map((c) => c.trim().toUpperCase()))];
+    }
   }
   return r;
 }
@@ -92,6 +117,7 @@ export function leerConfig(): ConfigGranja {
           ? c.parideras
           : CONFIG_POR_DEFECTO.parideras,
       alimentacion: leerAlimentacion(c.alimentacion),
+      productosEtapa: leerProductosEtapa(c.productosEtapa),
       permitirSinInventario: c.permitirSinInventario === true,
     };
   } catch {

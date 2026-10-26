@@ -14,8 +14,9 @@ import {
   leerConfig,
   type AlimentacionEstandar,
   type ConfigGranja,
+  type ProductosEtapa,
 } from "@/lib/config";
-import { clavesDeLaApp, leerCorrales, leerProductos, notificarCambio, useVersionDatos } from "@/lib/datos";
+import { clavesDeLaApp, codigoDe, leerCorrales, leerProductos, notificarCambio, useVersionDatos } from "@/lib/datos";
 import CatalogoProductos from "@/components/CatalogoProductos";
 import CatalogoCorrales from "@/components/CatalogoCorrales";
 import { activarFaceId, desactivarFaceId, faceIdActivo, faceIdDisponible } from "@/lib/faceid";
@@ -209,7 +210,11 @@ export default function AjustesAvanzadosPage() {
           abierto={abierto === "alimentacion"}
           onAlternar={() => alternar("alimentacion")}
         >
-          <Alimentacion actual={config.alimentacion} onGuardar={(a) => guardar({ alimentacion: a })} />
+          <Alimentacion
+            actual={config.alimentacion}
+            productosActuales={config.productosEtapa}
+            onGuardar={(a, productosEtapa) => guardar({ alimentacion: a, productosEtapa })}
+          />
         </Desplegable>
         <Desplegable
           icono="🏚️"
@@ -588,36 +593,68 @@ function Parideras({ actual, onGuardar }: { actual: number; onGuardar: (n: numbe
   );
 }
 
-function Alimentacion({ actual, onGuardar }: { actual: AlimentacionEstandar; onGuardar: (a: AlimentacionEstandar) => void }) {
+function Alimentacion({
+  actual,
+  productosActuales,
+  onGuardar,
+}: {
+  actual: AlimentacionEstandar;
+  productosActuales: ProductosEtapa;
+  onGuardar: (a: AlimentacionEstandar, productos: ProductosEtapa) => void;
+}) {
   const aTexto = (a: AlimentacionEstandar) =>
     Object.fromEntries(ETAPAS_ALIMENTACION.map(({ clave }) => [clave, String(a[clave]).replace(".", ",")])) as Record<keyof AlimentacionEstandar, string>;
   const [valores, setValores] = useState(aTexto(actual));
   const [base, setBase] = useState(actual);
+  const [unidos, setUnidos] = useState<ProductosEtapa>(productosActuales);
+  const [baseUnidos, setBaseUnidos] = useState(productosActuales);
+  const [eligiendo, setEligiendo] = useState<keyof AlimentacionEstandar | null>(null);
   if (base !== actual) {
     setBase(actual);
     setValores(aTexto(actual));
   }
+  if (baseUnidos !== productosActuales) {
+    setBaseUnidos(productosActuales);
+    setUnidos(productosActuales);
+  }
+
+  // Productos de bodega con código (uno por código; se muestra el nombre del primero)
+  const catalogo = [
+    ...new Map(
+      leerProductos()
+        .filter((p) => codigoDe(p) && p.activo !== false)
+        .sort((a, b) => Number(a.unidad === "kg") - Number(b.unidad === "kg"))
+        .map((p) => [codigoDe(p), p.nombre] as const)
+        .reverse(),
+    ),
+  ].sort((a, b) => a[0].localeCompare(b[0], "es", { numeric: true }));
+  const nombreDe = (codigo: string) => catalogo.find(([c]) => c === codigo)?.[1];
+  const alternarCodigo = (etapa: keyof AlimentacionEstandar, codigo: string) =>
+    setUnidos((u) => ({ ...u, [etapa]: u[etapa].includes(codigo) ? u[etapa].filter((c) => c !== codigo) : [...u[etapa], codigo] }));
 
   const numeros = Object.fromEntries(
     ETAPAS_ALIMENTACION.map(({ clave }) => [clave, Number((valores[clave] || "0").replace(",", "."))]),
   ) as unknown as AlimentacionEstandar;
   const valido = ETAPAS_ALIMENTACION.every(({ clave }) => Number.isFinite(numeros[clave]) && numeros[clave] >= 0 && numeros[clave] <= 10000);
-  const sinCambios = ETAPAS_ALIMENTACION.every(({ clave }) => numeros[clave] === actual[clave]);
+  const sinCambios = ETAPAS_ALIMENTACION.every(
+    ({ clave }) => numeros[clave] === actual[clave] && [...unidos[clave]].sort().join() === [...productosActuales[clave]].sort().join(),
+  );
   const total = ETAPAS_ALIMENTACION.reduce((s, { clave }) => s + (Number.isFinite(numeros[clave]) ? numeros[clave] : 0), 0);
 
   const enviar = async (e: FormEvent) => {
     e.preventDefault();
     if (!valido) return;
-    onGuardar(numeros);
-    await avisar({ titulo: "Alimentación actualizada", mensaje: "Se guardaron los kilos estándar de cada etapa." });
+    onGuardar(numeros, unidos);
+    setEligiendo(null);
+    await avisar({ titulo: "Alimentación actualizada", mensaje: "Se guardaron los kilos y los productos de cada etapa." });
   };
 
   return (
     <form onSubmit={enviar} className="flex flex-col gap-3">
       <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-100">
         {ETAPAS_ALIMENTACION.map(({ clave, nombre }) => (
-          <li key={clave}>
-            <label className="flex items-center gap-3 px-3.5 py-2">
+          <li key={clave} className="pb-2">
+            <label className="flex items-center gap-3 px-3.5 pt-2">
               <span className="min-w-0 flex-1 text-sm text-slate-800">{nombre}</span>
               <input
                 type="text"
@@ -630,6 +667,52 @@ function Alimentacion({ actual, onGuardar }: { actual: AlimentacionEstandar; onG
               />
               <span className="w-5 shrink-0 text-xs text-slate-500">kg</span>
             </label>
+            <div className="flex flex-wrap items-center gap-1.5 px-3.5 pt-1.5">
+              {unidos[clave].map((c) => (
+                <span
+                  key={c}
+                  className="inline-flex max-w-full items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-800 ring-1 ring-sky-200"
+                  title={nombreDe(c)}
+                >
+                  <span className="tabular-nums">{c}</span>
+                  {nombreDe(c) ? <span className="truncate font-normal text-sky-700/80">{nombreDe(c)}</span> : <span className="font-normal text-amber-700">sin producto</span>}
+                </span>
+              ))}
+              <button
+                type="button"
+                onClick={() => setEligiendo((e) => (e === clave ? null : clave))}
+                aria-expanded={eligiendo === clave}
+                className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-sky-700 border border-dashed border-sky-300 active:bg-sky-50"
+              >
+                {eligiendo === clave ? "Listo" : unidos[clave].length ? "Cambiar productos" : "+ Unir productos"}
+              </button>
+            </div>
+            {eligiendo === clave && (
+              <div className="mx-3.5 mt-2 rounded-xl bg-slate-50 p-2 ring-1 ring-slate-100">
+                {catalogo.length === 0 ? (
+                  <p className="px-1 py-1 text-xs text-slate-500">No hay productos con código. Asígnales un código en Productos de bodega.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {catalogo.map(([c, nombre]) => {
+                      const activo = unidos[clave].includes(c);
+                      return (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => alternarCodigo(clave, c)}
+                          aria-pressed={activo}
+                          className={`rounded-full px-2.5 py-1 text-xs ring-1 transition active:scale-95 ${
+                            activo ? "bg-sky-700 font-semibold text-white ring-sky-700" : "bg-white text-slate-700 ring-slate-200"
+                          }`}
+                        >
+                          <span className="font-semibold tabular-nums">{c}</span> · {nombre}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </li>
         ))}
         <li className="flex items-center justify-between bg-slate-50 px-3.5 py-2.5 text-sm">
