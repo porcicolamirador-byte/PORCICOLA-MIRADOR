@@ -278,17 +278,20 @@ async function restaurarDesdeNube(items: Pendiente[]) {
   ultimoError = "Algunos cambios no se guardaron en la nube porque tu usuario no tiene permiso.";
 }
 
+/** Milisegundos de una fecha de la nube (Safari no lee bien 6 decimales de segundo) */
+const ms = (iso: string) => new Date(iso.replace(/(\.\d{3})\d+/, "$1")).getTime();
+
 async function bajar() {
   const meta = leerMeta();
   let cursor = meta.cursor;
   for (;;) {
     // Se repasan 2 minutos hacia atrás por si algún cambio se guardó con una hora anterior
-    const desde = cursor ? new Date(new Date(cursor).getTime() - 120_000).toISOString() : null;
+    const desde = cursor ? new Date(ms(cursor) - 120_000).toISOString() : null;
     const filtro = desde ? `&actualizado_en=gte.${encodeURIComponent(desde)}` : "";
     const docs = await api<Documento[]>(`documentos?select=coleccion,id,datos,borrado,actualizado_en${filtro}&order=actualizado_en.asc&limit=1000`);
     aplicarDocumentos(docs);
     const ultimo = docs[docs.length - 1]?.actualizado_en ?? cursor;
-    const avanzo = !!ultimo && (!cursor || new Date(ultimo).getTime() > new Date(cursor).getTime());
+    const avanzo = !!ultimo && (!cursor || ms(ultimo) > ms(cursor));
     if (avanzo) cursor = ultimo;
     guardarMeta({ ...leerMeta(), cursor });
     if (docs.length < 1000 || !avanzo) break;
