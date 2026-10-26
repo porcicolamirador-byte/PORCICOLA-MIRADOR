@@ -95,7 +95,7 @@ export default function CatalogoProductos({ incrustado = false }: { incrustado?:
         </div>
       ) : (
       <div className="mb-3 flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-lg" aria-hidden="true">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-lg" aria-hidden="true">
           📦
         </span>
         <div className="min-w-0 flex-1">

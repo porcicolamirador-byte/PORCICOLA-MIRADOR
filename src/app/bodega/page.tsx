@@ -162,7 +162,7 @@ export default function BodegaPage() {
                       onClick={() => setFacturaSel(f.id)}
                       className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left transition hover:bg-slate-50 active:bg-slate-100"
                     >
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-50 text-base" aria-hidden="true">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sky-50 text-base" aria-hidden="true">
                         🧾
                       </span>
                       <span className="min-w-0 flex-1">
@@ -218,7 +218,7 @@ export default function BodegaPage() {
                             }`}
                           >
                             <div className="flex items-start justify-between gap-2">
-                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-xl">
+                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-xl">
                                 <IconoCategoria categoria={p.categoria} className="h-6 w-6 text-xl" />
                               </span>
                               <Insignia clase={estado.c}>{estado.t}</Insignia>
@@ -488,9 +488,9 @@ function NuevaFactura({
           <Entrada value={nota} onChange={setNota} placeholder="Opcional" />
         </Campo>
 
-        <div className="flex items-center justify-between rounded-2xl bg-teal-50 px-4 py-3 ring-1 ring-teal-100">
-          <span className="text-sm font-medium text-teal-900">Total de la factura</span>
-          <span className="text-lg font-bold text-teal-900 tabular-nums">{formatoPesos(total)}</span>
+        <div className="flex items-center justify-between rounded-2xl bg-sky-50 px-4 py-3 ring-1 ring-sky-100">
+          <span className="text-sm font-medium text-sky-900">Total de la factura</span>
+          <span className="text-lg font-bold text-sky-900 tabular-nums">{formatoPesos(total)}</span>
         </div>
         <label className="flex items-center gap-2 text-sm text-slate-700">
           <input type="checkbox" checked={comoGasto} onChange={(e) => setComoGasto(e.target.checked)} className="h-5 w-5 accent-sky-700" />
@@ -556,7 +556,7 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
     <Hoja abierta titulo={salida ? "Registrar salida" : p.nombre} onCerrar={salida ? volver : onCerrar}>
       {!salida ? (
         <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-3 rounded-2xl bg-teal-50/70 p-4 ring-1 ring-teal-100">
+          <div className="flex items-center gap-3 rounded-2xl bg-sky-50/70 p-4 ring-1 ring-sky-100">
             <IconoCategoria categoria={p.categoria} className="h-12 w-12 shrink-0 text-3xl" />
             <div className="min-w-0 flex-1">
               <p className="text-xs text-slate-500">{p.categoria} · existencia</p>
@@ -733,9 +733,9 @@ function DetalleFactura({ factura: f, productos, onCerrar }: { factura: Factura;
             );
           })}
         </ul>
-        <div className="flex items-center justify-between rounded-2xl bg-teal-50 px-4 py-3 ring-1 ring-teal-100">
-          <span className="text-sm font-medium text-teal-900">Total</span>
-          <span className="text-lg font-bold text-teal-900 tabular-nums">{formatoPesos(totalFactura(f))}</span>
+        <div className="flex items-center justify-between rounded-2xl bg-sky-50 px-4 py-3 ring-1 ring-sky-100">
+          <span className="text-sm font-medium text-sky-900">Total</span>
+          <span className="text-lg font-bold text-sky-900 tabular-nums">{formatoPesos(totalFactura(f))}</span>
         </div>
         {f.movimientoId && <p className="text-center text-xs text-slate-500">Registrada como gasto en Contabilidad.</p>}
         <button type="button" onClick={eliminar} className="self-center rounded-full px-4 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50">
