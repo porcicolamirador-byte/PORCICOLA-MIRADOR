@@ -235,7 +235,7 @@ export function tomarCodigoLote(): string {
   return formatoCodigoLote(n);
 }
 
-/** Nombre para mostrar: "LP-03" o "LP-03 · Camada P-12" */
+/** Nombre para mostrar: "LP-03" o "LP-03 · Lote P-12" */
 export function nombreLote(l: Pick<Lote, "codigo" | "nombre">): string {
   const nombre = (l.nombre ?? "").trim();
   if (!l.codigo) return nombre || "Lote";
@@ -264,7 +264,7 @@ function leerLotesSinCodigo(): Lote[] {
   return leer<Partial<Lote>[]>(CLAVES.lotes, []).map((l) => ({
     id: l.id ?? nuevoId(),
     codigo: typeof l.codigo === "string" && l.codigo ? l.codigo : undefined,
-    nombre: l.nombre ?? "Lote",
+    nombre: l.origen && l.nombre?.startsWith("Camada ") ? `Lote ${l.nombre.slice(7)}` : (l.nombre ?? "Lote"),
     fechaIngreso: l.fechaIngreso ?? hoy(),
     cantidadInicial: Number(l.cantidadInicial) || Number(l.vivos) || 0,
     vivos: Number(l.vivos) || 0,
@@ -302,7 +302,7 @@ export function crearLoteDesdeParto(datos: {
   const lote: Lote = {
     id: nuevoId(),
     codigo: tomarCodigoLote(),
-    nombre: `Camada ${datos.codigoParto}`,
+    nombre: `Lote ${datos.codigoParto}`,
     fechaIngreso: datos.fecha,
     cantidadInicial: vivos,
     vivos,

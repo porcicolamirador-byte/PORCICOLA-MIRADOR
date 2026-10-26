@@ -239,7 +239,7 @@ export default function RegistrarParto() {
             </p>
             {(aNumero(vivos) ?? 0) > 0 && (
               <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-100">
-                🐷 Al guardar se creará en <b>Engorde</b> el lote <b>Camada {codigoParto}</b> con{" "}
+                🐷 Al guardar se creará en <b>Engorde</b> el lote <b>Lote {codigoParto}</b> con{" "}
                 <b>{aNumero(vivos)}</b> {aNumero(vivos) === 1 ? "lechón" : "lechones"}.
               </p>
             )}
