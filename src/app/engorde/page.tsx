@@ -122,7 +122,12 @@ export default function EngordePage() {
                       )}
                       </div>
                     </div>
-                    <span className="text-xs text-slate-500">Día {r.dias}</span>
+                    <span className="shrink-0 text-right text-xs leading-tight text-slate-500">
+                      <span className="block text-[10px] uppercase tracking-wide text-slate-400">{l.origen ? "Edad" : "En el lote"}</span>
+                      <span className="font-semibold tabular-nums text-slate-700">
+                        {textoEdad(edadMesesDias(l.fechaIngreso, l.activo ? hoy() : l.fechaSalida || hoy()))}
+                      </span>
+                    </span>
                   </div>
                   <div className="mt-3 grid grid-cols-3 gap-2 text-center">
                     <Mini titulo="Animales" valor={`${l.vivos}/${l.cantidadInicial}`} />
