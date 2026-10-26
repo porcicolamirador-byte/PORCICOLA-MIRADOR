@@ -1068,15 +1068,7 @@ export default function CerdaDetalle() {
             className="info-hoja relative flex max-h-full w-full max-w-md flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl"
           >
             {/* Encabezado con el arete */}
-            <div className="relative overflow-hidden bg-emerald-900 px-5 pb-5 pt-5 text-white">
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0 opacity-60"
-                style={{
-                  backgroundImage:
-                    "repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 10px, transparent 10px 26px)",
-                }}
-              />
+            <div className="relative overflow-hidden bg-sky-900 px-5 pb-5 pt-5 text-white">
               <button
                 type="button"
                 onClick={() => setMostrarInfo(false)}
@@ -1095,7 +1087,7 @@ export default function CerdaDetalle() {
                   <span className="truncate text-2xl font-black tabular-nums text-amber-950">{cerda.id}</span>
                 </div>
                 <div className="min-w-0 pr-8">
-                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-emerald-200/90">Ficha de la cerda</p>
+                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-sky-200/90">Ficha de la cerda</p>
                   <p className="mt-0.5 truncate text-xl font-bold">{cerda.raza || "Sin raza"}</p>
                   <span className={`mt-1.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold ${estadoColor}`}>
                     <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />

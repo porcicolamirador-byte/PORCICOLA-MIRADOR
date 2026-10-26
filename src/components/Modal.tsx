@@ -62,15 +62,7 @@ export default function Modal({
       />
 
       <div className="modal-caja relative flex max-h-full w-full min-w-0 max-w-md flex-col overflow-hidden rounded-[28px] bg-white text-slate-900 shadow-2xl">
-        <div className="relative shrink-0 overflow-hidden bg-emerald-900 px-5 py-5 text-white">
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 opacity-60"
-            style={{
-              backgroundImage:
-                "repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 10px, transparent 10px 26px)",
-            }}
-          />
+        <div className="relative shrink-0 overflow-hidden bg-sky-900 px-5 py-5 text-white">
           <button
             type="button"
             onClick={onCerrar}
@@ -88,9 +80,9 @@ export default function Modal({
               </span>
             )}
             <div className="min-w-0">
-              {etiqueta && <p className="text-xs font-medium uppercase tracking-[0.18em] text-emerald-200/90">{etiqueta}</p>}
+              {etiqueta && <p className="text-xs font-medium uppercase tracking-[0.18em] text-sky-200/90">{etiqueta}</p>}
               <p className="mt-0.5 truncate text-xl font-bold">{titulo}</p>
-              {subtitulo && <p className="truncate text-xs text-emerald-100/90">{subtitulo}</p>}
+              {subtitulo && <p className="truncate text-xs text-sky-100/90">{subtitulo}</p>}
             </div>
           </div>
         </div>

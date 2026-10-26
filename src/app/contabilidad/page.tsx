@@ -93,7 +93,7 @@ export default function ContabilidadPage() {
         <Dato titulo="Gastos" valor={datos ? formatoPesos(datos.gastos) : "–"} />
       </div>
       <div
-        className={`rounded-2xl px-4 py-3 ${balance >= 0 ? "bg-emerald-900 text-white" : "bg-rose-600 text-white"}`}
+        className={`rounded-2xl px-4 py-3 ${balance >= 0 ? "bg-sky-900 text-white" : "bg-rose-600 text-white"}`}
       >
         <p className="text-xs opacity-80">Balance del mes</p>
         <p className="text-2xl font-semibold tabular-nums">{datos ? formatoPesos(balance) : "–"}</p>

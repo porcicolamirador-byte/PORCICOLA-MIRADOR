@@ -327,3 +327,6 @@ html.oscuro .celda-ios { background-color: #2c2c2e; }
 html.oscuro .celda-ios > * + * { border-color: #3a3a3c; }
 html.oscuro .campo-ios { color: #d1d1d6; }
 html.oscuro .campo-ios::placeholder { color: #636366; }
+
+/* Azul petróleo: texto del botón "Ver" en modo oscuro */
+html.oscuro .text-sky-900 { color: #bae6fd; }

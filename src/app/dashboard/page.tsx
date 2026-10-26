@@ -280,16 +280,8 @@ export default function Dashboard() {
         {/* Parte del día: compacto, una sola franja */}
         <section
           aria-label="Estado del día"
-          className="relative flex items-center gap-3 overflow-hidden rounded-2xl bg-emerald-900 px-4 py-3 text-white shadow-md"
+          className="relative flex items-center gap-3 overflow-hidden rounded-2xl bg-sky-900 px-4 py-3 text-white shadow-md"
         >
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0"
-            style={{
-              backgroundImage:
-                "repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 10px, transparent 10px 26px)",
-            }}
-          />
 
           <span
             aria-hidden="true"
@@ -306,7 +298,7 @@ export default function Dashboard() {
                 ? `${pendientes === 1 ? "Tarea pendiente" : "Tareas pendientes"}`
                 : "Todo al día"}
             </p>
-            <p className="truncate text-xs text-emerald-100/90">
+            <p className="truncate text-xs text-sky-100/90">
               {hayCriticas
                 ? `${cerdasCriticas.length} ${cerdasCriticas.length === 1 ? "urgente" : "urgentes"} · ${saludo}`
                 : pendientes > 0
@@ -319,7 +311,7 @@ export default function Dashboard() {
             <button
               type="button"
               onClick={() => router.push("/tareas")}
-              className="relative shrink-0 rounded-full bg-white px-3.5 py-1.5 text-xs font-semibold text-emerald-900 transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-emerald-900"
+              className="relative shrink-0 rounded-full bg-white px-3.5 py-1.5 text-xs font-semibold text-sky-900 transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-sky-900"
             >
               Ver
             </button>
