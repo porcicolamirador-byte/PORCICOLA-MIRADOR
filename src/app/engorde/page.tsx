@@ -199,6 +199,7 @@ function colorAvance(porcentaje: number) {
 }
 
 function ConsumoEstablecido({ lote }: { lote: Lote }) {
+  const [verEtapas, setVerEtapas] = useState(false);
   const c = consumoEstablecido(lote);
   if (c.estandar <= 0) return null;
   // El porcentaje sigue subiendo después del 100 %; la barra se llena hasta el tope
@@ -229,7 +230,23 @@ function ConsumoEstablecido({ lote }: { lote: Lote }) {
             : `Completado del total · faltan ${fmtBultos(c.estandar - c.consumido)}`}
       </p>
 
-      <ul className="mt-3 flex flex-col gap-2.5">
+      <button
+        type="button"
+        onClick={() => setVerEtapas((v) => !v)}
+        aria-expanded={verEtapas}
+        className="mt-3 flex w-full items-center gap-2 rounded-xl bg-slate-50 px-3 py-2.5 text-left active:bg-slate-100"
+      >
+        <span className="min-w-0 flex-1 text-sm font-semibold text-slate-800">Alimento por etapa</span>
+        {c.actual && !verEtapas && (
+          <span className="shrink-0 truncate text-xs text-slate-500">Actual: {c.etapas.find((e) => e.clave === c.actual)?.nombre}</span>
+        )}
+        <svg viewBox="0 0 20 20" className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${verEtapas ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M5 8l5 5 5-5" />
+        </svg>
+      </button>
+
+      {verEtapas && (
+      <ul className="mt-2 flex flex-col gap-2.5">
         {c.etapas.map((e) => {
           const actual = e.clave === c.actual;
           const avance = pct(e.consumido, e.estandar);
@@ -260,6 +277,7 @@ function ConsumoEstablecido({ lote }: { lote: Lote }) {
           );
         })}
       </ul>
+      )}
       {c.sinEtapa > 0 && (
         <p className="mt-2 text-xs text-slate-500">{fmtBultos(c.sinEtapa)} registrados con productos que no están unidos a ninguna etapa.</p>
       )}
