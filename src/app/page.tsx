@@ -69,17 +69,6 @@ export default function Home() {
           </p>
         </section>
 
-        {/* Surcos del campo, como en el logo */}
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 400 120"
-          preserveAspectRatio="none"
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-28 w-full"
-        >
-          <path d="M0 70 C120 40 260 40 400 62 L400 120 L0 120 Z" fill="#ecfdf5" />
-          <path d="M0 92 C140 66 270 70 400 86 L400 120 L0 120 Z" fill="#d1fae5" />
-          <path d="M0 110 C150 92 280 96 400 106 L400 120 L0 120 Z" fill="#a7f3d0" opacity="0.7" />
-        </svg>
       </div>
 
       <style>{`
