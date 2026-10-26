@@ -32,7 +32,7 @@ export default function ModuloPage({
 }: {
   titulo: string;
   subtitulo?: string;
-  icono?: string;
+  icono?: ReactNode;
   tono?: keyof typeof TONOS;
   accion?: ReactNode;
   volverA?: string;

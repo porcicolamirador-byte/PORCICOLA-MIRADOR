@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Boton, Interruptor } from "@/components/ui";
@@ -25,20 +25,41 @@ import { activarFaceId, desactivarFaceId, faceIdActivo, faceIdDisponible } from 
  * Sección oculta de ajustes: solo se abre después de ingresar el código
  * en Ajustes. Sin código válido, regresa a Ajustes.
  */
+const sinSuscripcion = () => () => {};
+
+function leerFaceIdDisponible(): boolean {
+  try {
+    return localStorage.getItem("faceid-disponible") === "1";
+  } catch {
+    return false;
+  }
+}
+
 export default function AjustesAvanzadosPage() {
   const router = useRouter();
-  const [permitido, setPermitido] = useState<boolean | null>(null);
-  const [config, setConfig] = useState<ConfigGranja>(CONFIG_POR_DEFECTO);
+  // En el cliente el permiso y la configuración se leen al instante (sin pantalla intermedia)
+  const cliente = useSyncExternalStore(sinSuscripcion, () => true, () => false);
+  const permitido = cliente && ajustesDesbloqueados();
+  const [config, setConfig] = useState<ConfigGranja>(() => (typeof window === "undefined" ? CONFIG_POR_DEFECTO : leerConfig()));
   const [abierto, setAbierto] = useState<string | null>(null);
   const alternar = (id: string) => setAbierto((a) => (a === id ? null : id));
   const version = useVersionDatos();
-  const productos = version < 0 ? 0 : leerProductos().length;
-  const corrales = version < 0 ? 0 : leerCorrales().length;
-  const [faceId, setFaceId] = useState<{ disponible: boolean; activo: boolean; ofrecer: boolean }>({ disponible: false, activo: false, ofrecer: false });
+  void version; // vuelve a leer al cambiar los datos
+  const productos = cliente ? leerProductos().length : 0;
+  const corrales = cliente ? leerCorrales().length : 0;
+  // Se parte de lo último que se supo de Face ID en este teléfono, para que nada salte al abrir
+  const [faceId, setFaceId] = useState<{ disponible: boolean; activo: boolean; ofrecer: boolean }>(() => {
+    if (typeof window === "undefined") return { disponible: false, activo: false, ofrecer: false };
+    const disponible = leerFaceIdDisponible();
+    return { disponible, activo: faceIdActivo(), ofrecer: disponible && !faceIdActivo() };
+  });
 
   useEffect(() => {
     faceIdDisponible().then((disponible) => {
-      setFaceId({ disponible, activo: faceIdActivo(), ofrecer: disponible && !faceIdActivo() });
+      try {
+        localStorage.setItem("faceid-disponible", disponible ? "1" : "0");
+      } catch {}
+      setFaceId((f) => ({ disponible, activo: faceIdActivo(), ofrecer: disponible && !faceIdActivo() && (f.ofrecer || !f.disponible) }));
     });
   }, []);
 
@@ -66,10 +87,7 @@ export default function AjustesAvanzadosPage() {
   };
 
   useEffect(() => {
-    const ok = ajustesDesbloqueados();
-    setPermitido(ok);
-    if (ok) setConfig(leerConfig());
-    else router.replace("/ajustes");
+    if (!ajustesDesbloqueados()) router.replace("/ajustes");
   }, [router]);
 
   const borrarTodo = async () => {
@@ -93,8 +111,8 @@ export default function AjustesAvanzadosPage() {
 
   if (!permitido) {
     return (
-      <ModuloPage titulo="Ajustes" subtitulo="Sección protegida" icono="🔒" tono="slate" volverA="/ajustes">
-        <div className="h-40 animate-pulse rounded-3xl bg-slate-100" />
+      <ModuloPage titulo="Ajustes avanzados" subtitulo="Sección protegida con código" icono={<IconoAjuste nombre="candado" className="h-5 w-5" />} tono="slate" volverA="/ajustes">
+        {null}
       </ModuloPage>
     );
   }
@@ -103,7 +121,7 @@ export default function AjustesAvanzadosPage() {
     <ModuloPage
       titulo="Ajustes avanzados"
       subtitulo="Sección protegida con código"
-      icono="🔓"
+      icono={<IconoAjuste nombre="candado" className="h-5 w-5" />}
       tono="slate"
       volverA="/ajustes"
       accion={
@@ -128,8 +146,8 @@ export default function AjustesAvanzadosPage() {
       <Grupo titulo="Acceso">
         <li>
           <label className={`flex w-full items-center gap-3 px-4 py-3 ${faceId.disponible ? "cursor-pointer" : "opacity-50"}`}>
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-base" aria-hidden="true">
-              🙂
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700" aria-hidden="true">
+              <IconoAjuste nombre="faceid" />
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-[15px] font-medium text-slate-900">Entrar con Face ID</span>
@@ -145,7 +163,7 @@ export default function AjustesAvanzadosPage() {
       </Grupo>
 
       <Grupo titulo="Claves">
-        <Desplegable icono="🔐" titulo="Clave de ajustes" resumen={config.claveAjustesActiva ? "Activa" : "Solo la primera vez"} abierto={abierto === "ajustes"} onAlternar={() => alternar("ajustes")}>
+        <Desplegable icono="llave" titulo="Clave de ajustes" resumen={config.claveAjustesActiva ? "Activa" : "Solo la primera vez"} abierto={abierto === "ajustes"} onAlternar={() => alternar("ajustes")}>
           <ActivarClave
             activa={config.claveAjustesActiva}
             donde="al entrar a los ajustes protegidos"
@@ -160,7 +178,7 @@ export default function AjustesAvanzadosPage() {
             onGuardar={(clave) => guardar({ claveAjustes: clave })}
           />
         </Desplegable>
-        <Desplegable icono="🗑️" titulo="Clave de eliminación" resumen={config.claveEliminarActiva ? "Activa" : "Desactivada"} abierto={abierto === "eliminar"} onAlternar={() => alternar("eliminar")}>
+        <Desplegable icono="papelera" titulo="Clave de eliminación" resumen={config.claveEliminarActiva ? "Activa" : "Desactivada"} abierto={abierto === "eliminar"} onAlternar={() => alternar("eliminar")}>
           <ActivarClave
             activa={config.claveEliminarActiva}
             donde="Gestación al eliminar una cerda"
@@ -174,7 +192,7 @@ export default function AjustesAvanzadosPage() {
             onGuardar={(clave) => guardar({ claveEliminar: clave })}
           />
         </Desplegable>
-        <Desplegable icono="🧾" titulo="Clave de facturas" resumen={config.claveFacturasActiva ? "Activa" : "Desactivada"} abierto={abierto === "facturas"} onAlternar={() => alternar("facturas")}>
+        <Desplegable icono="factura" titulo="Clave de facturas" resumen={config.claveFacturasActiva ? "Activa" : "Desactivada"} abierto={abierto === "facturas"} onAlternar={() => alternar("facturas")}>
           <ActivarClave
             activa={config.claveFacturasActiva}
             donde="Bodega al cargar una factura"
@@ -188,7 +206,7 @@ export default function AjustesAvanzadosPage() {
             onGuardar={(clave) => guardar({ claveFacturas: clave })}
           />
         </Desplegable>
-        <Desplegable icono="🐷" titulo="Clave de lotes" resumen={config.claveLotesActiva ? "Activa" : "Desactivada"} abierto={abierto === "lotes"} onAlternar={() => alternar("lotes")}>
+        <Desplegable icono="lote" titulo="Clave de lotes" resumen={config.claveLotesActiva ? "Activa" : "Desactivada"} abierto={abierto === "lotes"} onAlternar={() => alternar("lotes")}>
           <ActivarClave
             activa={config.claveLotesActiva}
             donde="Engorde al eliminar un lote"
@@ -207,7 +225,7 @@ export default function AjustesAvanzadosPage() {
 
       <Grupo titulo="Granja">
         <Desplegable
-          icono="🍼"
+          icono="destete"
           titulo="Días de destete"
           resumen={`${config.desteteMin} a ${config.desteteMax} d`}
           abierto={abierto === "destete"}
@@ -216,7 +234,7 @@ export default function AjustesAvanzadosPage() {
           <DiasDestete min={config.desteteMin} max={config.desteteMax} onGuardar={(min, max) => guardar({ desteteMin: min, desteteMax: max })} />
         </Desplegable>
         <Desplegable
-          icono="🏠"
+          icono="paridera"
           titulo="Parideras"
           resumen={config.parideras ? String(config.parideras) : "Sin definir"}
           abierto={abierto === "parideras"}
@@ -225,7 +243,7 @@ export default function AjustesAvanzadosPage() {
           <Parideras actual={config.parideras} onGuardar={(n) => guardar({ parideras: n })} />
         </Desplegable>
         <Desplegable
-          icono="🥣"
+          icono="alimento"
           titulo="Alimentación estándar"
           resumen={`${ETAPAS_ALIMENTACION.length} etapas`}
           abierto={abierto === "alimentacion"}
@@ -238,7 +256,7 @@ export default function AjustesAvanzadosPage() {
           />
         </Desplegable>
         <Desplegable
-          icono="🏚️"
+          icono="corral"
           titulo="Corrales"
           resumen={corrales ? String(corrales) : "Ninguno"}
           abierto={abierto === "corrales"}
@@ -251,8 +269,8 @@ export default function AjustesAvanzadosPage() {
       <Grupo titulo="Bodega">
         <li>
           <label className="flex w-full cursor-pointer items-center gap-3 px-4 py-3">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-base" aria-hidden="true">
-              📉
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700" aria-hidden="true">
+              <IconoAjuste nombre="inventario" />
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-[15px] font-medium text-slate-900">Usar productos sin inventario</span>
@@ -263,7 +281,7 @@ export default function AjustesAvanzadosPage() {
             <Interruptor activo={config.permitirSinInventario} onCambiar={(v) => guardar({ permitirSinInventario: v })} />
           </label>
         </li>
-        <Desplegable icono="📦" titulo="Productos de bodega" resumen={`${productos}`} abierto={abierto === "productos"} onAlternar={() => alternar("productos")}>
+        <Desplegable icono="productos" titulo="Productos de bodega" resumen={`${productos}`} abierto={abierto === "productos"} onAlternar={() => alternar("productos")}>
           <CatalogoProductos incrustado />
         </Desplegable>
       </Grupo>
@@ -271,8 +289,8 @@ export default function AjustesAvanzadosPage() {
       <Grupo titulo="Datos">
         <li>
           <button type="button" onClick={borrarTodo} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-rose-50">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-base" aria-hidden="true">
-              🗑️
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-600" aria-hidden="true">
+              <IconoAjuste nombre="papelera" />
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-[15px] font-medium text-rose-600">Borrar todos los datos</span>
@@ -297,6 +315,82 @@ function Encabezado(_props: { icono?: string; titulo?: string; descripcion: stri
 }
 
 /** Fila que se despliega al tocarla; solo una abierta a la vez */
+/** Iconos de línea gris (mismo estilo que el Dashboard) */
+const TRAZOS_AJUSTES = {
+  faceid: (
+    <>
+      <path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2" />
+      <path d="M9 9.5v1M15 9.5v1M12 9.5V13h-1M9.5 16a3.5 3.5 0 0 0 5 0" />
+    </>
+  ),
+  llave: (
+    <>
+      <circle cx="7.5" cy="15.5" r="3.5" />
+      <path d="m10 13 9-9M16 7l2 2M14 9l2 2" />
+    </>
+  ),
+  papelera: <path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />,
+  factura: (
+    <>
+      <path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" />
+      <path d="M9 8h6M9 12h6M9 16h3" />
+    </>
+  ),
+  lote: (
+    <>
+      <path d="M6 7h12l2 13H4z" />
+      <path d="M9 7a3 3 0 0 1 6 0" />
+      <path d="M12 12v3l1.5 1" />
+    </>
+  ),
+  destete: (
+    <>
+      <path d="M9 3h6M10 3v3L8 9v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V9l-2-3V3" />
+      <path d="M8 13h8" />
+    </>
+  ),
+  paridera: (
+    <>
+      <path d="m3 11 9-7 9 7M5 10v10h14V10" />
+      <path d="M10 20v-5h4v5" />
+    </>
+  ),
+  alimento: (
+    <>
+      <path d="M3 11h18a9 9 0 0 1-18 0z" />
+      <path d="M8 7c0-1 1-2 1-3M12 7c0-1 1-2 1-3M16 7c0-1 1-2 1-3" />
+    </>
+  ),
+  corral: <path d="M4 21V7l2-3 2 3v14M16 21V7l2-3 2 3v14M8 10h8M8 16h8" />,
+  inventario: (
+    <>
+      <path d="m3 7 6 6 4-4 8 8" />
+      <path d="M21 11v6h-6" />
+    </>
+  ),
+  productos: (
+    <>
+      <path d="M21 8 12 3 3 8v8l9 5 9-5z" />
+      <path d="m3 8 9 5 9-5M12 13v8" />
+    </>
+  ),
+  candado: (
+    <>
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </>
+  ),
+} satisfies Record<string, ReactNode>;
+type NombreIcono = keyof typeof TRAZOS_AJUSTES;
+
+function IconoAjuste({ nombre, className = "h-[18px] w-[18px]" }: { nombre: NombreIcono; className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {TRAZOS_AJUSTES[nombre]}
+    </svg>
+  );
+}
+
 function Desplegable({
   icono,
   titulo,
@@ -305,7 +399,7 @@ function Desplegable({
   onAlternar,
   children,
 }: {
-  icono: string;
+  icono: NombreIcono;
   titulo: string;
   resumen: string;
   abierto: boolean;
@@ -320,8 +414,8 @@ function Desplegable({
         aria-expanded={abierto}
         className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-50"
       >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-base" aria-hidden="true">
-          {icono}
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700" aria-hidden="true">
+          <IconoAjuste nombre={icono} />
         </span>
         <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-slate-900">{titulo}</span>
         <span className="shrink-0 text-sm text-slate-500">{resumen}</span>
