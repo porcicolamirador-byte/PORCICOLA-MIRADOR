@@ -101,7 +101,7 @@ create table public.registro_actividad (
   accion text not null check (accion in ('Creación', 'Modificación', 'Eliminación', 'Sistema')),
   modulo text not null,
   detalle text not null,
-  usuario_id uuid references public.perfiles (id) on delete set null default auth.uid(),
+  usuario_id uuid references public.perfiles (id) on delete set null,
   recibido_en timestamptz not null default now()
 );
 create index registro_actividad_fecha_idx on public.registro_actividad (fecha desc);
@@ -149,9 +149,9 @@ create policy "usuarios activos agregan al registro" on public.registro_activida
 revoke all on public.perfiles from anon;
 revoke all on public.documentos from anon;
 revoke all on public.registro_actividad from anon;
-revoke insert, update, delete on public.perfiles from authenticated;
-revoke delete on public.documentos from authenticated;
-revoke update, delete on public.registro_actividad from authenticated;
+revoke insert, update, delete, truncate on public.perfiles from authenticated;
+revoke delete, truncate on public.documentos from authenticated;
+revoke update, delete, truncate on public.registro_actividad from authenticated;
 
 -- ───────────── Secreto para derivar la contraseña del PIN ─────────────
 -- La contraseña real de cada usuario es un HMAC del PIN con este secreto, así

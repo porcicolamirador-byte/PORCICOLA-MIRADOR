@@ -8,7 +8,7 @@
  */
 
 export const NUBE_URL = "https://nfcroczfghddbndwgbab.supabase.co";
-export const NUBE_LLAVE = "__LLAVE_PUBLICABLE__";
+export const NUBE_LLAVE = "sb_publishable_vtvrwisDhsm2Vj2vdFhMEw_iHlHZIFu";
 
 const CLAVE_SESION = "nube-sesion";
 const CLAVE_PERFIL = "nube-perfil";
