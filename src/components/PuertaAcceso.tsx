@@ -112,8 +112,9 @@ function Marco({ children }: { children: ReactNode }) {
       style={{ paddingTop: "max(env(safe-area-inset-top), 24px)", paddingBottom: "max(env(safe-area-inset-bottom), 20px)" }}
     >
       <div className="mx-auto flex w-full max-w-sm flex-1 flex-col px-6">
-        <div className="mx-auto mt-6 flex h-24 w-24 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-slate-200">
-          <Image src="/images/logo.png" alt="El Mirador" width={1254} height={1254} priority className="h-auto w-20" />
+        {/* Círculo siempre blanco (también en modo oscuro) para que el logo se vea */}
+        <div className="logo-caja mx-auto mt-6 flex h-32 w-32 items-center justify-center overflow-hidden rounded-full bg-white shadow-lg">
+          <Image src="/images/logo.png" alt="El Mirador" width={1254} height={1254} priority className="h-auto w-[104px]" />
         </div>
         {children}
       </div>
