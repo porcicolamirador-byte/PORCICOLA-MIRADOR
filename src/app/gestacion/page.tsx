@@ -4,9 +4,10 @@ import { borrarConRegistro, guardarConRegistro } from "@/lib/log";
 import { useEffect, useMemo, useState, type TouchEvent } from "react";
 import { useRouter } from "next/navigation";
 import PageShell from "@/components/PageShell";
-import { confirmar } from "@/components/Dialogo";
+import { avisar, confirmar } from "@/components/Dialogo";
+import { puede } from "@/lib/nube";
 import { leerConfig } from "@/lib/config";
-import { eliminarLotesDePartos } from "@/lib/datos";
+import { eliminarLotesDePartos, useVersionDatos } from "@/lib/datos";
 
 const ESTADOS = [
   "Todos",
@@ -112,12 +113,12 @@ export default function Gestacion() {
     return Math.max(0, DIAS_GESTACION - diasDesde);
   }
 
+  const versionDatos = useVersionDatos();
   useEffect(() => {
     const datos = JSON.parse(localStorage.getItem("cerdas") || "[]");
-
     setCerdas(datos);
-    setEstadoFiltro("Todos");
-  }, []);
+  }, [versionDatos]);
+  useEffect(() => setEstadoFiltro("Todos"), []);
 
   // CERRAR MENÚ AL TOCAR FUERA
   useEffect(() => {
@@ -156,6 +157,11 @@ export default function Gestacion() {
   }
 
   function eliminarCerda(index: number) {
+    if (!puede("eliminar")) {
+      setMenuIndex(null);
+      void avisar({ titulo: "Sin permiso", mensaje: "Tu usuario no tiene permiso para eliminar. Pídeselo al administrador." });
+      return;
+    }
     setConfirmDeleteIndex(index);
     setMenuIndex(null);
   }

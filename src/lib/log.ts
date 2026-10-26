@@ -5,6 +5,8 @@
  * así que cualquier pantalla que guarde datos queda registrada.
  */
 
+import { capturarCambio, prepararHistorial } from "@/lib/sincronizar";
+
 export type AccionLog = "Creación" | "Modificación" | "Eliminación" | "Sistema";
 
 export interface EntradaLog {
@@ -292,13 +294,19 @@ export function registrarCambio(clave: string, antes: unknown, despues: unknown)
 /** Guarda un valor en el almacenamiento y registra el cambio */
 export function guardarConRegistro(clave: string, valor: unknown) {
   const antes = leerCrudo(clave);
-  localStorage.setItem(clave, JSON.stringify(valor));
-  registrarCambio(clave, antes, valor);
+  // Cada registro del historial lleva su id para poder sincronizarlo por separado
+  const final = clave.startsWith("historial-") ? prepararHistorial(antes, valor) : valor;
+  localStorage.setItem(clave, JSON.stringify(final));
+  registrarCambio(clave, antes, final);
+  capturarCambio(clave, antes, final);
 }
 
 /** Borra una clave del almacenamiento y registra lo que se eliminó */
 export function borrarConRegistro(clave: string) {
   const antes = leerCrudo(clave);
   localStorage.removeItem(clave);
-  if (antes !== null) registrarCambio(clave, antes, Array.isArray(antes) ? [] : null);
+  if (antes !== null) {
+    registrarCambio(clave, antes, Array.isArray(antes) ? [] : null);
+    capturarCambio(clave, antes, Array.isArray(antes) ? [] : null);
+  }
 }

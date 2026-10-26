@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import usePageBackground from "@/hooks/usePageBackground";
 import { cargarLogoJpeg, entregarPdf, generarPdfFicha, type LogoJpeg } from "@/lib/pdfFicha";
 import { confirmar } from "@/components/Dialogo";
-import { eliminarLotesDePartos, lotesDeParto, nombreLote } from "@/lib/datos";
+import { eliminarLotesDePartos, lotesDeParto, nombreLote, useVersionDatos } from "@/lib/datos";
 import { leerConfig } from "@/lib/config";
 
 const DIAS_GESTACION = 114;
@@ -155,6 +155,7 @@ export default function CerdaDetalle() {
 
   const [cerda, setCerda] = useState<any>(null);
   const [registros, setRegistros] = useState<any[]>([]);
+  const versionDatos = useVersionDatos();
   const [mostrarForm, setMostrarForm] = useState(false);
   const [mostrarMenu, setMostrarMenu] = useState(false);
 
@@ -191,7 +192,7 @@ export default function CerdaDetalle() {
       ? hist.filter((registro: any) => registro.tipo !== "Aviso")
       : [];
     setRegistros(registrosLimpios);
-  }, [id]);
+  }, [id, versionDatos]);
 
   function guardar(nuevos: any[]) {
     setRegistros(nuevos);

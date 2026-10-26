@@ -185,6 +185,7 @@ function EditorUsuario({
         mensaje: "No podrá entrar a la app en ningún teléfono. Sus registros se conservan y puedes reactivarlo cuando quieras.",
         aceptar: "Desactivar",
         destructivo: true,
+        requiere: null,
       });
       if (!ok) return;
     }

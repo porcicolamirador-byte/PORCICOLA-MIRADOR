@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Boton, Campo, Chevron, Chips, Entrada, Hoja, IconoMas, Insignia, SeccionDesplegable, Selector, Vacio, EntradaPesos } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
+import { puede } from "@/lib/nube";
 import DialogoClave from "@/components/DialogoClave";
 import { leerConfig } from "@/lib/config";
 import Modal from "@/components/Modal";
@@ -40,6 +41,8 @@ import {
   horaActual,
   nombreLote,
 } from "@/lib/datos";
+const avisarSinPermisoBodega = () =>
+  avisar({ titulo: "Sin permiso", mensaje: "Tu usuario no tiene permiso para cargar facturas ni registrar salidas de bodega. Pídeselo al administrador." });
 
 const num = (v: string) => {
   const n = Number(String(v).replace(",", "."));
@@ -66,7 +69,11 @@ export default function BodegaPage() {
   const [nuevaFactura, setNuevaFactura] = useState(false);
   const [pedirClave, setPedirClave] = useState(false);
   // Si la clave de facturas está desactivada en ajustes, se abre directo
-  const abrirFactura = () => (leerConfig().claveFacturasActiva ? setPedirClave(true) : setNuevaFactura(true));
+  const abrirFactura = () => {
+    if (!puede("bodega")) return void avisarSinPermisoBodega();
+    if (leerConfig().claveFacturasActiva) setPedirClave(true);
+    else setNuevaFactura(true);
+  };
   const [productoSel, setProductoSel] = useState<string | null>(null);
   const [facturaSel, setFacturaSel] = useState<string | null>(null);
 
@@ -581,7 +588,7 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
               </p>
             </div>
           </div>
-          <Boton variante="secundario" onClick={() => setSalida(true)} disabled={!libre && disponible <= 0}>
+          <Boton variante="secundario" onClick={() => (puede("bodega") ? setSalida(true) : void avisarSinPermisoBodega())} disabled={!libre && disponible <= 0}>
             − Registrar salida (consumo)
           </Boton>
           <SeccionDesplegable titulo="Movimientos" cantidad={movimientos.length}>

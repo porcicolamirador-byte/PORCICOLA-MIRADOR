@@ -21,6 +21,7 @@ import {
 } from "@/lib/datos";
 import { avisar as mostrarAviso, confirmar } from "@/components/Dialogo";
 import { perfilGuardado, puede, type PerfilNube } from "@/lib/nube";
+import { EVENTO_SYNC, errorSync, estadoSync, leerMeta, pendientesPorSubir, reemplazarClave, sincronizar, type EstadoSync } from "@/lib/sincronizar";
 import { salirDeLaApp } from "@/components/PuertaAcceso";
 
 export default function AjustesPage() {
@@ -43,7 +44,7 @@ export default function AjustesPage() {
   useEffect(() => setPerfil(perfilGuardado()), []);
 
   const cerrarSesion = async () => {
-    if (!(await confirmar({ titulo: "Cerrar sesión", mensaje: "Para volver a entrar en este teléfono se pedirá tu usuario y tu PIN (con internet).", aceptar: "Cerrar sesión", destructivo: true }))) return;
+    if (!(await confirmar({ titulo: "Cerrar sesión", mensaje: "Para volver a entrar en este teléfono se pedirá tu usuario y tu PIN (con internet).", aceptar: "Cerrar sesión", destructivo: true, requiere: null }))) return;
     registrarLog([{ accion: "Sistema", modulo: "Sesión", detalle: "Cerró sesión en este teléfono" }]);
     salirDeLaApp();
   };
@@ -117,9 +118,10 @@ export default function AjustesPage() {
     try {
       const json = JSON.parse(await f.text()) as { app?: string; datos?: Record<string, unknown> };
       if (json.app !== "porcicola-mirador" || !json.datos) throw new Error("formato");
-      if (!(await confirmar({ titulo: "Restaurar respaldo", mensaje: "Se reemplazarán los datos actuales por los del respaldo.", aceptar: "Restaurar", destructivo: true }))) return;
-      for (const k of clavesDeLaApp()) localStorage.removeItem(k);
-      for (const [k, v] of Object.entries(json.datos)) localStorage.setItem(k, JSON.stringify(v));
+      if (!(await confirmar({ titulo: "Restaurar respaldo", mensaje: "Se reemplazarán los datos actuales por los del respaldo.", aceptar: "Restaurar", destructivo: true, requiere: "ajustes" }))) return;
+      // Se reemplaza aquí y en la nube (los demás teléfonos lo reciben al sincronizar)
+      for (const k of clavesDeLaApp()) if (!(k in json.datos)) reemplazarClave(k, null);
+      for (const [k, v] of Object.entries(json.datos)) reemplazarClave(k, v);
       registrarLog([{ accion: "Sistema", modulo: "Datos", detalle: `Respaldo restaurado: ${f.name}` }]);
       notificarCambio();
       avisar("Respaldo restaurado");
@@ -131,6 +133,7 @@ export default function AjustesPage() {
 
   return (
     <ModuloPage titulo="Ajustes" subtitulo="Respaldo de los datos" icono="⚙️" tono="slate">
+      {perfil && <EstadoNube />}
       {perfil && (
         <div className="flex items-center gap-3 rounded-3xl bg-white p-4 ring-1 ring-slate-200/80">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-100 text-base font-bold text-sky-800" aria-hidden="true">
@@ -149,7 +152,7 @@ export default function AjustesPage() {
       )}
       <Tarjeta titulo="Datos">
         <p className="mb-3 text-sm text-slate-500">
-          Los datos se guardan solo en este dispositivo
+          Los datos se guardan en este teléfono y en la nube
           {resumen ? ` · ${resumen.cerdas} cerdas, ${resumen.lotes} lotes, ${resumen.movimientos} movimientos` : ""}.
           Exporta un respaldo con frecuencia.
         </p>
@@ -228,5 +231,65 @@ export default function AjustesPage() {
         </div>
       )}
     </ModuloPage>
+  );
+}
+
+const TEXTO_ESTADO: Record<EstadoSync, { t: string; c: string }> = {
+  "al-dia": { t: "Sincronizado", c: "bg-sky-500" },
+  sincronizando: { t: "Sincronizando…", c: "bg-sky-400 animate-pulse" },
+  pendiente: { t: "Cambios por subir", c: "bg-orange-500" },
+  "sin-conexion": { t: "Sin conexión: se guardará al volver internet", c: "bg-slate-400" },
+  error: { t: "No se pudo sincronizar", c: "bg-red-500" },
+  "sin-sesion": { t: "Sin sesión", c: "bg-slate-400" },
+};
+
+function haceCuanto(iso?: string) {
+  if (!iso) return "nunca";
+  const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (min < 1) return "hace un momento";
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `hace ${h} h`;
+  return new Date(iso).toLocaleDateString("es-CO", { day: "numeric", month: "short" });
+}
+
+/** Estado de la sincronización con la nube */
+function EstadoNube() {
+  const [, setTic] = useState(0);
+  useEffect(() => {
+    const f = () => setTic((n) => n + 1);
+    window.addEventListener(EVENTO_SYNC, f);
+    const t = setInterval(f, 30_000);
+    return () => {
+      window.removeEventListener(EVENTO_SYNC, f);
+      clearInterval(t);
+    };
+  }, []);
+  const estado = estadoSync();
+  const info = TEXTO_ESTADO[estado];
+  const pendientes = pendientesPorSubir();
+  const error = errorSync();
+  return (
+    <div className="rounded-3xl bg-white p-4 ring-1 ring-slate-200/80">
+      <div className="flex items-center gap-3">
+        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${info.c}`} aria-hidden="true" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-slate-900">Nube · {info.t}</span>
+          <span className="block text-xs text-slate-500">
+            Última vez {haceCuanto(leerMeta().ultima)}
+            {pendientes ? ` · ${pendientes} cambio${pendientes === 1 ? "" : "s"} por subir` : ""}
+          </span>
+        </span>
+        <button
+          type="button"
+          onClick={() => void sincronizar()}
+          disabled={estado === "sincronizando"}
+          className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold text-sky-700 ring-1 ring-sky-200 active:bg-sky-50 disabled:opacity-50"
+        >
+          Sincronizar
+        </button>
+      </div>
+      {error && estado !== "sincronizando" && <p className="mt-2 text-xs text-amber-700">{error}</p>}
+    </div>
   );
 }

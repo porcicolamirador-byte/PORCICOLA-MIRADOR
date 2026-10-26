@@ -14,6 +14,7 @@ import {
   type Movimiento,
 } from "@/lib/datos";
 import { confirmar } from "@/components/Dialogo";
+import { puede } from "@/lib/nube";
 
 const CATEGORIAS: Record<Movimiento["tipo"], string[]> = {
   ingreso: ["Venta de cerdos de engorde", "Venta de lechones", "Venta de cerdas de descarte", "Otros ingresos"],
@@ -67,6 +68,17 @@ export default function ContabilidadPage() {
   };
 
   const balance = datos ? datos.ingresos - datos.gastos : 0;
+
+  // Solo el administrador o quien tenga el permiso ve la contabilidad
+  if (version >= 0 && !puede("contabilidad")) {
+    return (
+      <ModuloPage titulo="Contabilidad" subtitulo="Ingresos y gastos" icono="💼" tono="stone">
+        <p className="rounded-2xl bg-white px-4 py-8 text-center text-sm text-slate-500 ring-1 ring-slate-200">
+          Tu usuario no tiene permiso para ver la contabilidad. Pídeselo al administrador.
+        </p>
+      </ModuloPage>
+    );
+  }
 
   return (
     <ModuloPage

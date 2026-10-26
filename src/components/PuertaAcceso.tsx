@@ -15,6 +15,7 @@ import {
   type PerfilNube,
 } from "@/lib/nube";
 import { estaDesbloqueada, marcarDesbloqueada, olvidarPinLocal, pinLocalCorrecto, recordarPinLocal, tocarDesbloqueo } from "@/lib/bloqueo";
+import { sincronizar } from "@/lib/sincronizar";
 import { activarFaceId, CLAVE_FACEID_APP, desactivarFaceId, faceIdActivo, faceIdDisponible, verificarFaceId } from "@/lib/faceid";
 
 /*
@@ -75,6 +76,26 @@ export default function PuertaAcceso({ children }: { children: ReactNode }) {
     }, 60_000);
     return () => clearInterval(t);
   }, [abierta]);
+
+  // Sincronización con la nube mientras la app está abierta
+  useEffect(() => {
+    if (!conSesion || !abierta) return;
+    void sincronizar();
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") void sincronizar();
+    }, 30_000);
+    const alVolver = () => {
+      if (document.visibilityState === "visible") void sincronizar();
+    };
+    const conInternet = () => void sincronizar();
+    document.addEventListener("visibilitychange", alVolver);
+    window.addEventListener("online", conInternet);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", alVolver);
+      window.removeEventListener("online", conInternet);
+    };
+  }, [conSesion, abierta]);
 
   // Con internet, se revisa que el usuario siga activo y con los mismos permisos
   useEffect(() => {

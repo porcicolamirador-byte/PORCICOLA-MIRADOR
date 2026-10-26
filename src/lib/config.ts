@@ -4,6 +4,7 @@
  */
 
 import { registrarCambio } from "@/lib/log";
+import { capturarCambio } from "@/lib/sincronizar";
 
 /** Alimentación estándar: kilos de alimento por cerdo en cada etapa */
 export interface AlimentacionEstandar {
@@ -146,5 +147,6 @@ export function guardarConfig(cambios: Partial<ConfigGranja>) {
   const nueva = { ...antes, ...cambios };
   localStorage.setItem(CLAVE_CONFIG, JSON.stringify(nueva));
   registrarCambio(CLAVE_CONFIG, antes, nueva);
+  capturarCambio(CLAVE_CONFIG, antes, nueva);
   return nueva;
 }

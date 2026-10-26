@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { puede, type PermisoNube } from "@/lib/nube";
 
 /*
  * Cuadros de confirmación con estilo de app nativa (como las alertas del
@@ -20,6 +21,11 @@ export interface OpcionesDialogo {
   cancelar?: string | null;
   /** Pinta el botón principal en rojo (acciones que borran) */
   destructivo?: boolean;
+  /**
+   * Permiso que necesita el usuario para aceptar. Por defecto, una acción
+   * destructiva pide "eliminar"; null para no pedir ninguno (p. ej. cerrar sesión).
+   */
+  requiere?: PermisoNube | null;
 }
 
 type Solicitud = { opciones: OpcionesDialogo; responder: (ok: boolean) => void };
@@ -28,6 +34,11 @@ let abrirDialogo: ((s: Solicitud) => void) | null = null;
 
 /** Pregunta y devuelve true si la persona acepta */
 export function confirmar(opciones: OpcionesDialogo): Promise<boolean> {
+  const permiso = opciones.requiere === undefined ? (opciones.destructivo ? "eliminar" : null) : opciones.requiere;
+  if (permiso && !puede(permiso)) {
+    const nombres: Record<PermisoNube, string> = { eliminar: "eliminar", bodega: "usar la bodega", contabilidad: "usar contabilidad", ajustes: "cambiar los ajustes" };
+    return avisar({ titulo: "Sin permiso", mensaje: `Tu usuario no tiene permiso para ${nombres[permiso]}. Pídeselo al administrador.` }).then(() => false);
+  }
   return new Promise((responder) => {
     if (!abrirDialogo) {
       // Respaldo por si el cuadro aún no está montado

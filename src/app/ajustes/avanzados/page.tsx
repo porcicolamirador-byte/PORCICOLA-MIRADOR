@@ -1,6 +1,7 @@
 "use client";
 
 import { leerLog, registrarLog } from "@/lib/log";
+import { reemplazarClave } from "@/lib/sincronizar";
 import { perfilGuardado, puede } from "@/lib/nube";
 import { useEffect, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
@@ -94,13 +95,14 @@ export default function AjustesAvanzadosPage() {
   }, [router]);
 
   const borrarTodo = async () => {
-    if (!(await confirmar({ titulo: "Borrar todos los datos", mensaje: "Se borrará toda la información de la granja guardada en este dispositivo.", aceptar: "Continuar", destructivo: true }))) return;
+    if (!(await confirmar({ titulo: "Borrar todos los datos", mensaje: "Se borrará toda la información de la granja en la nube y en todos los teléfonos.", aceptar: "Continuar", destructivo: true }))) return;
     if (!(await confirmar({ titulo: "¿Estás seguro?", mensaje: "Esta acción no se puede deshacer. Te recomendamos exportar un respaldo antes desde Ajustes.", aceptar: "Borrar todo", destructivo: true }))) return;
-    for (const k of clavesDeLaApp()) localStorage.removeItem(k);
+    // Se borra aquí y en la nube (todos los teléfonos)
+    for (const k of clavesDeLaApp()) reemplazarClave(k, null);
     registrarLog([{ accion: "Eliminación", modulo: "Datos", detalle: "Se borraron todos los datos de la granja" }]);
     notificarCambio();
     setConfig(leerConfig());
-    await avisar({ titulo: "Datos borrados", mensaje: "Se borró la información de la granja en este teléfono." });
+    await avisar({ titulo: "Datos borrados", mensaje: "Se borró la información de la granja. Los demás teléfonos se actualizarán al conectarse." });
   };
 
   const bloquear = () => {
@@ -329,7 +331,7 @@ export default function AjustesAvanzadosPage() {
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-[15px] font-medium text-rose-600">Borrar todos los datos</span>
-              <span className="block text-xs text-slate-500">Toda la información de la granja en este teléfono</span>
+              <span className="block text-xs text-slate-500">Toda la información de la granja, en todos los teléfonos</span>
             </span>
           </button>
         </li>
