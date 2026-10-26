@@ -305,115 +305,70 @@ export default function CalendarioPage() {
           </ul>
         )}
       </section>
-      {/* Resumen del mes: gráfica de líneas, eventos acumulados día a día */}
+      {/* Resumen del mes: dona con el total de eventos */}
       <section className="rounded-3xl bg-white p-4 ring-1 ring-slate-200/80">
-        <div className="mb-1 flex items-baseline justify-between gap-2">
-          <h2 className="text-[15px] font-bold text-slate-900">Resumen de {MESES[mes].toLowerCase()}</h2>
-          <span className="text-xs text-slate-500">
-            {delMes.length} {delMes.length === 1 ? "evento" : "eventos"}
-          </span>
+        <h2 className="mb-3 text-[15px] font-bold text-slate-900">Resumen de {MESES[mes].toLowerCase()}</h2>
+        <div className="flex items-center gap-4">
+          <Dona
+            total={delMes.length}
+            partes={ORDEN.map((t) => ({ tipo: t, valor: cuenta(t), color: COLOR_BARRA[t] }))}
+          />
+          <ul className="min-w-0 flex-1 space-y-2.5">
+            {ORDEN.map((t) => (
+              <li key={t} className="flex items-center gap-2 text-[13px] text-slate-700">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: COLOR_BARRA[t] }} aria-hidden="true" />
+                <span className="min-w-0 flex-1 truncate">{ESTILO[t].etiqueta}</span>
+                <b className="tabular-nums text-slate-900">{cuenta(t)}</b>
+              </li>
+            ))}
+          </ul>
         </div>
-        <ul className="mb-2 flex flex-wrap gap-x-3 gap-y-1">
-          {ORDEN.map((t) => (
-            <li key={t} className="flex items-center gap-1.5 text-[11px] text-slate-600">
-              <span className="h-0.5 w-3.5 rounded-full" style={{ backgroundColor: COLOR_BARRA[t] }} aria-hidden="true" />
-              {ESTILO[t].etiqueta} <b className="tabular-nums text-slate-900">{cuenta(t)}</b>
-            </li>
-          ))}
-        </ul>
-        <GraficaLineas
-          dias={diasMes}
-          series={ORDEN.map((t) => ({
-            tipo: t,
-            color: COLOR_BARRA[t],
-            porDia: Array.from({ length: diasMes }, (_, d) => (eventos.get(clave(anio, mes, d + 1)) ?? []).filter((e) => e.tipo === t).length),
-          }))}
-          diaElegido={seleccion.startsWith(prefijo) ? Number(seleccion.slice(8, 10)) : null}
-          onElegir={(d) => setSeleccion(clave(anio, mes, d))}
-        />
       </section>
     </ModuloPage>
   );
 }
 
-/** Gráfica de líneas del mes: cada línea suma los eventos de su tipo día a día */
-function GraficaLineas({
-  dias,
-  series,
-  diaElegido,
-  onElegir,
-}: {
-  dias: number;
-  series: { tipo: Tipo; color: string; porDia: number[] }[];
-  diaElegido: number | null;
-  onElegir: (dia: number) => void;
-}) {
-  const W = 320;
-  const H = 130;
-  const izq = 22;
-  const der = 22;
-  const arriba = 10;
-  const abajo = 20;
-  const acumuladas = series.map((s) => {
-    let suma = 0;
-    return { ...s, valores: s.porDia.map((v) => (suma += v)) };
-  });
-  const maximo = Math.max(1, ...acumuladas.map((s) => s.valores[s.valores.length - 1] ?? 0));
-  const tope = maximo <= 4 ? maximo : Math.ceil(maximo / 2) * 2;
-  const x = (d: number) => izq + ((d - 1) / Math.max(1, dias - 1)) * (W - izq - der);
-  const y = (v: number) => arriba + (1 - v / tope) * (H - arriba - abajo);
-  const marcasX = [1, 8, 15, 22, dias].filter((d, i, a) => d <= dias && a.indexOf(d) === i);
-  const marcasY = tope <= 4 ? Array.from({ length: tope + 1 }, (_, i) => i) : [0, tope / 2, tope];
-
-  const elegirDesde = (clienteX: number, caja: DOMRect) => {
-    const rel = ((clienteX - caja.left) / caja.width) * W;
-    const d = Math.round(((rel - izq) / (W - izq - der)) * (dias - 1)) + 1;
-    onElegir(Math.min(dias, Math.max(1, d)));
-  };
-
+/** Dona con el total de eventos del mes en el centro */
+function Dona({ total, partes }: { total: number; partes: { tipo: Tipo; valor: number; color: string }[] }) {
+  const r = 46;
+  const c = 2 * Math.PI * r;
+  const separacion = partes.filter((p) => p.valor > 0).length > 1 ? 2.5 : 0;
+  let desplazamiento = 0;
   return (
     <svg
-      viewBox={`0 0 ${W} ${H}`}
-      className="h-auto w-full touch-pan-y select-none"
+      viewBox="0 0 120 120"
+      className="h-32 w-32 shrink-0"
       role="img"
-      aria-label={acumuladas.map((s) => `${s.tipo}: ${s.valores[s.valores.length - 1] ?? 0}`).join(", ")}
-      onClick={(e) => elegirDesde(e.clientX, e.currentTarget.getBoundingClientRect())}
+      aria-label={`${total} eventos: ${partes.map((p) => `${ESTILO[p.tipo].etiqueta} ${p.valor}`).join(", ")}`}
     >
-      {/* Cuadrícula */}
-      {marcasY.map((v) => (
-        <g key={v}>
-          <line x1={izq} x2={W - der} y1={y(v)} y2={y(v)} className="stroke-slate-200" strokeDasharray={v === 0 ? undefined : "3 4"} strokeWidth={1} />
-          <text x={izq - 6} y={y(v) + 3} textAnchor="end" className="fill-slate-400 text-[9px] tabular-nums">
-            {v}
-          </text>
-        </g>
-      ))}
-      {marcasX.map((d) => (
-        <text key={d} x={x(d)} y={H - 5} textAnchor="middle" className="fill-slate-400 text-[9px] tabular-nums">
-          {d}
-        </text>
-      ))}
-      {/* Día elegido */}
-      {diaElegido && (
-        <line x1={x(diaElegido)} x2={x(diaElegido)} y1={arriba} y2={H - abajo} className="stroke-slate-400" strokeWidth={1} />
-      )}
-      {/* Líneas */}
-      {acumuladas.map((s) => (
-        <g key={s.tipo}>
-          <polyline
-            points={s.valores.map((v, i) => `${x(i + 1)},${y(v)}`).join(" ")}
-            fill="none"
-            stroke={s.color}
-            strokeWidth={2}
-            strokeLinejoin="round"
-            strokeLinecap="round"
-          />
-          <circle cx={x(dias)} cy={y(s.valores[dias - 1] ?? 0)} r={3.5} fill={s.color} className="stroke-white" strokeWidth={1.5} />
-          {diaElegido && (s.porDia[diaElegido - 1] ?? 0) > 0 && (
-            <circle cx={x(diaElegido)} cy={y(s.valores[diaElegido - 1])} r={4} fill={s.color} className="stroke-white" strokeWidth={1.5} />
-          )}
-        </g>
-      ))}
+      <circle cx="60" cy="60" r={r} fill="none" className="stroke-slate-100" strokeWidth={14} />
+      {total > 0 &&
+        partes.map((p) => {
+          if (!p.valor) return null;
+          const largo = (p.valor / total) * c;
+          const seg = (
+            <circle
+              key={p.tipo}
+              cx="60"
+              cy="60"
+              r={r}
+              fill="none"
+              stroke={p.color}
+              strokeWidth={14}
+              strokeDasharray={`${Math.max(0.5, largo - separacion)} ${c}`}
+              strokeDashoffset={-desplazamiento}
+              transform="rotate(-90 60 60)"
+            />
+          );
+          desplazamiento += largo;
+          return seg;
+        })}
+      <text x="60" y="58" textAnchor="middle" className="fill-slate-900 text-[26px] font-bold tabular-nums">
+        {total}
+      </text>
+      <text x="60" y="76" textAnchor="middle" className="fill-slate-500 text-[11px]">
+        {total === 1 ? "evento" : "eventos"}
+      </text>
     </svg>
   );
 }
