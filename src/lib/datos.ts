@@ -370,10 +370,10 @@ export interface ProductoBodega {
 
 /** Productos preestablecidos de la granja */
 export const PRODUCTOS_PREESTABLECIDOS: ProductoBodega[] = [
-  { id: "pre-PR-01", codigo: "PR-01", nombre: "Preiniciación Cerdos", categoria: "Alimento", unidad: "bultos", kgPorUnidad: 40, minimo: 2, activo: true, preestablecido: true },
-  { id: "pre-IN-01", codigo: "IN-01", nombre: "Iniciación Cerdos", categoria: "Alimento", unidad: "bultos", kgPorUnidad: 40, minimo: 2, activo: true, preestablecido: true },
-  { id: "pre-ML-01", codigo: "ML-01", nombre: "Maxi lechones 337", categoria: "Alimento", unidad: "bultos", kgPorUnidad: 40, minimo: 2, activo: true, preestablecido: true },
-  { id: "pre-MC-01", codigo: "MC-01", nombre: "Maxi Cerdos 337 Fin.", categoria: "Alimento", unidad: "bultos", kgPorUnidad: 40, minimo: 2, activo: true, preestablecido: true },
+  { id: "pre-PR-01", codigo: "PR-01", nombre: "Preiniciación Cerdos", categoria: "Alimento", unidad: "bultos", kgPorUnidad: 40, minimo: 0, activo: true, preestablecido: true },
+  { id: "pre-IN-01", codigo: "IN-01", nombre: "Iniciación Cerdos", categoria: "Alimento", unidad: "bultos", kgPorUnidad: 40, minimo: 0, activo: true, preestablecido: true },
+  { id: "pre-ML-01", codigo: "ML-01", nombre: "Maxi lechones 337", categoria: "Alimento", unidad: "bultos", kgPorUnidad: 40, minimo: 0, activo: true, preestablecido: true },
+  { id: "pre-MC-01", codigo: "MC-01", nombre: "Maxi Cerdos 337 Fin.", categoria: "Alimento", unidad: "bultos", kgPorUnidad: 40, minimo: 0, activo: true, preestablecido: true },
 ];
 export interface LineaFactura {
   productoId: string;
@@ -419,7 +419,17 @@ export const guardarCorrales = (c: Corral[]) => escribir(CLAVES.corrales, c);
 
 /** Todos los productos (los preestablecidos siempre están, activos o no) */
 export function leerProductos(): ProductoBodega[] {
-  const guardados = leer<ProductoBodega[]>(CLAVES.productos, []);
+  let guardados = leer<ProductoBodega[]>(CLAVES.productos, []);
+  // Una sola vez: los preestablecidos guardados con el mínimo anterior (2) pasan a 0
+  if (typeof window !== "undefined" && !localStorage.getItem("bodega-minimo-0")) {
+    guardados = guardados.map((g) => (g.id?.startsWith("pre-") && g.minimo === 2 ? { ...g, minimo: 0 } : g));
+    try {
+      if (localStorage.getItem(CLAVES.productos) !== null) localStorage.setItem(CLAVES.productos, JSON.stringify(guardados));
+      localStorage.setItem("bodega-minimo-0", "1");
+    } catch {
+      // sin almacenamiento
+    }
+  }
   const faltan = PRODUCTOS_PREESTABLECIDOS.filter((pre) => !guardados.some((g) => g.id === pre.id));
   return [
     ...guardados.map((g) => {
