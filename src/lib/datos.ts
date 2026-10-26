@@ -406,7 +406,12 @@ export interface MovimientoInventario {
 }
 export interface ExistenciaProducto {
   producto: ProductoBodega;
+  /** Existencia propia. En un subproducto (kilos de un bulto) es lo consumido, en negativo */
   existencia: number;
+  /** Lo que se puede usar: en un subproducto, lo que queda del producto principal en esta unidad */
+  disponible: number;
+  /** Si es subproducto (kilos que se descuentan del bulto con el mismo código) */
+  subproducto?: { principal: string };
   bajoMinimo: boolean;
   movimientos: MovimientoInventario[];
   /** Valor unitario de la compra más reciente con precio (0 si no hay) */
@@ -481,7 +486,10 @@ export function calcularInventario(opciones: { incluirInactivos?: boolean } = {}
           fechaPrecio = m.fecha;
         }
       }
-      const movimientos: MovimientoInventario[] = lista.map((m) => ({
+      // Subproducto: producto en kilos cuyo código pertenece a un producto en bultos
+      const principal = producto.unidad === "kg" ? productos.find((o) => o.id !== producto.id && o.unidad === "bultos" && grupoDe(o) === grupoDe(producto)) : undefined;
+      const propios = principal ? lista.filter((m) => m.origen.id === producto.id) : lista;
+      const movimientos: MovimientoInventario[] = propios.map((m) => ({
         fecha: m.fecha,
         hora: m.hora,
         tipo: m.tipo,
@@ -491,8 +499,12 @@ export function calcularInventario(opciones: { incluirInactivos?: boolean } = {}
         salidaId: m.salidaId,
       }));
       movimientos.sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.hora ?? "").localeCompare(a.hora ?? ""));
-      const existencia = lista.reduce((s, m) => s + (m.tipo === "entrada" ? m.base : -m.base), 0) / f;
-      return { producto, existencia, bajoMinimo: existencia <= producto.minimo, movimientos, ultimoPrecio };
+      const neto = (l: typeof lista) => l.reduce((s, m) => s + (m.tipo === "entrada" ? m.base : -m.base), 0) / f;
+      const disponible = neto(lista);
+      if (principal) {
+        return { producto, existencia: neto(propios), disponible, subproducto: { principal: principal.nombre }, bajoMinimo: false, movimientos, ultimoPrecio };
+      }
+      return { producto, existencia: disponible, disponible, bajoMinimo: disponible <= producto.minimo, movimientos, ultimoPrecio };
     });
 }
 const fmtNum = (n: number) => n.toLocaleString("es-CO", { maximumFractionDigits: 2 });

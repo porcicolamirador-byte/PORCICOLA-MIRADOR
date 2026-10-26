@@ -255,7 +255,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   const inventario = accion === "alimento" ? calcularInventario() : [];
   const productos = [...inventario].sort(
     (a, b) =>
-      Number(b.existencia > 0) - Number(a.existencia > 0) ||
+      Number(b.disponible > 0) - Number(a.disponible > 0) ||
       Number(b.producto.categoria === "Alimento") - Number(a.producto.categoria === "Alimento") ||
       a.producto.nombre.localeCompare(b.producto.nombre, "es"),
   );
@@ -263,7 +263,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   const cantidadNum = Number(valor.replace(",", ".")) || 0;
   // Ajuste oculto: permite usar productos sin existencia (el inventario queda negativo)
   const sinLimite = accion === "alimento" && leerConfig().permitirSinInventario;
-  const excede = !!elegido && !sinLimite && cantidadNum > elegido.existencia;
+  const excede = !!elegido && !sinLimite && cantidadNum > elegido.disponible;
   const kgDe = (cantidad: number, unidad: string) => kgDeCantidad(cantidad, unidad, elegido?.producto.kgPorUnidad);
 
   const limpiar = () => {
@@ -300,7 +300,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
       // Se descuenta de la bodega: queda como salida del producto elegido
       const actual = calcularInventario().find((p) => p.producto.id === productoId);
       const libre = leerConfig().permitirSinInventario;
-      if (!actual || (!libre && (actual.existencia <= 0 || n > actual.existencia))) return;
+      if (!actual || (!libre && (actual.disponible <= 0 || n > actual.disponible))) return;
       registrarConsumoLote({ loteId: lote.id, productoId: actual.producto.id, cantidad: n, fecha, hora });
     }
     limpiar();
@@ -479,8 +479,8 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                       { valor: "", texto: "Selecciona un producto" },
                       ...productos.map((p) => ({
                         valor: p.producto.id,
-                        texto: `${p.producto.nombre} · ${p.existencia > 0 ? `hay ${fmtCantidad(p.existencia)} ${p.producto.unidad}` : "sin existencia"}`,
-                        deshabilitado: !sinLimite && p.existencia <= 0,
+                        texto: `${p.producto.nombre} · ${p.disponible > 0 ? `hay ${fmtCantidad(p.disponible)} ${p.producto.unidad}` : "sin existencia"}`,
+                        deshabilitado: !sinLimite && p.disponible <= 0,
                       })),
                     ]}
                   />
@@ -493,18 +493,18 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                     step="any"
                     value={valor}
                     onChange={setValor}
-                    placeholder={elegido ? (sinLimite ? "Cantidad" : `Máximo ${fmtCantidad(elegido.existencia)}`) : "Primero elige el producto"}
+                    placeholder={elegido ? (sinLimite ? "Cantidad" : `Máximo ${fmtCantidad(elegido.disponible)}`) : "Primero elige el producto"}
                     required
                   />
                 </Campo>
                 {excede && elegido && (
                   <p className="text-sm font-medium text-rose-600">
-                    Solo hay {fmtCantidad(elegido.existencia)} {elegido.producto.unidad} en bodega.
+                    Solo hay {fmtCantidad(elegido.disponible)} {elegido.producto.unidad} en bodega.
                   </p>
                 )}
                 {elegido && cantidadNum > 0 && !excede && (
                   <p className="text-xs text-slate-500">
-                    Quedarán {fmtCantidad(elegido.existencia - cantidadNum)} {elegido.producto.unidad} en bodega
+                    Quedarán {fmtCantidad(elegido.disponible - cantidadNum)} {elegido.producto.unidad} en bodega
                     {kgDe(cantidadNum, elegido.producto.unidad) ? ` · ${fmtCantidad(kgDe(cantidadNum, elegido.producto.unidad))} kg para el lote` : ""}.
                   </p>
                 )}

@@ -90,9 +90,10 @@ export default function BodegaPage() {
   const mesActual = hoy().slice(0, 7);
   const compradoMes = (datos?.facturas ?? []).filter((f) => f.fecha.slice(0, 7) === mesActual).reduce((s, f) => s + totalFactura(f), 0);
 
-  const conExistencia = datos?.inventario.filter((i) => i.existencia > 0).length ?? 0;
-  const agotados = datos?.inventario.filter((i) => i.existencia <= 0).length ?? 0;
-  const valorBodega = datos?.inventario.reduce((s, i) => s + Math.max(0, i.existencia) * i.ultimoPrecio, 0) ?? 0;
+  const principales = datos?.inventario.filter((i) => !i.subproducto) ?? [];
+  const conExistencia = principales.filter((i) => i.existencia > 0).length;
+  const agotados = principales.filter((i) => i.existencia <= 0).length;
+  const valorBodega = principales.reduce((s, i) => s + Math.max(0, i.existencia) * i.ultimoPrecio, 0);
   const sinCatalogo = datos !== null && datos.activos.length === 0;
   const producto = datos?.inventario.find((i) => i.producto.id === productoSel) ?? null;
   const factura = datos?.facturas.find((f) => f.id === facturaSel) ?? null;
@@ -112,7 +113,7 @@ export default function BodegaPage() {
       {/* Resumen compacto: dos filas, valores en pesos completos */}
       <div className="grid grid-cols-2 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/80 [&>*:nth-child(odd)]:border-r [&>*:nth-child(-n+2)]:border-b [&>*]:border-slate-200">
         {[
-          { t: "Con existencia", v: datos ? `${conExistencia} de ${datos.inventario.length}` : "–", alerta: agotados > 0 },
+          { t: "Con existencia", v: datos ? `${conExistencia} de ${principales.length}` : "–", alerta: agotados > 0 },
           { t: "Por reponer", v: datos ? String(bajos.length) : "–", alerta: bajos.length > 0 },
           { t: "En bodega", v: datos ? formatoPesos(valorBodega) : "–", alerta: false },
           { t: "Compras del mes", v: datos ? formatoPesos(compradoMes) : "–", alerta: false },
@@ -202,12 +203,14 @@ export default function BodegaPage() {
                       {cat} · {items.length}
                     </h2>
                     <div className="grid grid-cols-2 gap-2">
-                      {items.map(({ producto: p, existencia, bajoMinimo, ultimoPrecio }) => {
-                        const agotado = existencia <= 0;
+                      {items.map(({ producto: p, existencia, disponible, subproducto, bajoMinimo, ultimoPrecio }) => {
+                        const agotado = !subproducto && existencia <= 0;
                         const referencia = Math.max(p.minimo * 3, p.minimo + 1, 1);
                         const nivel = Math.max(0, Math.min(100, (existencia / referencia) * 100));
                         const colorBarra = agotado || bajoMinimo ? "bg-red-500" : existencia <= p.minimo * 1.5 ? "bg-amber-400" : "bg-sky-500";
-                        const estado = agotado
+                        const estado = subproducto
+                          ? { t: "Subproducto", c: "bg-sky-50 text-sky-700 ring-sky-200" }
+                          : agotado
                           ? { t: "Agotado", c: "bg-red-600 text-white ring-red-600" }
                           : bajoMinimo
                           ? { t: "Reponer", c: "bg-red-50 text-red-700 ring-red-200" }
@@ -230,9 +233,15 @@ export default function BodegaPage() {
                               <Insignia clase={estado.c}>{estado.t}</Insignia>
                             </div>
                             <p className="line-clamp-2 text-[13px] font-semibold leading-tight text-slate-900">{p.nombre}</p>
-                            <p className={`text-xl font-bold leading-none tabular-nums ${agotado || bajoMinimo ? "text-red-600" : "text-slate-900"}`}>
+                            <p className={`text-xl font-bold leading-none tabular-nums ${subproducto ? "text-sky-700" : agotado || bajoMinimo ? "text-red-600" : "text-slate-900"}`}>
                               {fmt(existencia)} <span className="text-xs font-semibold text-slate-500">{p.unidad}</span>
                             </p>
+                            {subproducto ? (
+                              <p className="text-[10px] leading-tight text-slate-500">
+                                De {subproducto.principal} · quedan {fmt(Math.max(0, disponible))} {p.unidad}
+                              </p>
+                            ) : (
+                            <>
                             <div className="h-1 w-full overflow-hidden rounded-full bg-slate-100" role="img" aria-label={`Nivel ${Math.round(nivel)} %`}>
                               <div className={`h-full rounded-full ${colorBarra}`} style={{ width: `${Math.max(nivel, agotado ? 0 : 4)}%` }} />
                             </div>
@@ -241,6 +250,8 @@ export default function BodegaPage() {
                               {p.unidad === "bultos" && existencia > 0 ? ` · ${fmt(existencia * factorKg(p))} kg` : ""}
                               {ultimoPrecio > 0 && existencia > 0 ? ` · ${formatoPesos(existencia * ultimoPrecio)}` : ""}
                             </p>
+                            </>
+                            )}
                           </button>
                         );
                       })}
@@ -505,7 +516,7 @@ function NuevaFactura({
 /* ───────────────────── Detalle de producto (salidas) ───────────────────── */
 
 function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerrar: () => void }) {
-  const { producto: p, existencia, bajoMinimo, movimientos } = item;
+  const { producto: p, existencia, disponible, subproducto, bajoMinimo, movimientos } = item;
   const [salida, setSalida] = useState(false);
   const [cantidad, setCantidad] = useState("");
   const [fecha, setFecha] = useState(hoy());
@@ -532,7 +543,7 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
     e.preventDefault();
     const n = num(cantidad);
     if (n <= 0) return setError("Escribe una cantidad mayor que cero.");
-    if (!libre && n > existencia) return setError(`Solo hay ${fmt(existencia)} ${p.unidad} en bodega.`);
+    if (!libre && n > disponible) return setError(`Solo hay ${fmt(disponible)} ${p.unidad} en bodega.`);
     if (!destino) return setError("Elige el destino del consumo.");
     if (destino === "otro") {
       guardarSalidas([...leerSalidas(), { id: nuevoId(), productoId: p.id, fecha, hora, cantidad: n, nota: nota.trim() || undefined }]);
@@ -555,17 +566,18 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
           <div className="flex items-center gap-3 rounded-2xl bg-sky-50/70 p-4 ring-1 ring-sky-100">
             <IconoCategoria categoria={p.categoria} className="h-12 w-12 shrink-0 text-3xl" />
             <div className="min-w-0 flex-1">
-              <p className="text-xs text-slate-500">{p.categoria} · existencia</p>
-              <p className={`text-3xl font-bold leading-tight tabular-nums ${bajoMinimo ? "text-red-600" : "text-slate-900"}`}>
+              <p className="text-xs text-slate-500">{p.categoria} · {subproducto ? "consumido (subproducto)" : "existencia"}</p>
+              <p className={`text-3xl font-bold leading-tight tabular-nums ${subproducto ? "text-sky-700" : bajoMinimo ? "text-red-600" : "text-slate-900"}`}>
                 {fmt(existencia)} <span className="text-base font-semibold text-slate-500">{p.unidad}</span>
               </p>
               <p className="text-xs text-slate-500">
-                Mínimo {fmt(p.minimo)} {p.unidad}
-                {bajoMinimo ? " · hay que reponer" : ""}
+                {subproducto
+                  ? `Se descuenta de ${subproducto.principal} · quedan ${fmt(Math.max(0, disponible))} ${p.unidad}`
+                  : `Mínimo ${fmt(p.minimo)} ${p.unidad}${bajoMinimo ? " · hay que reponer" : ""}`}
               </p>
             </div>
           </div>
-          <Boton variante="secundario" onClick={() => setSalida(true)} disabled={!libre && existencia <= 0}>
+          <Boton variante="secundario" onClick={() => setSalida(true)} disabled={!libre && disponible <= 0}>
             − Registrar salida (consumo)
           </Boton>
           <SeccionDesplegable titulo="Movimientos" cantidad={movimientos.length}>
@@ -607,7 +619,7 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
       ) : (
         <form onSubmit={registrar} className="flex flex-col gap-3.5">
           <p className="text-sm text-slate-500">
-            {p.nombre}: hay {fmt(existencia)} {p.unidad}
+            {p.nombre}: hay {fmt(disponible)} {p.unidad}
           </p>
           <Campo etiqueta={`Cantidad (${p.unidad}) *`}>
             <Entrada type="number" inputMode="decimal" min={0} step="any" value={cantidad} onChange={setCantidad} required />
@@ -674,7 +686,7 @@ function DetalleFactura({ factura: f, productos, onCerrar }: { factura: Factura;
     const quedarianNegativos = f.lineas
       .map((l) => {
         const item = inventario.find((i) => i.producto.id === l.productoId);
-        return item && item.existencia - l.cantidad < 0 ? item.producto.nombre : null;
+        return item && item.disponible - l.cantidad < 0 ? item.producto.nombre : null;
       })
       .filter(Boolean);
     if (quedarianNegativos.length) {
