@@ -1,8 +1,9 @@
 "use client";
 
+import Modal from "@/components/Modal";
 import { useMemo, useState, type FormEvent } from "react";
 import ModuloPage from "@/components/ModuloPage";
-import { Boton, Campo, Entrada, Hoja, IconoMas, SeccionDesplegable, Selector, Vacio, EntradaPesos } from "@/components/ui";
+import { Boton, Campo, Entrada, IconoMas, SeccionDesplegable, Selector, Vacio, EntradaPesos } from "@/components/ui";
 import {
   formatoFecha,
   formatoPesos,
@@ -204,7 +205,14 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
   };
 
   return (
-    <Hoja abierta={abierta} titulo="Nuevo movimiento" onCerrar={onCerrar}>
+    <Modal
+      abierta={abierta}
+      etiqueta="Contabilidad"
+      titulo="Nuevo movimiento"
+      subtitulo={tipo === "gasto" ? "Registrar un gasto" : "Registrar un ingreso"}
+      icono={tipo === "gasto" ? "💸" : "💰"}
+      onCerrar={onCerrar}
+    >
       <form onSubmit={guardar} className="flex flex-col gap-3.5">
         <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1">
           {(["gasto", "ingreso"] as const).map((t) => (
@@ -236,7 +244,7 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
           </Campo>
         )}
         <Campo etiqueta="Descripción">
-          <Entrada value={descripcion} onChange={setDescripcion} placeholder="Ej. 20 bultos de levante" />
+          <Entrada value={descripcion} onChange={setDescripcion} placeholder="Dato" />
         </Campo>
         <div className="grid grid-cols-2 gap-3">
           <Campo etiqueta="Valor *">
@@ -250,7 +258,7 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
           Guardar
         </Boton>
       </form>
-    </Hoja>
+    </Modal>
   );
 }
 
@@ -352,7 +360,14 @@ function DetalleCuentasLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => vo
   ].sort((a, b) => b.f.localeCompare(a.f) || b.h.localeCompare(a.h));
 
   return (
-    <Hoja abierta titulo={nombreLote(lote)} onCerrar={onCerrar}>
+    <Modal
+      abierta
+      etiqueta="Contabilidad del lote"
+      titulo={nombreLote(lote)}
+      subtitulo={`${lote.vivos} animales vivos`}
+      icono="🐖"
+      onCerrar={onCerrar}
+    >
       <div className="flex flex-col gap-3">
         <div className="grid grid-cols-3 gap-1.5 text-center">
           {[
@@ -408,7 +423,7 @@ function DetalleCuentasLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => vo
           </SeccionDesplegable>
         )}
       </div>
-    </Hoja>
+    </Modal>
   );
 }
 
