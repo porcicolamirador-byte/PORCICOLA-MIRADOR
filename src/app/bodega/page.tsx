@@ -798,6 +798,7 @@ function TarjetaConsumoCerdas() {
   const datos = useMemo(() => (version < 0 ? null : calcularConsumoCerdas()), [version]);
   if (!datos || datos.cerdas === 0) return null;
   const minimo = [datos.gestacion, datos.lactancia].filter((a) => a.dias !== null).sort((a, b) => a.dias! - b.dias!)[0];
+  const revisar = [datos.gestacion, datos.lactancia].some(agotado);
   const kgDia = datos.gestacion.kgDia + datos.lactancia.kgDia;
 
   return (
@@ -820,10 +821,10 @@ function TarjetaConsumoCerdas() {
           </span>
         </span>
         <span className="shrink-0 text-right">
-          <span className={`block text-sm font-bold tabular-nums ${minimo && minimo.dias! <= 7 ? "text-orange-600" : "text-slate-900"}`}>
-            {minimo ? `${minimo.dias} días` : "–"}
+          <span className={`block text-sm font-bold tabular-nums ${revisar ? "text-orange-600" : "text-slate-900"}`}>
+            {revisar ? "Revisar" : minimo ? `${minimo.dias} días` : "–"}
           </span>
-          <span className="block text-[10px] text-slate-400">alcanza</span>
+          <span className="block text-[10px] text-slate-400">{revisar ? "alimento en 0" : "alcanza"}</span>
         </span>
         <Chevron />
       </button>
@@ -847,8 +848,11 @@ function TarjetaConsumoCerdas() {
   );
 }
 
+/** El alimento llegó a 0 en bodega: se revisa (depende de la condición corporal de cada cerda) */
+const agotado = (a: ConsumoAlimentoCerdas) => a.existenciaKg !== null && a.existenciaKg <= 0.01;
+
 function BloqueConsumo({ titulo, a }: { titulo: string; a: ConsumoAlimentoCerdas }) {
-  const alerta = a.dias !== null && a.dias <= 7;
+  const alerta = agotado(a);
   return (
     <section className="overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/80">
       <div className="flex items-center gap-2 px-3.5 pb-2 pt-3">
@@ -872,7 +876,7 @@ function BloqueConsumo({ titulo, a }: { titulo: string; a: ConsumoAlimentoCerdas
         <div className={`rounded-xl px-1.5 py-2 ${alerta ? "bg-orange-50" : "bg-sky-50"}`}>
           <p className={`text-[10px] font-medium uppercase tracking-wide ${alerta ? "text-orange-600" : "text-sky-700"}`}>Alcanza</p>
           <p className={`text-[13px] font-bold tabular-nums ${alerta ? "text-orange-600" : "text-sky-900"}`}>
-            {a.dias !== null ? `${a.dias} días` : "–"}
+            {alerta ? "Revisar" : a.dias !== null ? `${a.dias} días` : "–"}
           </p>
           <p className="text-[10px] text-slate-500">{a.existenciaKg !== null ? `hay ${bultosTexto(a.existenciaKg, a.kgBulto)}` : "sin producto"}</p>
         </div>
