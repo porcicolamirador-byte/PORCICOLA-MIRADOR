@@ -9,8 +9,11 @@ import {
   guardarMovimientos,
   hoy,
   leerMovimientos,
+  leerLotes,
+  nombreLote,
   nuevoId,
   useVersionDatos,
+  type Lote,
   type Movimiento,
 } from "@/lib/datos";
 import { confirmar } from "@/components/Dialogo";
@@ -110,6 +113,8 @@ export default function ContabilidadPage() {
         <p className="text-xs opacity-80">Balance del mes</p>
         <p className="text-2xl font-semibold tabular-nums">{datos ? formatoPesos(balance) : "–"}</p>
       </div>
+
+      <ContabilidadLotes version={version} />
 
       {datos && datos.porCategoria.length > 0 && (
         <Tarjeta titulo="Gastos por categoría">
@@ -236,6 +241,116 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
           Guardar
         </Boton>
       </form>
+    </Hoja>
+  );
+}
+
+/* ───────────── Contabilidad por lote (lotes activos) ───────────── */
+
+function cuentasLote(l: Lote) {
+  const alimento = l.alimento.reduce((s, a) => s + (Number(a.costo) || 0), 0);
+  const sinPrecio = l.alimento.filter((a) => !(Number(a.costo) > 0)).length;
+  const otros = (l.gastos ?? []).reduce((s, g) => s + (Number(g.valor) || 0), 0);
+  const total = alimento + otros;
+  return { alimento, otros, total, sinPrecio, porAnimal: l.vivos > 0 ? total / l.vivos : 0 };
+}
+
+function ContabilidadLotes({ version }: { version: number }) {
+  const lotes = useMemo(() => (version < 0 ? [] : leerLotes().filter((l) => l.activo)), [version]);
+  const [abierto, setAbierto] = useState<string | null>(null);
+  if (lotes.length === 0) return null;
+  const lote = lotes.find((l) => l.id === abierto) ?? null;
+  const totalGeneral = lotes.reduce((s, l) => s + cuentasLote(l).total, 0);
+
+  return (
+    <Tarjeta titulo="Contabilidad por lote">
+      <p className="-mt-1 mb-2 text-xs text-slate-500">Lotes activos · todo lo gastado desde que ingresaron · {formatoPesos(totalGeneral)} en total</p>
+      <ul className="flex flex-col gap-1.5">
+        {lotes.map((l) => {
+          const c = cuentasLote(l);
+          return (
+            <li key={l.id}>
+              <button type="button" onClick={() => setAbierto(l.id)} className="flex w-full items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5 text-left active:bg-slate-100">
+                <span className="shrink-0 rounded-lg bg-sky-100 px-2 py-0.5 text-xs font-bold tabular-nums text-sky-800">{l.codigo ?? "Lote"}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-slate-900">{l.nombre && l.nombre !== l.codigo ? l.nombre : `${l.vivos} animales`}</span>
+                  <span className="block truncate text-[11px] text-slate-500">
+                    Alimento {formatoPesos(c.alimento)} · Otros {formatoPesos(c.otros)}
+                  </span>
+                </span>
+                <span className="shrink-0 text-right">
+                  <span className="block text-sm font-bold tabular-nums text-slate-900">{formatoPesos(c.total)}</span>
+                  {c.porAnimal > 0 && <span className="block text-[10px] tabular-nums text-slate-500">{formatoPesos(Math.round(c.porAnimal))} / animal</span>}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      {lote && <DetalleCuentasLote lote={lote} onCerrar={() => setAbierto(null)} />}
+    </Tarjeta>
+  );
+}
+
+function DetalleCuentasLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
+  const c = cuentasLote(lote);
+  const items = [
+    ...lote.alimento.map((a, i) => ({
+      k: `a${i}`,
+      f: a.fecha,
+      h: a.hora ?? "",
+      t: a.producto ? `${a.producto} · ${a.cantidad ?? ""} ${a.unidad ?? ""}`.trim() : `Alimento · ${a.kg} kg`,
+      tipo: "Alimento",
+      v: Number(a.costo) || 0,
+    })),
+    ...(lote.gastos ?? []).map((g) => ({
+      k: g.id,
+      f: g.fecha,
+      h: g.hora ?? "",
+      t: `${g.descripcion}${g.cantidad ? ` · ${g.cantidad}` : ""}`,
+      tipo: g.categoria,
+      v: g.valor,
+    })),
+  ].sort((a, b) => b.f.localeCompare(a.f) || b.h.localeCompare(a.h));
+
+  return (
+    <Hoja abierta titulo={nombreLote(lote)} onCerrar={onCerrar}>
+      <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-3 gap-1.5 text-center">
+          {[
+            { t: "Alimento", v: formatoPesos(c.alimento) },
+            { t: "Otros", v: formatoPesos(c.otros) },
+            { t: "Total", v: formatoPesos(c.total) },
+          ].map((x) => (
+            <div key={x.t} className="rounded-xl bg-white px-2 py-2 ring-1 ring-slate-200">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{x.t}</p>
+              <p className="truncate text-[13px] font-bold tabular-nums text-slate-900">{x.v}</p>
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-slate-500">
+          {lote.vivos} animales vivos
+          {c.porAnimal > 0 ? ` · ${formatoPesos(Math.round(c.porAnimal))} por animal` : ""}
+          {c.sinPrecio ? ` · ${c.sinPrecio} registro${c.sinPrecio === 1 ? "" : "s"} de alimento sin precio (la factura no tenía valor)` : ""}
+        </p>
+        {items.length === 0 ? (
+          <p className="rounded-xl bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">Este lote aún no tiene gastos.</p>
+        ) : (
+          <ul className="flex flex-col divide-y divide-slate-100 rounded-2xl bg-white ring-1 ring-slate-200">
+            {items.map((x) => (
+              <li key={x.k} className="flex items-center gap-3 px-3.5 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm text-slate-800">{x.t}</p>
+                  <p className="truncate text-[11px] text-slate-500">
+                    {x.tipo} · {formatoFecha(x.f)}
+                  </p>
+                </div>
+                <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">{x.v > 0 ? formatoPesos(x.v) : "–"}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </Hoja>
   );
 }
