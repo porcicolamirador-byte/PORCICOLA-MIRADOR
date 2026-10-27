@@ -61,14 +61,16 @@ function contarCerdas(diaCambio: number) {
   return { gestantes, vacias, preparto, lactando };
 }
 
-const PREFIJO_AUTO = "auto-cg-";
-export const esSalidaAutomatica = (s: SalidaBodega) => s.id.startsWith(PREFIJO_AUTO);
+const PREFIJOS_AUTO = { gestacion: "auto-cg-", lactancia: "auto-cl-" } as const;
+export const esSalidaAutomatica = (s: SalidaBodega) => s.id.startsWith("auto-cg-") || s.id.startsWith("auto-cl-");
 
 /**
- * Descuenta de bodega, una vez por día, el alimento de gestación estimado
- * (cerdas gestantes y vacías × kg/día). Cada día tiene un id fijo para que
- * varios teléfonos no lo dupliquen. Si hubo días sin abrir la app se ponen
- * al día (máximo 60). Nunca deja la existencia en negativo.
+ * Descuenta de bodega, una vez por día, el alimento estimado de las cerdas:
+ *  - gestación: cerdas gestantes y en otros estados × kg de gestación;
+ *  - lactancia: pre-parto × kg de pre-parto + lactando × kg de lactancia.
+ * Cada día tiene un id fijo por alimento para que varios teléfonos no lo
+ * dupliquen. Si hubo días sin abrir la app se ponen al día (máximo 60).
+ * Nunca deja la existencia en negativo.
  */
 export function aplicarDescuentoCerdas() {
   if (typeof window === "undefined") return;
@@ -83,35 +85,49 @@ export function aplicarDescuentoCerdas() {
     const salidas = leerSalidas();
     const existentes = new Set(salidas.map((s) => s.id));
     const desde = reglas.descuentoDesde > sumarDias(hoyIso, -59) ? reglas.descuentoDesde : sumarDias(hoyIso, -59);
-    const dias: string[] = [];
-    for (let f = desde; f <= hoyIso; f = sumarDias(f, 1)) if (!existentes.has(PREFIJO_AUTO + f)) dias.push(f);
-    if (dias.length === 0) return;
+    const faltan = (prefijo: string) => {
+      const dias: string[] = [];
+      for (let f = desde; f <= hoyIso; f = sumarDias(f, 1)) if (!existentes.has(prefijo + f)) dias.push(f);
+      return dias;
+    };
+    const diasG = faltan(PREFIJOS_AUTO.gestacion);
+    const diasL = faltan(PREFIJOS_AUTO.lactancia);
+    if (diasG.length === 0 && diasL.length === 0) return;
 
-    const productos = leerProductos().filter((p) => codigoDe(p) === reglas.codigoGestacion && p.activo !== false);
-    const producto = productos.find((p) => p.unidad === "bultos") ?? productos[0];
-    if (!producto) return;
-    const item = calcularInventario().find((i) => i.producto.id === producto.id);
-    if (!item || item.sinCompras) return;
-    const { gestantes, vacias } = contarCerdas(reglas.diaCambio);
-    const cerdas = gestantes + vacias;
-    const kgDia = cerdas * reglas.gestacion;
-    if (kgDia <= 0) return;
-
-    let disponible = item.disponible; // en la unidad del producto
+    const cuenta = contarCerdas(reglas.diaCambio);
+    const inventario = calcularInventario();
+    const todos = leerProductos();
     const nuevas: SalidaBodega[] = [];
-    for (const f of dias) {
-      const cantidad = Math.min(kgDia / factorKg(producto), disponible);
-      if (cantidad <= 0.0001) break;
-      disponible -= cantidad;
-      nuevas.push({
-        id: PREFIJO_AUTO + f,
-        productoId: producto.id,
-        fecha: f,
-        hora: "06:00",
-        cantidad: Math.round(cantidad * 1000) / 1000,
-        nota: `Consumo automático cerdas · ${cerdas} × ${reglas.gestacion} kg`,
-      });
-    }
+
+    const descontar = (codigo: string, prefijo: string, dias: string[], kgDia: number, nota: string) => {
+      if (dias.length === 0 || kgDia <= 0) return;
+      const productos = todos.filter((p) => codigoDe(p) === codigo && p.activo !== false);
+      const producto = productos.find((p) => p.unidad === "bultos") ?? productos[0];
+      if (!producto) return;
+      const item = inventario.find((i) => i.producto.id === producto.id);
+      if (!item || item.sinCompras) return;
+      let disponible = item.disponible; // en la unidad del producto
+      for (const f of dias) {
+        const cantidad = Math.min(kgDia / factorKg(producto), disponible);
+        if (cantidad <= 0.0001) break;
+        disponible -= cantidad;
+        nuevas.push({ id: prefijo + f, productoId: producto.id, fecha: f, hora: "06:00", cantidad: Math.round(cantidad * 1000) / 1000, nota });
+      }
+    };
+
+    const cerdasG = cuenta.gestantes + cuenta.vacias;
+    descontar(reglas.codigoGestacion, PREFIJOS_AUTO.gestacion, diasG, cerdasG * reglas.gestacion, `Consumo automático cerdas · ${cerdasG} × ${reglas.gestacion} kg`);
+    const partes = [
+      cuenta.preparto ? `${cuenta.preparto} pre-parto × ${reglas.preparto} kg` : "",
+      cuenta.lactando ? `${cuenta.lactando} lactando × ${reglas.lactancia} kg` : "",
+    ].filter(Boolean);
+    descontar(
+      reglas.codigoLactancia,
+      PREFIJOS_AUTO.lactancia,
+      diasL,
+      cuenta.preparto * reglas.preparto + cuenta.lactando * reglas.lactancia,
+      `Consumo automático lactancia · ${partes.join(" + ")}`,
+    );
     if (nuevas.length) guardarSalidas([...salidas, ...nuevas]);
   } catch {
     // es solo una estimación: si algo falla no se descuenta

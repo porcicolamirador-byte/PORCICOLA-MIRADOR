@@ -956,13 +956,6 @@ function ConsumoCerdasAjuste({ actual, onGuardar }: { actual: ConsumoCerdas; onG
       <div className={caja}>
         {selector("codigoGestacion", "Producto")}
         {campoKg("gestacion", "Gestación", "Cerdas en cualquier estado, menos pre-parto y lactancia")}
-        <label className="flex items-center gap-3 px-3.5 py-2.5">
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm text-slate-800">Descontar de bodega cada día</span>
-            <span className="block text-[11px] text-slate-500">Saca sola la salida diaria de este alimento</span>
-          </span>
-          <Interruptor activo={descontar} onCambiar={setDescontar} />
-        </label>
       </div>
       <p className={titulo}>Alimento de lactancia</p>
       <div className={caja}>
@@ -986,6 +979,13 @@ function ConsumoCerdasAjuste({ actual, onGuardar }: { actual: ConsumoCerdas; onG
         {campoKg("preparto", "Pre-parto", `Del día ${valores.diaCambio || "—"} al parto`)}
         {campoKg("lactancia", "Lactancia", "Del parto al destete")}
       </div>
+      <label className="flex items-center gap-3 rounded-2xl bg-white px-3.5 py-2.5 ring-1 ring-slate-100">
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm text-slate-800">Descontar de bodega cada día</span>
+          <span className="block text-[11px] text-slate-500">Saca sola la salida diaria de gestación y de lactancia</span>
+        </span>
+        <Interruptor activo={descontar} onCambiar={setDescontar} />
+      </label>
       {!valido && <p className="text-sm font-medium text-rose-600">Escribe kilos entre 0 y 50 y un día entre 1 y 120.</p>}
       <div className="grid grid-cols-2 gap-2">
         <Boton

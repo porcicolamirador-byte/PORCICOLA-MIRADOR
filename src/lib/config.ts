@@ -51,7 +51,7 @@ export interface ConsumoCerdas {
   /** Códigos de bodega del alimento de cada tipo */
   codigoGestacion: string;
   codigoLactancia: string;
-  /** Descontar cada día de bodega el alimento de gestación estimado */
+  /** Descontar cada día de bodega el alimento estimado (gestación y lactancia) */
   descontarGestacion: boolean;
   /** Primer día que se descuenta (AAAA-MM-DD); vacío = desde hoy */
   descuentoDesde: string;
