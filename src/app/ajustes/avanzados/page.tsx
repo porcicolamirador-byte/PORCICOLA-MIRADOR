@@ -13,6 +13,8 @@ import {
   ALIMENTACION_POR_DEFECTO,
   CONFIG_POR_DEFECTO,
   ETAPAS_ALIMENTACION,
+  ETAPAS_CERDAS,
+  ETAPAS_TODAS,
   guardarConfig,
   leerConfig,
   type AlimentacionEstandar,
@@ -166,7 +168,7 @@ export default function AjustesAvanzadosPage() {
         <Desplegable
           icono="alimento"
           titulo="Alimentación estándar"
-          resumen={`${ETAPAS_ALIMENTACION.length} etapas`}
+          resumen={`${ETAPAS_TODAS.length} etapas`}
           abierto={abierto === "alimentacion"}
           onAlternar={() => alternar("alimentacion")}
         >
@@ -705,7 +707,7 @@ function Alimentacion({
   onGuardar: (a: AlimentacionEstandar, productos: ProductosEtapa) => void;
 }) {
   const aTexto = (a: AlimentacionEstandar) =>
-    Object.fromEntries(ETAPAS_ALIMENTACION.map(({ clave }) => [clave, String(a[clave]).replace(".", ",")])) as Record<keyof AlimentacionEstandar, string>;
+    Object.fromEntries(ETAPAS_TODAS.map(({ clave }) => [clave, String(a[clave]).replace(".", ",")])) as Record<keyof AlimentacionEstandar, string>;
   const [valores, setValores] = useState(aTexto(actual));
   const [base, setBase] = useState(actual);
   const [unidos, setUnidos] = useState<ProductosEtapa>(productosActuales);
@@ -734,10 +736,10 @@ function Alimentacion({
     setUnidos((u) => ({ ...u, [etapa]: u[etapa].includes(codigo) ? u[etapa].filter((c) => c !== codigo) : [...u[etapa], codigo] }));
 
   const numeros = Object.fromEntries(
-    ETAPAS_ALIMENTACION.map(({ clave }) => [clave, Number((valores[clave] || "0").replace(",", "."))]),
+    ETAPAS_TODAS.map(({ clave }) => [clave, Number((valores[clave] || "0").replace(",", "."))]),
   ) as unknown as AlimentacionEstandar;
-  const valido = ETAPAS_ALIMENTACION.every(({ clave }) => Number.isFinite(numeros[clave]) && numeros[clave] >= 0 && numeros[clave] <= 10000);
-  const sinCambios = ETAPAS_ALIMENTACION.every(
+  const valido = ETAPAS_TODAS.every(({ clave }) => Number.isFinite(numeros[clave]) && numeros[clave] >= 0 && numeros[clave] <= 10000);
+  const sinCambios = ETAPAS_TODAS.every(
     ({ clave }) => numeros[clave] === actual[clave] && [...unidos[clave]].sort().join() === [...productosActuales[clave]].sort().join(),
   );
   const total = ETAPAS_ALIMENTACION.reduce((s, { clave }) => s + (Number.isFinite(numeros[clave]) ? numeros[clave] : 0), 0);
@@ -751,6 +753,7 @@ function Alimentacion({
 
   return (
     <form onSubmit={enviar} className="flex flex-col gap-3">
+      <p className="-mb-1 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Lotes de engorde (kg por cerdo)</p>
       <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-100">
         {ETAPAS_ALIMENTACION.map(({ clave, nombre }) => (
           <li key={clave} className="pb-2">
@@ -825,6 +828,78 @@ function Alimentacion({
           <span className="font-medium text-slate-600">Total por cerdo</span>
           <span className="font-bold tabular-nums text-slate-900">{total.toLocaleString("es-CO", { maximumFractionDigits: 1 })} kg</span>
         </li>
+      </ul>
+      <p className="-mb-1 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Cerdas (kg por cerda)</p>
+      <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-100">
+        {ETAPAS_CERDAS.map(({ clave, nombre }) => (
+          <li key={clave} className="pb-2">
+            <label className="flex items-center gap-3 px-3.5 pt-2">
+              <span className="min-w-0 flex-1 text-sm text-slate-800">{nombre}</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={valores[clave]}
+                onChange={(e) => setValores((v) => ({ ...v, [clave]: e.target.value.replace(/[^\d.,]/g, "").slice(0, 7) }))}
+                onFocus={(e) => e.target.select()}
+                aria-label={`${nombre} en kilos`}
+                className="h-10 w-20 shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-2 text-right text-base font-semibold tabular-nums text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-sky-200"
+              />
+              <span className="w-5 shrink-0 text-xs text-slate-500">kg</span>
+            </label>
+            <div className="flex flex-col gap-1.5 px-3.5 pt-2">
+              {unidos[clave].map((c) => (
+                <div key={c} className="flex items-center gap-2 rounded-xl bg-sky-50 py-1.5 pl-2.5 pr-1 ring-1 ring-sky-100">
+                  <span className="shrink-0 rounded-md bg-white px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-sky-800 ring-1 ring-sky-200">{c}</span>
+                  <span className={`min-w-0 flex-1 truncate text-sm ${nombreDe(c) ? "text-slate-800" : "text-amber-700"}`}>
+                    {nombreDe(c) ?? "Sin producto en bodega"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => alternarCodigo(clave, c)}
+                    aria-label={`Quitar ${c} de ${nombre}`}
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-400 active:bg-sky-100"
+                  >
+                    <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" aria-hidden="true">
+                      <path d="M5 5l10 10M15 5L5 15" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+              {(() => {
+                const libres = catalogo.filter(([c]) => !unidos[clave].includes(c));
+                return (
+                  <div className="relative">
+                    <select
+                      value=""
+                      onChange={(e) => e.target.value && alternarCodigo(clave, e.target.value)}
+                      disabled={libres.length === 0}
+                      aria-label={`Unir producto a ${nombre}`}
+                      className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-3 pr-9 text-sm text-slate-600 outline-none focus:ring-2 focus:ring-sky-200 disabled:opacity-60"
+                    >
+                      <option value="">
+                        {catalogo.length === 0
+                          ? "No hay productos con código"
+                          : libres.length === 0
+                            ? "Todos los productos están unidos"
+                            : unidos[clave].length
+                              ? "Agregar otro producto…"
+                              : "Unir producto de bodega…"}
+                      </option>
+                      {libres.map(([c, n]) => (
+                        <option key={c} value={c}>
+                          {c} · {n}
+                        </option>
+                      ))}
+                    </select>
+                    <svg viewBox="0 0 20 20" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M5 8l5 5 5-5" />
+                    </svg>
+                  </div>
+                );
+              })()}
+            </div>
+          </li>
+        ))}
       </ul>
       {!valido && <p className="text-sm font-medium text-rose-600">Escribe kilos válidos (números entre 0 y 10.000).</p>}
       <div className="grid grid-cols-2 gap-2">

@@ -12,6 +12,9 @@ export interface AlimentacionEstandar {
   iniciacionCerdos: number;
   levante: number;
   engorde: number;
+  /** Alimento de las cerdas (kilos por cerda en cada etapa) */
+  gestacionCerdas: number;
+  lactanciaCerdas: number;
 }
 
 export const ETAPAS_ALIMENTACION: { clave: keyof AlimentacionEstandar; nombre: string }[] = [
@@ -21,6 +24,14 @@ export const ETAPAS_ALIMENTACION: { clave: keyof AlimentacionEstandar; nombre: s
   { clave: "engorde", nombre: "Etapa engorde" },
 ];
 
+/** Etapas de las cerdas (no cuentan en el consumo de los lotes de engorde) */
+export const ETAPAS_CERDAS: { clave: keyof AlimentacionEstandar; nombre: string }[] = [
+  { clave: "gestacionCerdas", nombre: "Maxi cerdas gestación x 40 kg" },
+  { clave: "lactanciaCerdas", nombre: "Maxi cerdas lactancia x 40 kg" },
+];
+
+export const ETAPAS_TODAS = [...ETAPAS_ALIMENTACION, ...ETAPAS_CERDAS];
+
 /** Códigos de productos de bodega unidos a cada etapa (para el consumo establecido) */
 export type ProductosEtapa = Record<keyof AlimentacionEstandar, string[]>;
 
@@ -29,6 +40,8 @@ export const PRODUCTOS_ETAPA_POR_DEFECTO: ProductosEtapa = {
   iniciacionCerdos: [],
   levante: [],
   engorde: [],
+  gestacionCerdas: [],
+  lactanciaCerdas: [],
 };
 
 export const ALIMENTACION_POR_DEFECTO: AlimentacionEstandar = {
@@ -36,6 +49,8 @@ export const ALIMENTACION_POR_DEFECTO: AlimentacionEstandar = {
   iniciacionCerdos: 20,
   levante: 100,
   engorde: 100,
+  gestacionCerdas: 0,
+  lactanciaCerdas: 0,
 };
 
 export interface ConfigGranja {
@@ -95,7 +110,7 @@ const esKilos = (v: unknown): v is number => typeof v === "number" && Number.isF
 function leerAlimentacion(a: unknown): AlimentacionEstandar {
   const o = (a && typeof a === "object" ? a : {}) as Partial<Record<keyof AlimentacionEstandar, unknown>>;
   const r = { ...ALIMENTACION_POR_DEFECTO };
-  for (const { clave } of ETAPAS_ALIMENTACION) {
+  for (const { clave } of ETAPAS_TODAS) {
     const v = o[clave];
     if (esKilos(v)) r[clave] = v;
   }
@@ -105,7 +120,7 @@ function leerAlimentacion(a: unknown): AlimentacionEstandar {
 function leerProductosEtapa(p: unknown): ProductosEtapa {
   const o = (p && typeof p === "object" ? p : {}) as Partial<Record<keyof AlimentacionEstandar, unknown>>;
   const r = { ...PRODUCTOS_ETAPA_POR_DEFECTO };
-  for (const { clave } of ETAPAS_ALIMENTACION) {
+  for (const { clave } of ETAPAS_TODAS) {
     const v = o[clave];
     if (Array.isArray(v)) {
       r[clave] = [...new Set(v.filter((c): c is string => typeof c === "string" && !!c.trim()).map((c) => c.trim().toUpperCase()))];
