@@ -207,7 +207,7 @@ function contabilidadMadre(lote: Lote): { movimientos: MovimientoLotePdf[]; nota
   const sinPrecio = [kgG > 0 && precioG === 0 ? alimentoG.nombre : "", kgL > 0 && precioL === 0 ? alimentoL.nombre : ""].filter(Boolean);
   const dma = (iso: string) => iso.split("-").reverse().join("/");
   const nota =
-    `Madre: cerda ${cerdaId} · ${dma(desde)} – ${dma(hasta)} · alimento estimado` +
+    `Madre: cerda ${cerdaId} · ${dma(desde)} – ${dma(hasta)} · alimento estimado según consumo` +
     (sinPrecio.length ? ` · ${sinPrecio.join(" y ")} sin precio de compra ($0)` : "");
   return { movimientos, nota };
 }
