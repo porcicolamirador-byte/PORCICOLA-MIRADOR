@@ -495,7 +495,6 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   // Otro gasto del lote (medicamento, vacuna, insumo…)
   const [gastoDesc, setGastoDesc] = useState("");
   const [gastoCant, setGastoCant] = useState("");
-  const [gastoUnidad, setGastoUnidad] = useState("");
   // Otro gasto: valor unitario × cantidad = total
   const gastoCantNum = Number(gastoCant.replace(",", ".")) || 0;
   const gastoTotal = Math.round(gastoCantNum * (Number(valor.replace(/\D/g, "")) || 0));
@@ -536,7 +535,6 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
     setExtra("");
     setGastoDesc("");
     setGastoCant("");
-    setGastoUnidad("");
     setGastoCat(CATEGORIAS_GASTO_LOTE[0]);
     setGastoPago("");
     setProductoId("");
@@ -584,7 +582,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
     }
     if (accion === "gasto") {
       if (!gastoDesc.trim() || gastoTotal <= 0 || !gastoPago) return;
-      const cantidadTexto = `${String(gastoCantNum).replace(".", ",")} ${gastoUnidad.trim()}`.trim();
+      const cantidadTexto = String(gastoCantNum).replace(".", ",");
       registrarGastoLote(lote.id, { descripcion: gastoDesc, cantidad: cantidadTexto, valor: gastoTotal, categoria: gastoCat, fecha, hora, pago: gastoPago });
       limpiar();
       return;
@@ -957,13 +955,10 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                     required
                   />
                 </Campo>
-                <Campo etiqueta="Unidad">
-                  <Entrada value={gastoUnidad} onChange={(v) => setGastoUnidad(v.slice(0, 20))} placeholder="Dato" />
+                <Campo etiqueta="Valor unitario *">
+                  <EntradaPesos value={valor} onChange={setValor} placeholder="Dato" required />
                 </Campo>
               </div>
-              <Campo etiqueta="Valor unitario *">
-                <EntradaPesos value={valor} onChange={setValor} placeholder="Dato" required />
-              </Campo>
               <div className="flex items-center justify-between rounded-xl bg-sky-50 px-3.5 py-2.5 ring-1 ring-sky-100">
                 <span className="text-sm text-sky-800">
                   Total{gastoCantNum > 0 && gastoTotal > 0 ? <span className="text-xs text-sky-700/80"> · {String(gastoCantNum).replace(".", ",")} × {formatoPesos(gastoTotal / gastoCantNum)}</span> : null}
