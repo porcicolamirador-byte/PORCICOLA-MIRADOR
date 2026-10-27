@@ -746,18 +746,10 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
             </div>
           )}
 
-          {(lote.pesajes.length > 0 || lote.mortalidad.length > 0 || lote.alimento.length > 0 || (lote.gastos?.length ?? 0) > 0) && (
-            <SeccionDesplegable titulo="Registros" cantidad={lote.pesajes.length + lote.mortalidad.length + lote.alimento.length + (lote.gastos?.length ?? 0)}>
+          {(lote.alimento.length > 0 || (lote.gastos?.length ?? 0) > 0) && (
+            <SeccionDesplegable titulo="Consumo de alimento e insumos" cantidad={lote.alimento.length + (lote.gastos?.length ?? 0)}>
               <ul className="flex flex-col gap-1.5 text-sm">
                 {[
-                  ...lote.pesajes.map((p) => ({ f: p.fecha, h: "", t: `Pesaje: ${p.pesoPromedio} kg promedio`, i: -1 })),
-                  ...(lote.gastos ?? []).map((g) => ({
-                    i: -1,
-                    g: g.id,
-                    f: g.fecha,
-                    h: g.hora ?? "",
-                    t: `Gasto: ${g.descripcion}${g.cantidad ? ` (${g.cantidad})` : ""} · ${formatoPesos(g.valor)}`,
-                  })),
                   ...lote.alimento.map((a, i) => ({
                     i,
                     f: a.fecha,
@@ -766,6 +758,66 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                       ? `Alimento: ${fmtCantidad(a.cantidad ?? 0)} ${a.unidad ?? ""} ${a.producto}${a.kg ? ` (${fmtCantidad(a.kg)} kg)` : ""}`
                       : `Alimento: ${a.kg} kg${a.costo ? ` · ${formatoPesos(a.costo)}` : ""}`,
                   })),
+                  ...(lote.gastos ?? []).map((g) => ({
+                    i: -1,
+                    g: g.id,
+                    f: g.fecha,
+                    h: g.hora ?? "",
+                    t: `Gasto: ${g.descripcion}${g.cantidad ? ` (${g.cantidad})` : ""} · ${formatoPesos(g.valor)}`,
+                  })),
+                ]
+                  .sort((a, b) => b.f.localeCompare(a.f) || b.h.localeCompare(a.h))
+                  .map((x, k) => {
+                    const contenido = (
+                      <>
+                        <span className="min-w-0 flex-1 text-slate-700">{x.t}</span>
+                        <span className="shrink-0 text-right text-xs leading-tight text-slate-500">
+                          {formatoFecha(x.f)}
+                          {x.h && <span className="block text-[10px]">{formatoHora(x.h)}</span>}
+                        </span>
+                      </>
+                    );
+                    return (
+                      <li key={k}>
+                        {"g" in x && x.g ? (
+                          <button
+                            type="button"
+                            onClick={() => void borrarGasto(x.g as string, x.t)}
+                            aria-label={`Eliminar: ${x.t}`}
+                            className="flex w-full items-center gap-3 rounded-xl bg-slate-50 px-3 py-2 text-left active:bg-slate-100"
+                          >
+                            {contenido}
+                            <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />
+                            </svg>
+                          </button>
+                        ) : x.i >= 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => abrirEdicion(x.i)}
+                            aria-label={`Editar o eliminar: ${x.t}`}
+                            className="flex w-full items-center gap-3 rounded-xl bg-slate-50 px-3 py-2 text-left active:bg-slate-100"
+                          >
+                            {contenido}
+                            <svg viewBox="0 0 20 20" className="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+                              <path d="M13.5 3.5l3 3L7 16H4v-3l9.5-9.5z" strokeLinejoin="round" />
+                            </svg>
+                          </button>
+                        ) : (
+                          <div className="flex justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2">{contenido}</div>
+                        )}
+                      </li>
+                    );
+                  })}
+              </ul>
+            </SeccionDesplegable>
+          )}
+
+          {(lote.pesajes.length > 0 || lote.mortalidad.length > 0) && (
+            <SeccionDesplegable titulo="Pesajes y mortalidad" cantidad={lote.pesajes.length + lote.mortalidad.length}>
+              <ul className="flex flex-col gap-1.5 text-sm">
+                {[
+                  ...lote.pesajes.map((p) => ({ f: p.fecha, h: "", t: `Pesaje: ${p.pesoPromedio} kg promedio`, i: -1 })),
                   ...lote.mortalidad.map((m) => ({ f: m.fecha, h: "", t: `Muerte: ${m.cantidad}${m.causa ? ` · ${m.causa}` : ""}`, i: -1 })),
                 ]
                   .sort((a, b) => b.f.localeCompare(a.f) || b.h.localeCompare(a.h))

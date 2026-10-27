@@ -388,7 +388,8 @@ function DetalleCuentasLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => vo
         {items.length === 0 ? (
           <p className="rounded-xl bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">Este lote aún no tiene gastos ni ingresos.</p>
         ) : (
-          <ul className="flex flex-col divide-y divide-slate-100 rounded-2xl bg-white ring-1 ring-slate-200">
+          <SeccionDesplegable titulo="Alimento, insumos e ingresos" cantidad={items.length}>
+          <ul className="flex flex-col divide-y divide-slate-100 bg-white">
             {items.map((x) => (
               <li key={x.k} className="flex items-center gap-3 px-3.5 py-2.5">
                 <div className="min-w-0 flex-1">
@@ -403,6 +404,7 @@ function DetalleCuentasLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => vo
               </li>
             ))}
           </ul>
+          </SeccionDesplegable>
         )}
       </div>
     </Hoja>
