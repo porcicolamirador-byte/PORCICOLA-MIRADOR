@@ -70,7 +70,15 @@ export default function ContabilidadPage() {
         .filter((m) => m.tipo === "gasto")
         .reduce<Record<string, number>>((acc, m) => ({ ...acc, [m.categoria]: (acc[m.categoria] ?? 0) + m.monto }), {})
     ).sort((a, b) => b[1] - a[1]);
-    return { movs, ingresos, gastos, porCategoria };
+    // Saldo a crédito de las facturas y gastos del mes (aún sin pagar): resta del balance
+    const credito =
+      leerFacturas()
+        .filter((f) => f.pago === "credito" && f.fecha.slice(0, 7) === mes)
+        .reduce((t, f) => t + saldoFactura(f), 0) +
+      leerCuentasPorPagar()
+        .filter((c) => c.fecha.slice(0, 7) === mes)
+        .reduce((t, c) => t + saldoCuenta(c), 0);
+    return { movs, ingresos, gastos, porCategoria, credito };
   }, [version, mes]);
 
   const eliminar = async (id: string) => {
@@ -128,7 +136,7 @@ export default function ContabilidadPage() {
     guardarMovimientos(leerMovimientos().filter((m) => m.id !== id));
   };
 
-  const balance = datos ? datos.ingresos - datos.gastos : 0;
+  const balance = datos ? datos.ingresos - datos.gastos - datos.credito : 0;
 
   // Solo el administrador o quien tenga el permiso ve la contabilidad
   if (version >= 0 && !puede("contabilidad")) {
@@ -174,6 +182,12 @@ export default function ContabilidadPage() {
             </div>
           ))}
         </div>
+        {datos && datos.credito > 0 && (
+          <div className="flex items-center justify-between border-t border-slate-100 px-3 py-1.5 text-[12px]">
+            <span className="text-slate-500">Crédito por pagar del mes (incluido en el balance)</span>
+            <span className="font-bold tabular-nums text-orange-600">−{formatoPesos(datos.credito)}</span>
+          </div>
+        )}
       </section>
 
       <FacturasCredito version={version} />
