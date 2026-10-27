@@ -167,22 +167,37 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
   const [descripcion, setDescripcion] = useState("");
   const [monto, setMonto] = useState("");
   const [fecha, setFecha] = useState(hoy());
+  const [loteId, setLoteId] = useState("");
+  const lotesActivos = abierta ? leerLotes().filter((l) => l.activo) : [];
 
   const cambiarTipo = (t: Movimiento["tipo"]) => {
     setTipo(t);
     setCategoria(CATEGORIAS[t][0]);
+    if (t !== "ingreso") setLoteId("");
   };
 
   const guardar = (e: FormEvent) => {
     e.preventDefault();
     const valor = Number(monto) || 0;
     if (valor <= 0) return;
+    const lote = tipo === "ingreso" && loteId ? leerLotes().find((l) => l.id === loteId) : undefined;
+    const texto = descripcion.trim();
     guardarMovimientos([
       ...leerMovimientos(),
-      { id: nuevoId(), fecha, tipo, categoria, descripcion: descripcion.trim(), monto: valor },
+      {
+        id: nuevoId(),
+        fecha,
+        tipo,
+        categoria,
+        // Con lote, el nombre del lote queda en la descripción (como los gastos del lote)
+        descripcion: lote ? `${texto || categoria} · ${nombreLote(lote)}` : texto,
+        monto: valor,
+        ...(lote ? { loteId: lote.id } : {}),
+      },
     ]);
     setDescripcion("");
     setMonto("");
+    setLoteId("");
     onCerrar();
   };
 
@@ -206,6 +221,18 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
         <Campo etiqueta="Categoría">
           <Selector value={categoria} onChange={setCategoria} opciones={CATEGORIAS[tipo].map((c) => ({ valor: c, texto: c }))} />
         </Campo>
+        {tipo === "ingreso" && lotesActivos.length > 0 && (
+          <Campo etiqueta="Lote (opcional)">
+            <Selector
+              value={loteId}
+              onChange={setLoteId}
+              opciones={[
+                { valor: "", texto: "Ingreso general de la granja" },
+                ...lotesActivos.map((l) => ({ valor: l.id, texto: `${nombreLote(l)} · ${l.vivos} animales` })),
+              ]}
+            />
+          </Campo>
+        )}
         <Campo etiqueta="Descripción">
           <Entrada value={descripcion} onChange={setDescripcion} placeholder="Ej. 20 bultos de levante" />
         </Campo>
@@ -227,12 +254,14 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
 
 /* ───────────── Contabilidad por lote (lotes activos) ───────────── */
 
-function cuentasLote(l: Lote) {
+function cuentasLote(l: Lote, movimientos = leerMovimientos()) {
   const alimento = l.alimento.reduce((s, a) => s + (Number(a.costo) || 0), 0);
   const sinPrecio = l.alimento.filter((a) => !(Number(a.costo) > 0)).length;
   const otros = (l.gastos ?? []).reduce((s, g) => s + (Number(g.valor) || 0), 0);
   const total = alimento + otros;
-  return { alimento, otros, total, sinPrecio, porAnimal: l.vivos > 0 ? total / l.vivos : 0 };
+  const ingresosLote = movimientos.filter((m) => m.tipo === "ingreso" && m.loteId === l.id);
+  const ingresos = ingresosLote.reduce((s, m) => s + m.monto, 0);
+  return { alimento, otros, total, sinPrecio, porAnimal: l.vivos > 0 ? total / l.vivos : 0, ingresos, ingresosLote, utilidad: ingresos - total };
 }
 
 function ContabilidadLotes({ version }: { version: number }) {
@@ -259,6 +288,7 @@ function ContabilidadLotes({ version }: { version: number }) {
                   <span className="block truncate text-sm font-semibold text-slate-900">{l.nombre && l.nombre !== l.codigo ? l.nombre : `${l.vivos} animales`}</span>
                   <span className="block truncate text-[11px] text-slate-500">
                     Alimento {formatoPesos(c.alimento)} · Otros {formatoPesos(c.otros)}
+                    {c.ingresos > 0 ? ` · Ingresos ${formatoPesos(c.ingresos)}` : ""}
                   </span>
                 </span>
                 <span className="shrink-0 text-right">
@@ -285,6 +315,7 @@ function DetalleCuentasLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => vo
       t: a.producto ? `${a.producto} · ${a.cantidad ?? ""} ${a.unidad ?? ""}`.trim() : `Alimento · ${a.kg} kg`,
       tipo: "Alimento",
       v: Number(a.costo) || 0,
+      ingreso: false,
     })),
     ...(lote.gastos ?? []).map((g) => ({
       k: g.id,
@@ -293,6 +324,16 @@ function DetalleCuentasLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => vo
       t: `${g.descripcion}${g.cantidad ? ` · ${g.cantidad}` : ""}`,
       tipo: g.categoria,
       v: g.valor,
+      ingreso: false,
+    })),
+    ...c.ingresosLote.map((m) => ({
+      k: m.id,
+      f: m.fecha,
+      h: "",
+      t: m.descripcion.replace(` · ${nombreLote(lote)}`, "") || m.categoria,
+      tipo: `Ingreso · ${m.categoria}`,
+      v: m.monto,
+      ingreso: true,
     })),
   ].sort((a, b) => b.f.localeCompare(a.f) || b.h.localeCompare(a.h));
 
@@ -303,7 +344,7 @@ function DetalleCuentasLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => vo
           {[
             { t: "Alimento", v: formatoPesos(c.alimento) },
             { t: "Otros", v: formatoPesos(c.otros) },
-            { t: "Total", v: formatoPesos(c.total) },
+            { t: "Gastos", v: formatoPesos(c.total) },
           ].map((x) => (
             <div key={x.t} className="rounded-xl bg-white px-2 py-2 ring-1 ring-slate-200">
               <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{x.t}</p>
@@ -311,13 +352,25 @@ function DetalleCuentasLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => vo
             </div>
           ))}
         </div>
+        {c.ingresos > 0 && (
+          <div className="grid grid-cols-2 gap-1.5 text-center">
+            <div className="rounded-xl bg-sky-50 px-2 py-2 ring-1 ring-sky-100">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-sky-700">Ingresos</p>
+              <p className="truncate text-[13px] font-bold tabular-nums text-sky-700">{formatoPesos(c.ingresos)}</p>
+            </div>
+            <div className={`rounded-xl px-2 py-2 ring-1 ${c.utilidad >= 0 ? "bg-sky-50 ring-sky-100" : "bg-rose-50 ring-rose-100"}`}>
+              <p className={`text-[10px] font-medium uppercase tracking-wide ${c.utilidad >= 0 ? "text-sky-700" : "text-rose-600"}`}>Utilidad</p>
+              <p className={`truncate text-[13px] font-bold tabular-nums ${c.utilidad >= 0 ? "text-sky-700" : "text-rose-600"}`}>{formatoPesos(c.utilidad)}</p>
+            </div>
+          </div>
+        )}
         <p className="text-xs text-slate-500">
           {lote.vivos} animales vivos
           {c.porAnimal > 0 ? ` · ${formatoPesos(Math.round(c.porAnimal))} por animal` : ""}
           {c.sinPrecio ? ` · ${c.sinPrecio} registro${c.sinPrecio === 1 ? "" : "s"} de alimento sin precio (la factura no tenía valor)` : ""}
         </p>
         {items.length === 0 ? (
-          <p className="rounded-xl bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">Este lote aún no tiene gastos.</p>
+          <p className="rounded-xl bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">Este lote aún no tiene gastos ni ingresos.</p>
         ) : (
           <ul className="flex flex-col divide-y divide-slate-100 rounded-2xl bg-white ring-1 ring-slate-200">
             {items.map((x) => (
@@ -328,7 +381,9 @@ function DetalleCuentasLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => vo
                     {x.tipo} · {formatoFecha(x.f)}
                   </p>
                 </div>
-                <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">{x.v > 0 ? formatoPesos(x.v) : "–"}</span>
+                <span className={`shrink-0 text-sm font-semibold tabular-nums ${x.ingreso ? "text-sky-700" : "text-slate-900"}`}>
+                  {x.v > 0 ? `${x.ingreso ? "+" : "−"}${formatoPesos(x.v)}` : "–"}
+                </span>
               </li>
             ))}
           </ul>

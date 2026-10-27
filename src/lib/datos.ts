@@ -149,6 +149,8 @@ export interface Movimiento {
   categoria: string;
   descripcion: string;
   monto: number;
+  /** Lote de engorde al que corresponde (p. ej. el ingreso por su venta) */
+  loteId?: string;
 }
 
 export type ZonaMonitoreo = "Maternidad" | "Gestación" | "Precebo" | "Engorde";
