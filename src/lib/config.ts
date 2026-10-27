@@ -101,6 +101,8 @@ export interface ConfigGranja {
   clavesV2?: boolean;
   /** Las claves de eliminar, facturas y lotes ya pasaron a 1415 */
   clavesV3?: boolean;
+  /** Ya se aplicó que las claves vengan desactivadas por defecto */
+  clavesV4?: boolean;
   claveEliminarActiva: boolean;
   claveFacturasActiva: boolean;
   claveLotesActiva: boolean;
@@ -127,9 +129,9 @@ export const CONFIG_POR_DEFECTO: ConfigGranja = {
   claveFacturas: "1415",
   claveLotes: "1415",
   claveAjustesActiva: true,
-  claveEliminarActiva: true,
-  claveFacturasActiva: true,
-  claveLotesActiva: true,
+  claveEliminarActiva: false,
+  claveFacturasActiva: false,
+  claveLotesActiva: false,
   desteteMin: 21,
   desteteMax: 28,
   parideras: 0,
@@ -180,9 +182,11 @@ export function leerConfig(): ConfigGranja {
       clavesV2: true,
       clavesV3: true,
       claveAjustesActiva: c.claveAjustesActiva !== false,
-      claveEliminarActiva: c.claveEliminarActiva !== false,
-      claveFacturasActiva: c.claveFacturasActiva !== false,
-      claveLotesActiva: c.claveLotesActiva !== false,
+      // Por defecto desactivadas (una sola vez se apagan todas; luego el administrador decide)
+      clavesV4: true,
+      claveEliminarActiva: c.clavesV4 ? c.claveEliminarActiva === true : false,
+      claveFacturasActiva: c.clavesV4 ? c.claveFacturasActiva === true : false,
+      claveLotesActiva: c.clavesV4 ? c.claveLotesActiva === true : false,
       claveLotes: c.clavesV3 && esClave(c.claveLotes) ? c.claveLotes : CONFIG_POR_DEFECTO.claveLotes,
       desteteMin: min,
       desteteMax: max,

@@ -93,6 +93,8 @@ export default function AjustesAvanzadosPage() {
       </Grupo>
       )}
 
+      {/* Solo el administrador ve y cambia las claves */}
+      {esAdmin && (
       <Grupo titulo="Claves">
         <Desplegable icono="papelera" titulo="Clave de eliminación" resumen={config.claveEliminarActiva ? "Activa" : "Desactivada"} abierto={abierto === "eliminar"} onAlternar={() => alternar("eliminar")}>
           <ActivarClave
@@ -137,6 +139,7 @@ export default function AjustesAvanzadosPage() {
           />
         </Desplegable>
       </Grupo>
+      )}
 
       <Grupo titulo="Granja">
         <Desplegable
