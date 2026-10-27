@@ -10,6 +10,11 @@
  *  - historial de cada cerda: un documento por registro
  *  - valores sueltos (configuración, checklist): un documento "valor"
  * Si dos teléfonos cambian el mismo elemento, queda el último que se sube.
+ *
+ * Granjas: cada granja tiene sus datos aparte. La principal (El Mirador) usa los
+ * nombres de colección de siempre; las demás los guardan como "g:<id>:<clave>".
+ * En el teléfono solo está "en vivo" la granja elegida; las otras quedan
+ * guardadas aparte y se cambian con cambiarGranja().
  */
 
 import { api, perfilGuardado, sesionGuardada } from "@/lib/nube";
@@ -29,10 +34,50 @@ const LISTAS = new Set([
   "corrales",
 ]);
 const VALORES = new Set(["config-granja", "ajustes", "bioseguridad-checks"]);
+/** Lista de granjas: es común a todas (no se separa por granja) */
+export const CLAVE_GRANJAS = "granjas";
 const ID_VALOR = "valor";
 
 const esHistorial = (clave: string) => clave.startsWith("historial-");
-export const seSincroniza = (clave: string) => LISTAS.has(clave) || VALORES.has(clave) || esHistorial(clave);
+export const seSincroniza = (clave: string) => clave === CLAVE_GRANJAS || LISTAS.has(clave) || VALORES.has(clave) || esHistorial(clave);
+
+/* ───────────── Granjas ───────────── */
+
+export const GRANJA_PRINCIPAL = "mirador";
+const CLAVE_GRANJA_ACTUAL = "granja-actual";
+export interface Granja {
+  id: string;
+  nombre: string;
+  creada?: string;
+}
+
+export function granjaActual(): string {
+  try {
+    return localStorage.getItem(CLAVE_GRANJA_ACTUAL) || GRANJA_PRINCIPAL;
+  } catch {
+    return GRANJA_PRINCIPAL;
+  }
+}
+
+/** Todas las granjas (la principal siempre primero) */
+export function leerGranjas(): Granja[] {
+  const otras = leerJson<Granja[]>(CLAVE_GRANJAS, []).filter((g) => g && g.id && g.id !== GRANJA_PRINCIPAL);
+  return [{ id: GRANJA_PRINCIPAL, nombre: "El Mirador" }, ...otras];
+}
+export const nombreGranjaActual = () => leerGranjas().find((g) => g.id === granjaActual())?.nombre ?? "El Mirador";
+
+/** Nombre de la colección en la nube para una clave del teléfono */
+function remota(clave: string, granja = granjaActual()) {
+  if (clave === CLAVE_GRANJAS || granja === GRANJA_PRINCIPAL) return clave;
+  return `g:${granja}:${clave}`;
+}
+/** Clave del teléfono para una colección de la nube (null si es de otra granja) */
+function local(coleccion: string, granja = granjaActual()): string | null {
+  if (coleccion === CLAVE_GRANJAS) return coleccion;
+  const m = /^g:([^:]+):(.+)$/.exec(coleccion);
+  if (m) return m[1] === granja ? m[2] : null;
+  return granja === GRANJA_PRINCIPAL ? coleccion : null;
+}
 
 type Obj = Record<string, unknown>;
 
@@ -56,8 +101,10 @@ interface Pendiente {
   borrado: boolean;
 }
 interface Meta {
-  /** Fecha del último cambio bajado de la nube */
+  /** Fecha del último cambio bajado de la nube (granja principal, formato anterior) */
   cursor: string | null;
+  /** Fecha del último cambio bajado, por granja */
+  cursores?: Record<string, string | null>;
   /** Usuario con el que se inicializó este teléfono */
   usuarioId?: string;
   /** Última sincronización completa */
@@ -94,8 +141,9 @@ export function capturarCambio(clave: string, antes: unknown, despues: unknown) 
   if (aplicandoRemoto || typeof window === "undefined" || !seSincroniza(clave)) return;
   try {
     const cola = leerCola();
+    const coleccion = remota(clave);
     const poner = (id: string, datos: unknown, borrado: boolean) => {
-      cola[llave(clave, id)] = { coleccion: clave, id, datos: borrado ? null : datos, borrado };
+      cola[llave(coleccion, id)] = { coleccion, id, datos: borrado ? null : datos, borrado };
     };
     if (VALORES.has(clave)) {
       if (JSON.stringify(antes ?? null) !== JSON.stringify(despues ?? null)) poner(ID_VALOR, despues ?? null, despues === null || despues === undefined);
@@ -162,10 +210,11 @@ function aplicarDocumentos(docs: Documento[]) {
   const cola = leerCola();
   const porClave = new Map<string, Documento[]>();
   for (const d of docs) {
-    if (!seSincroniza(d.coleccion)) continue;
+    const clave = local(d.coleccion);
+    if (!clave || !seSincroniza(clave)) continue;
     // Si este teléfono tiene un cambio sin subir del mismo elemento, se respeta el local
     if (cola[llave(d.coleccion, d.id)]) continue;
-    porClave.set(d.coleccion, [...(porClave.get(d.coleccion) ?? []), d]);
+    porClave.set(clave, [...(porClave.get(clave) ?? []), d]);
   }
   aplicandoRemoto = true;
   try {
@@ -282,18 +331,22 @@ async function restaurarDesdeNube(items: Pendiente[]) {
 const ms = (iso: string) => new Date(iso.replace(/(\.\d{3})\d+/, "$1")).getTime();
 
 async function bajar() {
+  const granja = granjaActual();
   const meta = leerMeta();
-  let cursor = meta.cursor;
+  let cursor = (meta.cursores ?? {})[granja] ?? (granja === GRANJA_PRINCIPAL ? meta.cursor : null);
+  // Solo se baja la granja elegida (y la lista de granjas)
+  const deLaGranja = granja === GRANJA_PRINCIPAL ? "&coleccion=not.like.g:*" : `&or=(coleccion.like.g:${granja}:*,coleccion.eq.${CLAVE_GRANJAS})`;
   for (;;) {
     // Se repasan 2 minutos hacia atrás por si algún cambio se guardó con una hora anterior
     const desde = cursor ? new Date(ms(cursor) - 120_000).toISOString() : null;
-    const filtro = desde ? `&actualizado_en=gte.${encodeURIComponent(desde)}` : "";
+    const filtro = (desde ? `&actualizado_en=gte.${encodeURIComponent(desde)}` : "") + deLaGranja;
     const docs = await api<Documento[]>(`documentos?select=coleccion,id,datos,borrado,actualizado_en${filtro}&order=actualizado_en.asc&limit=1000`);
     aplicarDocumentos(docs);
     const ultimo = docs[docs.length - 1]?.actualizado_en ?? cursor;
     const avanzo = !!ultimo && (!cursor || ms(ultimo) > ms(cursor));
     if (avanzo) cursor = ultimo;
-    guardarMeta({ ...leerMeta(), cursor });
+    const m = leerMeta();
+    guardarMeta({ ...m, cursores: { ...(m.cursores ?? {}), [granja]: cursor } });
     if (docs.length < 1000 || !avanzo) break;
   }
 }
@@ -301,10 +354,10 @@ async function bajar() {
 /* Registro de actividad: se sube lo nuevo de este teléfono */
 async function subirRegistro() {
   const meta = leerMeta();
-  const log = leerJson<{ id: string; fecha: string; accion: string; modulo: string; detalle: string }[]>("registro-actividad", []);
+  const log = leerJson<{ id: string; fecha: string; accion: string; modulo: string; detalle: string; granja?: string }[]>("registro-actividad", []);
   const nuevos = meta.logSubido ? log.filter((e) => e.fecha > meta.logSubido!) : log;
   if (!nuevos.length) return;
-  const lote = nuevos.slice(0, 500).map(({ id, fecha, accion, modulo, detalle }) => ({ id, fecha, accion, modulo, detalle }));
+  const lote = nuevos.slice(0, 500).map(({ id, fecha, accion, modulo, detalle, granja }) => ({ id, fecha, accion, modulo, detalle, granja: granja ?? null }));
   await api("registro_actividad?on_conflict=id", {
     method: "POST",
     headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
@@ -319,7 +372,7 @@ function clavesLocales(): string[] {
   const out: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
-    if (k && (seSincroniza(k) || k === "engorde-secuencia-lotes" || k === "bodega-articulos")) out.push(k);
+    if (k && k !== CLAVE_GRANJAS && (seSincroniza(k) || k === "engorde-secuencia-lotes" || k === "bodega-articulos")) out.push(k);
   }
   return out;
 }
@@ -400,4 +453,51 @@ export function reemplazarClave(clave: string, valor: unknown | null) {
 export function reiniciarSincronizacion() {
   localStorage.removeItem(CLAVE_META);
   localStorage.removeItem(CLAVE_COLA);
+}
+
+/* ───────────── Crear y cambiar de granja ───────────── */
+
+const prefijoGuardado = (granja: string) => `granja-guardada:${granja}:`;
+
+/** Crea una granja nueva (en blanco) y la devuelve */
+export function crearGranja(nombre: string): Granja {
+  const limpio = nombre.trim().slice(0, 40);
+  const granja: Granja = { id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, nombre: limpio, creada: new Date().toISOString() };
+  const otras = leerJson<Granja[]>(CLAVE_GRANJAS, []);
+  reemplazarClave(CLAVE_GRANJAS, [...otras, granja]);
+  return granja;
+}
+
+/**
+ * Cambia la granja en uso: guarda aparte los datos de la actual y pone "en vivo"
+ * los de la elegida (lo que haya guardado en este teléfono). Después hay que
+ * sincronizar para traer lo último de la nube.
+ */
+export function cambiarGranja(id: string) {
+  const actual = granjaActual();
+  if (id === actual) return;
+  aplicandoRemoto = true;
+  try {
+    // 1. Guardar aparte la granja actual
+    for (const k of clavesLocales()) {
+      const v = localStorage.getItem(k);
+      if (v !== null) localStorage.setItem(prefijoGuardado(actual) + k, v);
+      localStorage.removeItem(k);
+    }
+    // 2. Poner en vivo la elegida
+    const prefijo = prefijoGuardado(id);
+    const guardadas: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(prefijo)) guardadas.push(k);
+    }
+    for (const k of guardadas) {
+      localStorage.setItem(k.slice(prefijo.length), localStorage.getItem(k) ?? "");
+      localStorage.removeItem(k);
+    }
+    localStorage.setItem(CLAVE_GRANJA_ACTUAL, id);
+  } finally {
+    aplicandoRemoto = false;
+  }
+  window.dispatchEvent(new Event("storage"));
 }

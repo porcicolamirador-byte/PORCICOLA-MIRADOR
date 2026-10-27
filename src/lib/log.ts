@@ -5,7 +5,7 @@
  * así que cualquier pantalla que guarde datos queda registrada.
  */
 
-import { capturarCambio, prepararHistorial } from "@/lib/sincronizar";
+import { capturarCambio, nombreGranjaActual, prepararHistorial } from "@/lib/sincronizar";
 
 export type AccionLog = "Creación" | "Modificación" | "Eliminación" | "Sistema";
 
@@ -18,6 +18,8 @@ export interface EntradaLog {
   detalle: string;
   /** Nombre del usuario que lo hizo (si había sesión) */
   usuario?: string;
+  /** Granja en la que se hizo */
+  granja?: string;
 }
 
 export const CLAVE_LOG = "registro-actividad";
@@ -70,7 +72,8 @@ export function registrarLog(entradas: { accion: AccionLog; modulo: string; deta
   try {
     const fecha = new Date().toISOString();
     const usuario = usuarioActual();
-    const nuevas = entradas.map((e) => ({ id: nuevoIdLog(), fecha, ...e, ...(usuario ? { usuario } : {}) }));
+    const granja = nombreGranjaActual();
+    const nuevas = entradas.map((e) => ({ id: nuevoIdLog(), fecha, ...e, ...(usuario ? { usuario } : {}), granja }));
     localStorage.setItem(CLAVE_LOG, JSON.stringify([...nuevas.reverse(), ...leerLog()].slice(0, MAXIMO)));
   } catch {
     // sin espacio o sin almacenamiento: el registro no debe impedir guardar los datos
@@ -195,6 +198,8 @@ function coleccionDe(clave: string): Coleccion | null {
       };
     case "bodega-productos":
       return { modulo: "Bodega", idDe: (o) => txt(o.id), describir: (o) => `Producto ${`${txt(o.codigo)} ${txt(o.nombre)}`.trim()}${o.activo === false ? " (inactivo)" : ""}` };
+    case "granjas":
+      return { modulo: "Granjas", idDe: (o) => txt(o.id), describir: (o) => `Granja ${txt(o.nombre)}` };
     case "corrales":
       return { modulo: "Corrales", idDe: (o) => txt(o.id), describir: (o) => `Corral ${txt(o.codigo)} · ${txt(o.zona)}` };
     case "tratamientos":

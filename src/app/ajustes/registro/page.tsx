@@ -53,7 +53,7 @@ export default function RegistroActividadPage() {
   const log = useMemo<EntradaLog[]>(() => (cliente ? leerLog() : []), [cliente, version, recarga]);
   const q = busqueda.trim().toLowerCase();
   const filtrados = log.filter(
-    (e) => (filtro === "todos" || e.accion === filtro) && (!q || `${e.detalle} ${e.modulo} ${e.usuario ?? ""}`.toLowerCase().includes(q)),
+    (e) => (filtro === "todos" || e.accion === filtro) && (!q || `${e.detalle} ${e.modulo} ${e.usuario ?? ""} ${e.granja ?? ""}`.toLowerCase().includes(q)),
   );
   const visibles = filtrados.slice(0, limite);
   const cuenta = (a: AccionLog) => log.filter((e) => e.accion === a).length;
@@ -136,6 +136,7 @@ export default function RegistroActividadPage() {
                           <p className="mt-0.5 text-[11px] text-slate-500">
                             <span className={`font-semibold ${est.texto}`}>{est.etiqueta}</span> · {e.modulo}
                             {e.usuario ? <> · <span className="font-medium text-slate-600">{e.usuario}</span></> : null}
+                            {e.granja && e.granja !== "El Mirador" ? <> · {e.granja}</> : null}
                           </p>
                         </div>
                         <span className="shrink-0 pt-0.5 text-[11px] tabular-nums text-slate-400">{horaDe(e.fecha)}</span>

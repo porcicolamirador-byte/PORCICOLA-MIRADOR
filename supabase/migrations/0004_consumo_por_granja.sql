@@ -1,0 +1,2 @@
+-- consumo_nube: agrupa también los datos de las granjas adicionales (g:<id>:<clave>)
+-- (ver la versión aplicada en la base; reemplaza a 0002)

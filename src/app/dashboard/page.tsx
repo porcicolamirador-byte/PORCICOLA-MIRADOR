@@ -3,6 +3,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
+import Modal from "@/components/Modal";
+import { Boton, Campo, Entrada } from "@/components/ui";
+import { cambiarGranja, crearGranja, granjaActual, leerGranjas, nombreGranjaActual, sincronizar } from "@/lib/sincronizar";
+import { registrarLog } from "@/lib/log";
 import SummaryCard from "@/components/SummaryCard";
 import PageShell from "@/components/PageShell";
 import BottomNav from "@/components/BottomNav";
@@ -203,6 +207,17 @@ function obtenerCerdasCriticas(datos: Cerda[]) {
 export default function Dashboard() {
   const router = useRouter();
 
+  // Granja en uso (cada granja tiene sus propios datos)
+  const [granjaNombre, setGranjaNombre] = useState("El Mirador");
+  const [verGranjas, setVerGranjas] = useState(false);
+  const [crearGranjaAbierto, setCrearGranjaAbierto] = useState(false);
+  useEffect(() => {
+    const leer = () => setGranjaNombre(nombreGranjaActual());
+    leer();
+    window.addEventListener("storage", leer);
+    return () => window.removeEventListener("storage", leer);
+  }, []);
+
   // Se carga en el cliente después de montar (el servidor no tiene localStorage)
   const [cerdas, setCerdas] = useState<Cerda[]>([]);
 
@@ -273,8 +288,21 @@ export default function Dashboard() {
     <PageShell bgColor={COLOR_PAGINA} className="flex flex-col">
       <div className="mx-auto flex max-w-xl flex-1 flex-col gap-5 pb-44">
         <Header
-          title="El Mirador"
+          title={granjaNombre}
           bgColor={COLOR_PAGINA}
+          onTitulo={() => setVerGranjas(true)}
+          actions={
+            <button
+              type="button"
+              onClick={() => setCrearGranjaAbierto(true)}
+              aria-label="Crear otra granja"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-900 text-white shadow-sm transition active:scale-95"
+            >
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
+          }
         />
 
         {/* Parte del día: compacto, una sola franja */}
@@ -416,6 +444,112 @@ export default function Dashboard() {
         </button>
       )}
 
+      <SelectorGranjas abierto={verGranjas} onCerrar={() => setVerGranjas(false)} onNueva={() => { setVerGranjas(false); setCrearGranjaAbierto(true); }} />
+      <NuevaGranja abierto={crearGranjaAbierto} onCerrar={() => setCrearGranjaAbierto(false)} />
     </PageShell>
+  );
+}
+
+/* ───────────── Granjas: elegir y crear ───────────── */
+
+const ICONO_GRANJA = (
+  <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="m3 11 9-7 9 7M5 10v10h14V10" />
+    <path d="M10 20v-5h4v5" />
+  </svg>
+);
+
+/** Cambia de granja y recarga el panel con sus datos */
+function abrirGranja(id: string) {
+  cambiarGranja(id);
+  void sincronizar();
+  window.location.replace("/dashboard");
+}
+
+function SelectorGranjas({ abierto, onCerrar, onNueva }: { abierto: boolean; onCerrar: () => void; onNueva: () => void }) {
+  if (!abierto) return null;
+  const granjas = leerGranjas();
+  const actual = granjaActual();
+  return (
+    <Modal abierta etiqueta="Porcícola" titulo="Granjas" subtitulo="Cada granja tiene sus propios datos" icono={ICONO_GRANJA} onCerrar={onCerrar}>
+      <div className="flex flex-col gap-3">
+        <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200">
+          {granjas.map((g) => {
+            const esta = g.id === actual;
+            return (
+              <li key={g.id}>
+                <button
+                  type="button"
+                  onClick={() => (esta ? onCerrar() : abrirGranja(g.id))}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-50"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700" aria-hidden="true">
+                    {g.nombre.trim().charAt(0).toUpperCase()}
+                  </span>
+                  <span className={`min-w-0 flex-1 truncate text-[15px] ${esta ? "font-semibold text-slate-900" : "text-slate-700"}`}>{g.nombre}</span>
+                  {esta && (
+                    <svg viewBox="0 0 20 20" className="h-5 w-5 shrink-0 text-sky-600" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="m4.5 10.5 3.5 3.5 7.5-8" />
+                    </svg>
+                  )}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        <Boton onClick={onNueva} className="w-full py-3">
+          + Nueva granja
+        </Boton>
+      </div>
+    </Modal>
+  );
+}
+
+function NuevaGranja({ abierto, onCerrar }: { abierto: boolean; onCerrar: () => void }) {
+  const [nombre, setNombre] = useState("");
+  const [error, setError] = useState("");
+  if (!abierto) return null;
+
+  const crear = () => {
+    const limpio = nombre.trim();
+    if (limpio.length < 2) return setError("Escribe el nombre de la granja.");
+    if (leerGranjas().some((g) => g.nombre.trim().toLowerCase() === limpio.toLowerCase())) return setError("Ya existe una granja con ese nombre.");
+    const g = crearGranja(limpio);
+    registrarLog([{ accion: "Creación", modulo: "Granjas", detalle: `Granja ${g.nombre}` }]);
+    setNombre("");
+    abrirGranja(g.id);
+  };
+
+  return (
+    <Modal abierta etiqueta="Porcícola" titulo="Nueva granja" subtitulo="Empieza en blanco" icono={ICONO_GRANJA} onCerrar={onCerrar}>
+      <form
+        className="flex flex-col gap-3.5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          crear();
+        }}
+      >
+        <Campo etiqueta="Nombre de la granja">
+          <Entrada
+            value={nombre}
+            onChange={(v) => {
+              setNombre(v.slice(0, 40));
+              setError("");
+            }}
+            placeholder="Ej. La Esperanza"
+          />
+        </Campo>
+        <p className="text-xs text-slate-500">
+          Tendrá sus propias cerdas, lotes, bodega, contabilidad y ajustes. Los usuarios y sus permisos son los mismos. Puedes volver a El Mirador tocando el nombre de arriba.
+        </p>
+        {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
+        <div className="grid grid-cols-2 gap-2">
+          <Boton variante="secundario" onClick={onCerrar}>
+            Cancelar
+          </Boton>
+          <Boton type="submit">Crear granja</Boton>
+        </div>
+      </form>
+    </Modal>
   );
 }

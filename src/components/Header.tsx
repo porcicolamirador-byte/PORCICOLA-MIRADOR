@@ -6,6 +6,8 @@ interface HeaderProps {
   subtitle?: string;
   bgColor?: string;
   actions?: React.ReactNode;
+  /** Si se da, el título se puede tocar (p. ej. para cambiar de granja) */
+  onTitulo?: () => void;
 }
 
 function isColorDark(color: string): boolean {
@@ -46,6 +48,7 @@ export default function Header({
   subtitle,
   bgColor = "#f5f5f7",
   actions,
+  onTitulo,
 }: HeaderProps) {
   const isDark = useMemo(() => isColorDark(bgColor), [bgColor]);
 
@@ -59,7 +62,7 @@ export default function Header({
       className={`encabezado flex items-start justify-between gap-4 p-4 rounded-2xl border ${borderColor}`}
       style={getHeaderBgStyle(isDark)}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3">
         <div
           className={`logo-caja flex h-16 w-16 items-center justify-center rounded-3xl ${iconBgColor} shadow-sm`}
         >
@@ -74,13 +77,20 @@ export default function Header({
             className="h-12 w-12 rounded-2xl object-contain"
           />
         </div>
-        <div>
+        <div className="min-w-0">
           <p className={`text-sm font-semibold uppercase tracking-[0.25em] ${subtitleColor}`}>
             Porcícola
           </p>
-          <h1 className={`text-3xl font-black leading-tight ${textColor}`}>
-            {title}
-          </h1>
+          {onTitulo ? (
+            <button type="button" onClick={onTitulo} className="flex items-center gap-1.5 text-left active:opacity-70" aria-label={`${title}: cambiar de granja`}>
+              <h1 className={`text-3xl font-black leading-tight ${textColor}`}>{title}</h1>
+              <svg viewBox="0 0 20 20" className={`mt-1 h-5 w-5 shrink-0 ${subtitleColor}`} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M5 8l5 5 5-5" />
+              </svg>
+            </button>
+          ) : (
+            <h1 className={`text-3xl font-black leading-tight ${textColor}`}>{title}</h1>
+          )}
           {subtitle && (
             <p className={`mt-1 text-sm ${subtitleColor}`}>{subtitle}</p>
           )}

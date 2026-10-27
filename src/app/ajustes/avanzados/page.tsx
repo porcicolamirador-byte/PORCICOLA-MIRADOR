@@ -858,6 +858,7 @@ const NOMBRES_COLECCION: Record<string, string> = {
   "config-granja": "Configuración",
   ajustes: "Ajustes",
   "bioseguridad-checks": "Checklist de bioseguridad",
+  granjas: "Granjas adicionales",
 };
 
 const mb = (bytes: number) => bytes / (1024 * 1024);
