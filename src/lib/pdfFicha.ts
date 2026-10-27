@@ -3,10 +3,10 @@
  * Usa las fuentes estándar Helvetica con codificación WinAnsi (acentos y ñ OK).
  */
 
-type RGB = [number, number, number];
+export type RGB = [number, number, number];
 
-const ANCHO = 595; // A4 en puntos
-const ALTO = 842;
+export const ANCHO = 595; // A4 en puntos
+export const ALTO = 842;
 
 const VERDE: RGB = [6, 78, 59];
 const VERDE_CLARO: RGB = [236, 253, 245];
@@ -43,7 +43,7 @@ function cadena(texto: string): string {
 const color = ([r, g, b]: RGB) => `${(r / 255).toFixed(3)} ${(g / 255).toFixed(3)} ${(b / 255).toFixed(3)}`;
 const n = (v: number) => v.toFixed(2);
 
-class Lienzo {
+export class Lienzo {
   ops: string[] = [];
 
   /** Rectángulo relleno (y medido desde arriba), con esquinas redondeadas opcionales */
@@ -89,12 +89,12 @@ class Lienzo {
 }
 
 /** Ancho aproximado de un texto en Helvetica (suficiente para maquetar) */
-function anchoAprox(t: string, tam: number, negrita = false) {
+export function anchoAprox(t: string, tam: number, negrita = false) {
   return t.length * tam * (negrita ? 0.58 : 0.52);
 }
 
 /** Parte un texto en líneas de como máximo `max` caracteres */
-function partir(texto: string, max: number): string[] {
+export function partir(texto: string, max: number): string[] {
   const lineas: string[] = [];
   for (const parrafo of texto.split(/\r?\n/)) {
     let actual = "";
@@ -230,23 +230,30 @@ export function generarPdfFicha(d: DatosFicha): Blob {
   L.texto(M, 822, `${d.granja} · Gestión de producción porcina`, 8, PIZARRA_400);
   L.texto(ANCHO - M - 150, 822, `Cerda ${d.id} · ${d.fechaGeneracion}`, 8, PIZARRA_400);
 
-  // Ensamblado del archivo PDF
-  const contenido = L.ops.join("\n");
+  return ensamblarPdf([L], d.logo);
+}
+
+/** Arma el archivo PDF con una o varias páginas (cada Lienzo es una página) */
+export function ensamblarPdf(paginas: Lienzo[], logo?: LogoJpeg | null): Blob {
+  // 1 catálogo, 2 páginas, 3-4 fuentes, 5 logo, desde 6: página + contenido
   const objetos: string[] = [];
+  const kids = paginas.map((_, i) => `${6 + i * 2} 0 R`).join(" ");
   objetos[1] = "<< /Type /Catalog /Pages 2 0 R >>";
-  objetos[2] = "<< /Type /Pages /Kids [3 0 R] /Count 1 >>";
-  objetos[3] =
-    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${ANCHO} ${ALTO}] ` +
-    `/Resources << /Font << /F1 5 0 R /F2 6 0 R >>${d.logo ? " /XObject << /Im1 7 0 R >>" : ""} >> /Contents 4 0 R >>`;
-  objetos[4] = `<< /Length ${contenido.length} >>\nstream\n${contenido}\nendstream`;
-  objetos[5] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>";
-  objetos[6] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>";
-  if (d.logo) {
-    objetos[7] =
-      `<< /Type /XObject /Subtype /Image /Width ${d.logo.ancho} /Height ${d.logo.alto} ` +
-      `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${d.logo.datos.length} >>\n` +
-      `stream\n${d.logo.datos}\nendstream`;
-  }
+  objetos[2] = `<< /Type /Pages /Kids [${kids}] /Count ${paginas.length} >>`;
+  objetos[3] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>";
+  objetos[4] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>";
+  objetos[5] = logo
+    ? `<< /Type /XObject /Subtype /Image /Width ${logo.ancho} /Height ${logo.alto} ` +
+      `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${logo.datos.length} >>\n` +
+      `stream\n${logo.datos}\nendstream`
+    : "<< >>";
+  paginas.forEach((pag, i) => {
+    const contenido = pag.ops.join("\n");
+    objetos[6 + i * 2] =
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${ANCHO} ${ALTO}] ` +
+      `/Resources << /Font << /F1 3 0 R /F2 4 0 R >>${logo ? " /XObject << /Im1 5 0 R >>" : ""} >> /Contents ${7 + i * 2} 0 R >>`;
+    objetos[7 + i * 2] = `<< /Length ${contenido.length} >>\nstream\n${contenido}\nendstream`;
+  });
 
   let pdf = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n";
   const offsets: number[] = [];

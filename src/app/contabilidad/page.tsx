@@ -18,6 +18,9 @@ import {
 } from "@/lib/datos";
 import { confirmar } from "@/components/Dialogo";
 import { puede } from "@/lib/nube";
+import { cargarLogoJpeg, entregarPdf } from "@/lib/pdfFicha";
+import { generarPdfContabilidad } from "@/lib/pdfContabilidad";
+import { nombreGranjaActual } from "@/lib/sincronizar";
 
 const CATEGORIAS: Record<Movimiento["tipo"], string[]> = {
   ingreso: ["Venta de cerdos de engorde", "Venta de lechones", "Venta de cerdas de descarte", "Otros ingresos"],
@@ -143,50 +146,14 @@ export default function ContabilidadPage() {
 
       {datos === null ? (
         <div className="h-40 animate-pulse rounded-3xl bg-slate-100" />
-      ) : datos.movs.length === 0 ? (
+      ) : leerMovimientos().length === 0 ? (
         <Vacio
-          titulo="Sin movimientos este mes"
+          titulo="Sin movimientos"
           texto="Registra ventas y gastos para conocer el balance de la granja."
           accion={<Boton onClick={() => setNuevo(true)}>Registrar movimiento</Boton>}
         />
       ) : (
-        <section>
-          <h2 className="mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Movimientos · {datos.movs.length}</h2>
-          <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200">
-            {datos.movs.map((m) => (
-              <li key={m.id} className="flex items-center gap-2.5 px-3 py-2">
-                <span
-                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${
-                    m.tipo === "ingreso" ? "bg-sky-50 text-sky-700" : "bg-rose-50 text-rose-700"
-                  }`}
-                  aria-hidden="true"
-                >
-                  {m.tipo === "ingreso" ? "+" : "−"}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-semibold text-slate-900">{m.descripcion || m.categoria}</p>
-                  <p className="truncate text-[11px] text-slate-500">
-                    {m.categoria} · {formatoFecha(m.fecha)}
-                  </p>
-                </div>
-                <span className={`shrink-0 text-[13px] font-semibold tabular-nums ${m.tipo === "ingreso" ? "text-sky-700" : "text-slate-900"}`}>
-                  {m.tipo === "ingreso" ? "+" : "−"}
-                  {formatoPesos(m.monto)}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => eliminar(m.id)}
-                  aria-label={`Quitar ${m.descripcion || m.categoria}`}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-300 active:bg-rose-50 active:text-rose-600"
-                >
-                  <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" aria-hidden="true">
-                    <path d="M5 5l10 10M15 5L5 15" />
-                  </svg>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <MovimientosPeriodo version={version} mes={mes} onEliminar={eliminar} />
       )}
 
       <NuevoMovimiento abierta={nuevo} onCerrar={() => setNuevo(false)} />
@@ -368,5 +335,152 @@ function DetalleCuentasLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => vo
         )}
       </div>
     </Hoja>
+  );
+}
+
+/* ───────────── Movimientos: desplegable, por semana o mes, y PDF ───────────── */
+
+const aISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function lunesDe(iso: string) {
+  const [a, m, d] = iso.split("-").map(Number);
+  const f = new Date(a, m - 1, d);
+  f.setDate(f.getDate() - ((f.getDay() + 6) % 7));
+  return aISO(f);
+}
+function sumarDias(iso: string, dias: number) {
+  const [a, m, d] = iso.split("-").map(Number);
+  const f = new Date(a, m - 1, d);
+  f.setDate(f.getDate() + dias);
+  return aISO(f);
+}
+const fechaCorta = (iso: string) => {
+  const [a, m, d] = iso.split("-").map(Number);
+  return new Date(a, m - 1, d).toLocaleDateString("es-CO", { day: "numeric", month: "short" });
+};
+const textoSemana = (lunes: string) => {
+  const domingo = sumarDias(lunes, 6);
+  return `Semana del ${fechaCorta(lunes)} al ${fechaCorta(domingo)} ${domingo.slice(0, 4)}`;
+};
+
+function MovimientosPeriodo({ version, mes, onEliminar }: { version: number; mes: string; onEliminar: (id: string) => void }) {
+  const [modo, setModo] = useState<"mes" | "semana">("mes");
+  const [lunes, setLunes] = useState(() => lunesDe(hoy()));
+  const [exportando, setExportando] = useState(false);
+
+  const movs = useMemo(() => {
+    void version;
+    const todos = leerMovimientos();
+    const domingo = sumarDias(lunes, 6);
+    return todos
+      .filter((m) => (modo === "mes" ? m.fecha.slice(0, 7) === mes : m.fecha >= lunes && m.fecha <= domingo))
+      .sort((a, b) => b.fecha.localeCompare(a.fecha));
+  }, [version, mes, modo, lunes]);
+  const periodo = modo === "mes" ? nombreMes(mes) : textoSemana(lunes);
+  const ingresos = movs.filter((m) => m.tipo === "ingreso").reduce((s, m) => s + m.monto, 0);
+  const gastos = movs.filter((m) => m.tipo === "gasto").reduce((s, m) => s + m.monto, 0);
+
+  const exportar = async () => {
+    if (exportando) return;
+    setExportando(true);
+    try {
+      const logo = await cargarLogoJpeg("/images/logo.png");
+      const blob = generarPdfContabilidad({
+        granja: nombreGranjaActual(),
+        periodo: periodo.charAt(0).toUpperCase() + periodo.slice(1),
+        filas: movs.map((m) => ({ fecha: formatoFecha(m.fecha), descripcion: m.descripcion, categoria: m.categoria, tipo: m.tipo, monto: m.monto })),
+        fechaGeneracion: formatoFecha(hoy()),
+        logo,
+      });
+      const sufijo = modo === "mes" ? mes : `semana-${lunes}`;
+      await entregarPdf(blob, `contabilidad-${sufijo}.pdf`);
+    } finally {
+      setExportando(false);
+    }
+  };
+
+  return (
+    <SeccionDesplegable titulo="Movimientos" cantidad={movs.length}>
+      <div className="flex flex-col gap-2.5 p-3">
+        <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
+          {(["mes", "semana"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setModo(m)}
+              aria-pressed={modo === m}
+              className={`h-8 rounded-lg text-[13px] font-semibold transition ${modo === m ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+            >
+              {m === "mes" ? "Mes" : "Semana"}
+            </button>
+          ))}
+        </div>
+
+        {modo === "semana" ? (
+          <div className="flex items-center justify-between">
+            <button type="button" onClick={() => setLunes(sumarDias(lunes, -7))} aria-label="Semana anterior" className="flex h-8 w-8 items-center justify-center rounded-lg text-lg text-slate-500 active:bg-slate-100">‹</button>
+            <span className="text-[13px] font-semibold text-slate-900">{textoSemana(lunes)}</span>
+            <button type="button" onClick={() => setLunes(sumarDias(lunes, 7))} aria-label="Semana siguiente" className="flex h-8 w-8 items-center justify-center rounded-lg text-lg text-slate-500 active:bg-slate-100">›</button>
+          </div>
+        ) : (
+          <p className="text-center text-[13px] font-semibold capitalize text-slate-900">{nombreMes(mes)}</p>
+        )}
+
+        <div className="flex items-center justify-between gap-2 text-[12px]">
+          <span className="text-slate-500">
+            <span className="font-semibold text-sky-700">+{formatoPesos(ingresos)}</span> · <span className="font-semibold text-slate-900">−{formatoPesos(gastos)}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => void exportar()}
+            disabled={exportando}
+            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-sky-700 ring-1 ring-sky-200 active:bg-sky-50 disabled:opacity-50"
+          >
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14" />
+            </svg>
+            {exportando ? "Generando…" : "Exportar PDF"}
+          </button>
+        </div>
+
+        {movs.length === 0 ? (
+          <p className="rounded-xl bg-slate-50 px-3 py-5 text-center text-sm text-slate-500">No hay movimientos en este periodo.</p>
+        ) : (
+          <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl bg-white ring-1 ring-slate-100">
+            {movs.map((m) => (
+              <li key={m.id} className="flex items-center gap-2.5 px-3 py-2">
+                <span
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${
+                    m.tipo === "ingreso" ? "bg-sky-50 text-sky-700" : "bg-rose-50 text-rose-700"
+                  }`}
+                  aria-hidden="true"
+                >
+                  {m.tipo === "ingreso" ? "+" : "−"}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13px] font-semibold text-slate-900">{m.descripcion || m.categoria}</p>
+                  <p className="truncate text-[11px] text-slate-500">
+                    {m.categoria} · {formatoFecha(m.fecha)}
+                  </p>
+                </div>
+                <span className={`shrink-0 text-[13px] font-semibold tabular-nums ${m.tipo === "ingreso" ? "text-sky-700" : "text-slate-900"}`}>
+                  {m.tipo === "ingreso" ? "+" : "−"}
+                  {formatoPesos(m.monto)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onEliminar(m.id)}
+                  aria-label={`Quitar ${m.descripcion || m.categoria}`}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-300 active:bg-rose-50 active:text-rose-600"
+                >
+                  <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" aria-hidden="true">
+                    <path d="M5 5l10 10M15 5L5 15" />
+                  </svg>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </SeccionDesplegable>
   );
 }
