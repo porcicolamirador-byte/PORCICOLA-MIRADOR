@@ -779,7 +779,7 @@ export default function Gestacion() {
                   </div>
 
                   <div
-                    className="relative z-10 cursor-pointer bg-white p-3"
+                    className="relative z-10 cursor-pointer bg-white px-2.5 py-2"
                     onClick={() => {
                       if (isSwiped) {
                         setSwipedIndex(null);
@@ -795,29 +795,29 @@ export default function Gestacion() {
                       transition: isActiveMove ? "none" : "transform 200ms ease-out",
                     }}
                   >
-                    <div className="flex flex-col gap-2.5">
+                    <div className="flex flex-col gap-1.5">
                       {/* Cabecera: arete + raza + estado + progreso */}
                       <div className="flex items-center gap-3">
                         {/* El ID se ve como un arete de oreja */}
-                        <div className="relative flex h-12 min-w-[3.5rem] max-w-[6.5rem] shrink-0 items-center justify-center rounded-[14px] bg-gradient-to-b from-amber-200 to-amber-300 px-2.5 pt-1.5 shadow-sm ring-1 ring-amber-400/60">
+                        <div className="relative flex h-9 min-w-[2.75rem] shrink-0 items-center justify-center rounded-[10px] bg-gradient-to-b from-amber-200 to-amber-300 px-1.5 pt-1 shadow-sm ring-1 ring-amber-400/60">
                           <span
                             aria-hidden="true"
-                            className="absolute left-1/2 top-1.5 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-white/90 ring-1 ring-amber-600/40"
+                            className="absolute left-1/2 top-[3px] h-1 w-1 -translate-x-1/2 rounded-full bg-white/90 ring-1 ring-amber-600/40"
                           />
-                          <span className="truncate text-[17px] font-black tabular-nums tracking-tight text-amber-950">{cerda.id}</span>
+                          <span className="whitespace-nowrap text-[13px] font-black tabular-nums tracking-tight text-amber-950">{cerda.id}</span>
                         </div>
 
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-[15px] font-semibold leading-tight text-slate-900">{cerda.raza || "Sin raza"}</p>
-                          <span className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${obtenerEstadoStyles(estadoLabel)}`}>
+                          <p className="truncate text-sm font-semibold leading-tight text-slate-900">{cerda.raza || "Sin raza"}</p>
+                          <span className={`mt-0.5 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${obtenerEstadoStyles(estadoLabel)}`}>
                             <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
                             {estadoLabel}
                           </span>
                         </div>
 
                         {progresoGestacion !== null && estadoLabel === "Gestación" && diasParaParto !== null && (
-                          <div className={`relative h-11 w-11 shrink-0 ${panelStyles.secondary}`} role="img" aria-label={`Gestación al ${progresoGestacion}%`}>
-                            <svg viewBox="0 0 44 44" className="h-11 w-11 -rotate-90" aria-hidden="true">
+                          <div className={`relative h-9 w-9 shrink-0 ${panelStyles.secondary}`} role="img" aria-label={`Gestación al ${progresoGestacion}%`}>
+                            <svg viewBox="0 0 44 44" className="h-9 w-9 -rotate-90" aria-hidden="true">
                               <circle cx="22" cy="22" r="18" fill="none" strokeWidth="4" stroke="currentColor" strokeOpacity={0.15} />
                               <circle
                                 cx="22"
@@ -831,8 +831,8 @@ export default function Gestacion() {
                               />
                             </svg>
                             <span className="absolute inset-0 flex flex-col items-center justify-center leading-none">
-                              <span className="text-[12px] font-bold tabular-nums">{Math.max(0, diasParaParto)}</span>
-                              <span className="text-[8px] font-medium text-slate-500">días</span>
+                              <span className="text-[11px] font-bold tabular-nums">{Math.max(0, diasParaParto)}</span>
+                              <span className="text-[7px] font-medium text-slate-500">días</span>
                             </span>
                           </div>
                         )}
@@ -851,18 +851,15 @@ export default function Gestacion() {
                       </div>
 
                       {cerda.caracteristicas ? (
-                        <p className="-mt-1 line-clamp-1 px-0.5 text-xs text-slate-500">📝 {cerda.caracteristicas}</p>
+                        <p className="line-clamp-1 px-0.5 text-xs text-slate-500">{cerda.caracteristicas}</p>
                       ) : null}
 
                       {/* Estado / seguimiento */}
-                      <div className={`flex items-center gap-2.5 rounded-xl px-3 py-2 ${panelStyles.bg}`}>
-                        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/80 text-sm shadow-sm ${panelStyles.title}`} aria-hidden="true">
-                          {estadoLabel === "Gestación" ? "🤰" : estadoLabel === "Lactancia" ? "🍼" : ultimoRegistro?.tipo === "Evento" ? "📌" : "📋"}
-                        </span>
+                      <div className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 ${panelStyles.bg}`}>
                         {estadoLabel === "Gestación" && diasParaParto !== null ? (
                           <div className="min-w-0 flex-1">
-                            <p className={`text-[10px] font-semibold uppercase tracking-wider ${panelStyles.title}`}>Parto estimado</p>
                             <p className={`truncate text-[13px] font-bold ${panelStyles.content}`}>
+                              <span className={`mr-1.5 text-[11px] font-medium ${panelStyles.title}`}>Parto</span>
                               {formatearFechaCorta(calcularParto(ultimaInseminacion?.fecha || cerda.fecha))}
                               <span className={`ml-1.5 text-xs font-medium ${panelStyles.secondary}`}>
                                 · Día {diasDesdeInseminacion} de {DIAS_GESTACION}
@@ -871,10 +868,10 @@ export default function Gestacion() {
                           </div>
                         ) : (
                           <div className="min-w-0 flex-1">
-                            <p className={`text-[10px] font-semibold uppercase tracking-wider ${panelStyles.title}`}>
-                              {ultimoRegistro?.tipo === "Evento" ? "Evento" : estadoLabel === "Lactancia" ? "Lactancia" : "Seguimiento"}
-                            </p>
                             <p className={`text-[13px] font-semibold leading-snug ${panelStyles.content}`}>
+                              <span className={`mr-1.5 text-[11px] font-medium ${panelStyles.title}`}>
+                                {ultimoRegistro?.tipo === "Evento" ? "Evento" : estadoLabel === "Lactancia" ? "Lactancia" : "Seguimiento"}
+                              </span>
                               {ultimoRegistro?.tipo === "Evento"
                                 ? "Nuevo evento registrado"
                                 : estadoLabel === "Lactancia"
