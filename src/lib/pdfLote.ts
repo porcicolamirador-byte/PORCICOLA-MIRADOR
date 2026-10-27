@@ -92,9 +92,9 @@ export function generarPdfLote(d: DatosPdfLote): Blob {
   let y = 0;
 
   const titulo = (t: string) => {
-    L.texto(M, y, t.toUpperCase(), 8.5, AZUL_TEXTO, true);
-    L.linea(M, DER, y + 6, P200, 0.6);
-    y += 22;
+    L.texto(M, y, t.toUpperCase(), 8, AZUL_TEXTO, true);
+    L.linea(M, DER, y + 5, P200, 0.6);
+    y += 18;
   };
 
   const nuevaPagina = () => {
@@ -102,26 +102,26 @@ export function generarPdfLote(d: DatosPdfLote): Blob {
     paginas.push(L);
     L.rect(0, 0, ANCHO, 6, AZUL);
     L.texto(M, 34, `${d.codigo} · ${d.nombre}`, 10, P900, true);
-    der(L, DER, 34, "Estado contable del lote (continuación)", 8.5, P500);
+    der(L, DER, 34, `Estado contable lote ${d.codigo} (continuación)`, 8.5, P500);
     L.linea(M, DER, 44, P200, 0.6);
     y = 66;
   };
 
   /* ── Página 1: encabezado ── */
   paginas.push(L);
-  L.rect(0, 0, ANCHO, 128, AZUL);
+  L.rect(0, 0, ANCHO, 96, AZUL);
   if (d.logo) {
-    L.rect(M, 26, 76, 76, BLANCO, 14);
-    L.imagen(M + 6, 32, 64, 64);
+    L.rect(M, 18, 60, 60, BLANCO, 12);
+    L.imagen(M + 5, 23, 50, 50);
   }
-  const xt = d.logo ? M + 94 : M;
-  L.texto(xt, 46, `PORCÍCOLA ${d.granja}`.toUpperCase(), 8.5, [186, 230, 253], true);
-  L.texto(xt, 74, "Estado contable del lote", 22, BLANCO, true);
-  L.texto(xt, 96, `${d.codigo} · ${d.nombre}`, 11, [224, 242, 254], true);
-  der(L, DER, 46, `Generado el ${d.fechaGeneracion}`, 8, [186, 230, 253]);
+  const xt = d.logo ? M + 74 : M;
+  L.texto(xt, 36, `PORCÍCOLA ${d.granja}`.toUpperCase(), 8, [186, 230, 253], true);
+  L.texto(xt, 60, `Estado contable lote ${d.codigo}`, 19, BLANCO, true);
+  L.texto(xt, 77, d.nombre, 10, [224, 242, 254], true);
+  der(L, DER, 36, `Generado el ${d.fechaGeneracion}`, 8, [186, 230, 253]);
 
   // Ficha del lote (solo datos que contextualizan las cifras)
-  y = 150;
+  y = 116;
   const fichas = [
     { t: "Periodo", v: `${fecha(d.fechaIngreso)} – ${fecha(d.fechaCorte)}` },
     { t: "Duración", v: `${dias(d.fechaIngreso, d.fechaCorte)} días` },
@@ -135,10 +135,10 @@ export function generarPdfLote(d: DatosPdfLote): Blob {
   fichas.forEach((f, i) => {
     const wf = unidad * pesosCol[i];
     L.texto(xf, y, f.t.toUpperCase(), 7.5, P400, true);
-    L.texto(xf, y + 15, recortar(f.v, wf - 8, 10, true), 10, P900, true);
+    L.texto(xf, y + 13, recortar(f.v, wf - 8, 9.5, true), 9.5, P900, true);
     xf += wf;
   });
-  y += 34;
+  y += 26;
 
   // Tarjetas resumen
   const gap = 10;
@@ -155,40 +155,40 @@ export function generarPdfLote(d: DatosPdfLote): Blob {
   ];
   tarjetas.forEach((x, i) => {
     const xx = M + i * (w + gap);
-    L.rect(xx, y, w, 58, x.f, 10);
-    L.texto(xx + 12, y + 20, recortar(x.t, w - 24, 8, true).toUpperCase(), 8, P500, true);
-    L.texto(xx + 12, y + 42, recortar(x.v, w - 24, 16, true), 16, x.c, true);
+    L.rect(xx, y, w, 44, x.f, 8);
+    L.texto(xx + 10, y + 15, recortar(x.t, w - 20, 7.5, true).toUpperCase(), 7.5, P500, true);
+    L.texto(xx + 10, y + 33, recortar(x.v, w - 20, 14, true), 14, x.c, true);
   });
-  y += 84;
+  y += 64;
 
   /* ── Estado de resultados ── */
   titulo("Estado de resultados");
   const fila = (concepto: string, valor: string, opciones: { negrita?: boolean; sangria?: number; color?: RGB; fondo?: RGB; tam?: number } = {}) => {
-    const tam = opciones.tam ?? 9.5;
-    if (opciones.fondo) L.rect(M, y - 13, ANCHO_UTIL, 20, opciones.fondo, 4);
+    const tam = opciones.tam ?? 9;
+    if (opciones.fondo) L.rect(M, y - 11, ANCHO_UTIL, 16, opciones.fondo, 4);
     L.texto(M + 8 + (opciones.sangria ?? 0), y, recortar(concepto, ANCHO_UTIL - 160, tam, opciones.negrita), tam, opciones.color ?? P700, opciones.negrita);
     der(L, DER - 8, y, valor, tam, opciones.color ?? P900, opciones.negrita);
-    y += 19;
+    y += 15.5;
   };
   fila("Ingresos operacionales", "", { negrita: true, color: P900 });
   if (ingresosPorCat.length === 0) fila("Sin ingresos registrados", pesos(0), { sangria: 12, color: P500 });
   for (const [cat, v] of ingresosPorCat) fila(cat, pesos(v), { sangria: 12 });
   fila("Total ingresos", pesos(totalIngresos), { negrita: true, color: AZUL_TEXTO, fondo: AZUL_CLARO });
-  y += 6;
+  y += 3;
   fila("Costos de producción", "", { negrita: true, color: P900 });
   if (costosPorCat.length === 0) fila("Sin costos registrados", pesos(0), { sangria: 12, color: P500 });
   for (const [cat, v] of costosPorCat) fila(cat, `(${pesos(v)})`, { sangria: 12 });
   fila("Total costos", `(${pesos(totalCostos)})`, { negrita: true, fondo: P100 });
-  y += 8;
-  L.linea(M, DER, y - 12, P900, 1);
+  y += 6;
+  L.linea(M, DER, y - 11, P900, 1);
   fila(utilidad >= 0 ? "Utilidad neta del lote" : "Pérdida neta del lote", pesos(utilidad), {
     negrita: true,
-    tam: 11,
+    tam: 10.5,
     color: utilidad >= 0 ? AZUL_TEXTO : ROJO_TEXTO,
   });
-  L.linea(M, DER, y - 13, P900, 1);
-  L.linea(M, DER, y - 11, P900, 1);
-  y += 14;
+  L.linea(M, DER, y - 10, P900, 1);
+  L.linea(M, DER, y - 8, P900, 1);
+  y += 12;
 
   /* ── Indicadores financieros ── */
   titulo("Indicadores financieros");
@@ -206,26 +206,26 @@ export function generarPdfLote(d: DatosPdfLote): Blob {
     const col = i % 3;
     const row = Math.floor(i / 3);
     const xx = M + col * (wi + gap);
-    const yy = y + row * 50;
-    L.rect(xx, yy - 12, wi, 42, P50, 8);
-    L.texto(xx + 10, yy + 2, x.t, 8, P500);
-    L.texto(xx + 10, yy + 20, recortar(x.v, wi - 20, 12, true), 12, P900, true);
+    const yy = y + row * 38;
+    L.rect(xx, yy - 10, wi, 32, P50, 6);
+    L.texto(xx + 9, yy + 2, x.t, 7.5, P500);
+    L.texto(xx + 9, yy + 16, recortar(x.v, wi - 18, 10.5, true), 10.5, P900, true);
   });
-  y += 2 * 50 + 6;
+  y += 2 * 38 + 4;
   if (d.registrosSinPrecio > 0) {
     L.texto(M, y, `Nota: ${d.registrosSinPrecio} consumo(s) de alimento sin precio de compra no están incluidos en los costos.`, 8, P500);
-    y += 16;
+    y += 13;
   }
-  y += 10;
+  y += 6;
 
   /* ── Detalle de movimientos ── */
   const encabezadoDetalle = () => {
-    L.rect(M, y - 13, ANCHO_UTIL, 20, P100, 4);
+    L.rect(M, y - 11, ANCHO_UTIL, 16, P100, 4);
     L.texto(M + 8, y, "FECHA", 7.5, P500, true);
     L.texto(M + 78, y, "CONCEPTO", 7.5, P500, true);
     L.texto(M + 300, y, "CATEGORÍA", 7.5, P500, true);
     der(L, DER - 8, y, "VALOR", 7.5, P500, true);
-    y += 20;
+    y += 16;
   };
   if (y > 700) nuevaPagina();
   titulo(`Detalle de movimientos (${d.movimientos.length})`);
@@ -246,8 +246,8 @@ export function generarPdfLote(d: DatosPdfLote): Blob {
     L.texto(M + 78, y, recortar(m.concepto, 212, 8.5), 8.5, P900);
     L.texto(M + 300, y, recortar(m.categoria, DER - M - 300 - 100, 8.5), 8.5, P500);
     der(L, DER - 8, y, valor, 8.5, m.tipo === "ingreso" ? AZUL_TEXTO : P900, true);
-    L.linea(M, DER, y + 6, P100, 0.5);
-    y += 18;
+    L.linea(M, DER, y + 5, P100, 0.5);
+    y += 15;
   }
   if (ordenados.length > 0) {
     if (y > 790) nuevaPagina();
