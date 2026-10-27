@@ -746,7 +746,7 @@ export default function Gestacion() {
               return (
                 <article
                   key={index}
-                  className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+                  className="relative overflow-hidden rounded-[20px] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] ring-1 ring-slate-200/70"
                 >
                   {/* Acciones que aparecen al deslizar */}
                   <div
@@ -779,7 +779,7 @@ export default function Gestacion() {
                   </div>
 
                   <div
-                    className="relative z-10 cursor-pointer bg-white py-2.5 pl-4 pr-2.5"
+                    className="relative z-10 cursor-pointer bg-white p-3"
                     onClick={() => {
                       if (isSwiped) {
                         setSwipedIndex(null);
@@ -795,28 +795,47 @@ export default function Gestacion() {
                       transition: isActiveMove ? "none" : "transform 200ms ease-out",
                     }}
                   >
-                    {/* Franja de color = estado */}
-                    <div className={`absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b ${obtenerBarraColor(estadoLabel)}`} />
-
-                    <div className="flex flex-col gap-2">
-                      {/* Cabecera: arete + raza + estado */}
+                    <div className="flex flex-col gap-2.5">
+                      {/* Cabecera: arete + raza + estado + progreso */}
                       <div className="flex items-center gap-3">
                         {/* El ID se ve como un arete de oreja */}
-                        <div className="relative flex h-10 min-w-[3.25rem] max-w-[6rem] shrink-0 items-center justify-center rounded-lg bg-amber-300 px-2 pt-1 shadow-inner">
+                        <div className="relative flex h-12 min-w-[3.5rem] max-w-[6.5rem] shrink-0 items-center justify-center rounded-[14px] bg-gradient-to-b from-amber-200 to-amber-300 px-2.5 pt-1.5 shadow-sm ring-1 ring-amber-400/60">
                           <span
                             aria-hidden="true"
-                            className="absolute left-1/2 top-1 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-amber-50/90 ring-1 ring-amber-600/40"
+                            className="absolute left-1/2 top-1.5 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-white/90 ring-1 ring-amber-600/40"
                           />
-                          <span className="truncate text-base font-black tabular-nums text-amber-950">{cerda.id}</span>
+                          <span className="truncate text-[17px] font-black tabular-nums tracking-tight text-amber-950">{cerda.id}</span>
                         </div>
 
-                        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
-                          <p className="truncate text-sm font-semibold text-slate-900">{cerda.raza}</p>
-                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${obtenerEstadoStyles(estadoLabel)}`}>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[15px] font-semibold leading-tight text-slate-900">{cerda.raza || "Sin raza"}</p>
+                          <span className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${obtenerEstadoStyles(estadoLabel)}`}>
                             <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
                             {estadoLabel}
                           </span>
                         </div>
+
+                        {progresoGestacion !== null && estadoLabel === "Gestación" && diasParaParto !== null && (
+                          <div className={`relative h-11 w-11 shrink-0 ${panelStyles.secondary}`} role="img" aria-label={`Gestación al ${progresoGestacion}%`}>
+                            <svg viewBox="0 0 44 44" className="h-11 w-11 -rotate-90" aria-hidden="true">
+                              <circle cx="22" cy="22" r="18" fill="none" strokeWidth="4" stroke="currentColor" strokeOpacity={0.15} />
+                              <circle
+                                cx="22"
+                                cy="22"
+                                r="18"
+                                fill="none"
+                                strokeWidth="4"
+                                strokeLinecap="round"
+                                stroke="currentColor"
+                                strokeDasharray={`${(progresoGestacion / 100) * 113.1} 113.1`}
+                              />
+                            </svg>
+                            <span className="absolute inset-0 flex flex-col items-center justify-center leading-none">
+                              <span className="text-[12px] font-bold tabular-nums">{Math.max(0, diasParaParto)}</span>
+                              <span className="text-[8px] font-medium text-slate-500">días</span>
+                            </span>
+                          </div>
+                        )}
 
                         <button
                           type="button"
@@ -825,70 +844,48 @@ export default function Gestacion() {
                             e.stopPropagation();
                             setSwipedIndex(isSwiped ? null : index);
                           }}
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xl leading-none text-slate-400 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600"
+                          className="-mr-1 flex h-8 w-7 shrink-0 items-center justify-center rounded-full text-xl leading-none text-slate-400 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600"
                         >
-                          ⋯
+                          ⋮
                         </button>
                       </div>
 
-                      {/* Datos clave */}
-                      <div className="space-y-1.5 text-sm text-slate-600 empty:hidden">
-                        {progresoGestacion !== null && estadoLabel === "Gestación" ? (
-                          <div>
-                            <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
-                              <span>Día {diasDesdeInseminacion} de {DIAS_GESTACION}</span>
-                              <span className="font-semibold text-blue-700">{progresoGestacion}%</span>
-                            </div>
-                            <div
-                              role="progressbar"
-                              aria-valuenow={progresoGestacion}
-                              aria-valuemin={0}
-                              aria-valuemax={100}
-                              aria-label="Progreso de gestación"
-                              className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100"
-                            >
-                              <div
-                                className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-300"
-                                style={{ width: `${progresoGestacion}%` }}
-                              />
-                            </div>
-                          </div>
-                        ) : null}
+                      {cerda.caracteristicas ? (
+                        <p className="-mt-1 line-clamp-1 px-0.5 text-xs text-slate-500">📝 {cerda.caracteristicas}</p>
+                      ) : null}
 
-                        {cerda.caracteristicas ? (
-                          <p className="flex items-start gap-2">
-                            <span aria-hidden="true">📝</span>
-                            <span className="line-clamp-1 text-xs">{cerda.caracteristicas}</span>
-                          </p>
-                        ) : null}
-                      </div>
-
-                      {/* Panel de estado (una sola línea) */}
-                      <div className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-1.5 ${panelStyles.bg} ${panelStyles.border}`}>
+                      {/* Estado / seguimiento */}
+                      <div className={`flex items-center gap-2.5 rounded-xl px-3 py-2 ${panelStyles.bg}`}>
+                        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/80 text-sm shadow-sm ${panelStyles.title}`} aria-hidden="true">
+                          {estadoLabel === "Gestación" ? "🤰" : estadoLabel === "Lactancia" ? "🍼" : ultimoRegistro?.tipo === "Evento" ? "📌" : "📋"}
+                        </span>
                         {estadoLabel === "Gestación" && diasParaParto !== null ? (
-                          <>
-                            <p className={`min-w-0 truncate text-sm font-bold ${panelStyles.content}`}>
-                              <span className={`mr-1.5 text-xs font-medium ${panelStyles.title}`}>Parto</span>
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-[10px] font-semibold uppercase tracking-wider ${panelStyles.title}`}>Parto estimado</p>
+                            <p className={`truncate text-[13px] font-bold ${panelStyles.content}`}>
                               {formatearFechaCorta(calcularParto(ultimaInseminacion?.fecha || cerda.fecha))}
+                              <span className={`ml-1.5 text-xs font-medium ${panelStyles.secondary}`}>
+                                · Día {diasDesdeInseminacion} de {DIAS_GESTACION}
+                              </span>
                             </p>
-                            <p className={`shrink-0 text-xs font-semibold ${panelStyles.secondary}`}>
-                              {diasParaParto === 1 ? "Queda 1 día" : `Quedan ${diasParaParto} días`}
-                            </p>
-                          </>
+                          </div>
                         ) : (
-                          <>
-                            <span className={`shrink-0 text-xs font-medium ${panelStyles.title}`}>
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-[10px] font-semibold uppercase tracking-wider ${panelStyles.title}`}>
                               {ultimoRegistro?.tipo === "Evento" ? "Evento" : estadoLabel === "Lactancia" ? "Lactancia" : "Seguimiento"}
-                            </span>
-                            <span className={`min-w-0 text-right text-[13px] font-semibold leading-snug ${panelStyles.content}`}>
+                            </p>
+                            <p className={`text-[13px] font-semibold leading-snug ${panelStyles.content}`}>
                               {ultimoRegistro?.tipo === "Evento"
                                 ? "Nuevo evento registrado"
                                 : estadoLabel === "Lactancia"
                                   ? ultimoRegistro?.mensaje || "En lactancia"
                                   : ultimoRegistro?.mensaje || "Pendiente"}
-                            </span>
-                          </>
+                            </p>
+                          </div>
                         )}
+                        <svg viewBox="0 0 24 24" aria-hidden="true" className={`h-4 w-4 shrink-0 opacity-60 ${panelStyles.title}`} fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+                          <path d="m9 6 6 6-6 6" />
+                        </svg>
                       </div>
                     </div>
                   </div>
