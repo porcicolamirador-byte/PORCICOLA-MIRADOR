@@ -898,7 +898,8 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
           {gastos.length === 0 ? (
             <p className="rounded-xl bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">Aún no hay gastos de producción.</p>
           ) : (
-            <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200">
+            <SeccionDesplegable titulo="Registros" cantidad={gastos.length}>
+            <ul className="divide-y divide-slate-100 bg-white">
               {gastos.map((g) => (
                 <li key={g.id} className="flex items-center gap-2.5 px-3 py-2">
                   <div className="min-w-0 flex-1">
@@ -921,6 +922,7 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
                 </li>
               ))}
             </ul>
+            </SeccionDesplegable>
           )}
         </div>
       )}
