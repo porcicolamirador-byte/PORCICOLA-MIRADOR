@@ -1083,7 +1083,6 @@ export default function CerdaDetalle() {
                       />
                       Registrar como gasto en Contabilidad
                     </label>
-                    <p className="mt-1 text-xs text-gray-500">El valor siempre queda guardado en esta cerda.</p>
                   </div>
                 )}
 
