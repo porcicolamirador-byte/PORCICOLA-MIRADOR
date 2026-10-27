@@ -139,7 +139,7 @@ function ListaUsuarios({ titulo, usuarios, yoId, onElegir }: { titulo: string; u
               <span
                 className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${u.rol === "admin" ? "bg-sky-100 text-sky-800" : "bg-slate-100 text-slate-600"}`}
               >
-                {u.rol === "admin" ? "Admin" : "Trabajador"}
+                {u.rol === "admin" ? "Admin" : "Usuario"}
               </span>
             </button>
           </li>
@@ -193,7 +193,7 @@ function EditorUsuario({
     try {
       if (nuevo) {
         const u = await crearUsuario({ usuario: nombreUsuario, nombre: nombre.trim(), pin, rol, permisos });
-        registrarLog([{ accion: "Creación", modulo: "Usuarios", detalle: `Usuario @${u.usuario} (${u.nombre}) · ${u.rol === "admin" ? "administrador" : "trabajador"}` }]);
+        registrarLog([{ accion: "Creación", modulo: "Usuarios", detalle: `Usuario @${u.usuario} (${u.nombre}) · ${u.rol === "admin" ? "administrador" : "usuario"}` }]);
         onGuardado(u, true);
         await avisar({ titulo: "Usuario creado", mensaje: `Comparte con ${u.nombre} su usuario "${u.usuario}" y su PIN. Podrá entrar desde su teléfono.` });
       } else {
@@ -205,7 +205,7 @@ function EditorUsuario({
           ...(pin ? { pin } : {}),
         });
         const cambios = [
-          usuario!.rol !== rol ? `rol ${rol === "admin" ? "administrador" : "trabajador"}` : "",
+          usuario!.rol !== rol ? `rol ${rol === "admin" ? "administrador" : "usuario"}` : "",
           JSON.stringify(usuario!.permisos ?? {}) !== JSON.stringify(u.permisos ?? {}) ? `permisos: ${resumenPermisos(u)}` : "",
           usuario!.activo !== false && !activo ? "desactivado" : "",
           usuario!.activo === false && activo ? "reactivado" : "",
@@ -251,7 +251,7 @@ function EditorUsuario({
                   rol === r ? "bg-sky-900 text-white ring-sky-900" : "bg-white text-slate-700 ring-slate-200"
                 }`}
               >
-                {r === "admin" ? "Administrador" : "Trabajador"}
+                {r === "admin" ? "Administrador" : "Usuario"}
               </button>
             ))}
           </div>
@@ -273,7 +273,7 @@ function EditorUsuario({
                 </li>
               ))}
             </ul>
-            <p className="mt-1.5 px-1 text-[11px] text-slate-500">Sin permisos extra, un trabajador puede ver y registrar datos (partos, alimento, pesajes…), pero no borrar.</p>
+            <p className="mt-1.5 px-1 text-[11px] text-slate-500">Sin permisos extra, un usuario puede ver y registrar datos (partos, alimento, pesajes…), pero no borrar.</p>
           </div>
         ) : (
           <p className="rounded-xl bg-sky-50 px-3 py-2.5 text-xs text-sky-900 ring-1 ring-sky-100">El administrador tiene todos los permisos y puede administrar usuarios.</p>

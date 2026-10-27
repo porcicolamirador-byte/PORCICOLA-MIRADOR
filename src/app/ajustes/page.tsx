@@ -140,7 +140,7 @@ export default function AjustesPage() {
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-semibold text-slate-900">{perfil.nombre}</span>
             <span className="block truncate text-xs text-slate-500">
-              @{perfil.usuario} · {perfil.rol === "admin" ? "Administrador" : "Trabajador"}
+              @{perfil.usuario} · {perfil.rol === "admin" ? "Administrador" : "Usuario"}
             </span>
           </span>
           <button type="button" onClick={cerrarSesion} className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold text-rose-600 ring-1 ring-rose-200 active:bg-rose-50">
