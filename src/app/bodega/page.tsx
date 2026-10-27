@@ -13,6 +13,7 @@ import { calcularConsumoCerdas, type ConsumoAlimentoCerdas } from "@/lib/consumo
 import { CATEGORIAS_BODEGA, IconoCategoria, RecuadroCategoria } from "@/components/CatalogoProductos";
 import {
   calcularInventario,
+  codigoDe,
   formatoFecha,
   formatoPesos,
   guardarFacturas,
@@ -110,6 +111,11 @@ export default function BodegaPage() {
   const valorBodega = principales.reduce((s, i) => s + Math.max(0, i.existencia) * i.ultimoPrecio, 0);
   const sinCatalogo = datos !== null && datos.activos.length === 0;
   const producto = datos?.inventario.find((i) => i.producto.id === productoSel) ?? null;
+  // Días que alcanza el alimento de las cerdas (por código), para avisar en naranja
+  const consumoCerdas = useMemo(() => (datos ? calcularConsumoCerdas() : null), [datos]);
+  const diasAlimento = new Map<string, number | null>(
+    consumoCerdas ? [consumoCerdas.gestacion, consumoCerdas.lactancia].map((a) => [a.codigo, a.existenciaKg !== null && a.existenciaKg <= 0.01 ? 0 : a.dias] as const) : [],
+  );
   const factura = datos?.facturas.find((f) => f.id === facturaSel) ?? null;
 
   return (
@@ -222,11 +228,16 @@ export default function BodegaPage() {
                     <div className="grid grid-cols-2 gap-2">
                       {items.map(({ producto: p, existencia, disponible, subproducto, bajoMinimo, sinCompras }) => {
                         const nuevo = !subproducto && sinCompras;
-                        const agotado = !subproducto && !nuevo && existencia <= 0;
+                        const diasCerdas = !subproducto && !nuevo ? diasAlimento.get(codigoDe(p)) : undefined;
+                        // Alimento de cerdas: naranja cuando queda para unos 2 días o menos ("Revisar" en 0)
+                        const naranja = diasCerdas !== undefined && diasCerdas !== null && diasCerdas <= 2;
+                        const agotado = !subproducto && !nuevo && existencia <= 0 && !naranja;
                         const referencia = Math.max(p.minimo * 3, p.minimo + 1, 1);
                         const nivel = Math.max(0, Math.min(100, (existencia / referencia) * 100));
-                        const colorBarra = agotado || bajoMinimo ? "bg-red-500" : existencia <= p.minimo * 1.5 ? "bg-amber-400" : "bg-sky-500";
-                        const estado = subproducto
+                        const colorBarra = naranja ? "bg-orange-500" : agotado || bajoMinimo ? "bg-red-500" : existencia <= p.minimo * 1.5 ? "bg-amber-400" : "bg-sky-500";
+                        const estado = naranja
+                          ? { t: existencia <= 0 || diasCerdas === 0 ? "Revisar" : `${diasCerdas} día${diasCerdas === 1 ? "" : "s"}`, c: "bg-orange-500 text-white ring-orange-500" }
+                          : subproducto
                           ? { t: "Subproducto", c: "bg-sky-50 text-sky-700 ring-sky-200" }
                           : nuevo
                           ? { t: "Sin compras", c: "bg-slate-100 text-slate-500 ring-slate-200" }
@@ -243,7 +254,7 @@ export default function BodegaPage() {
                             type="button"
                             onClick={() => setProductoSel(p.id)}
                             className={`flex flex-col gap-1.5 rounded-2xl bg-white p-2.5 text-left ring-1 transition active:scale-[0.98] ${
-                              agotado || bajoMinimo ? "ring-red-200" : "ring-slate-200/80"
+                              naranja ? "ring-orange-300" : agotado || bajoMinimo ? "ring-red-200" : "ring-slate-200/80"
                             }`}
                           >
                             <div className="flex items-start justify-between gap-2">
@@ -251,7 +262,7 @@ export default function BodegaPage() {
                               <Insignia clase={estado.c}>{estado.t}</Insignia>
                             </div>
                             <p className="line-clamp-2 text-[13px] font-semibold leading-tight text-slate-900">{p.nombre}</p>
-                            <p className={`text-xl font-bold leading-none tabular-nums ${subproducto ? "text-sky-700" : agotado || bajoMinimo ? "text-red-600" : "text-slate-900"}`}>
+                            <p className={`text-xl font-bold leading-none tabular-nums ${subproducto ? "text-sky-700" : naranja ? "text-orange-600" : agotado || bajoMinimo ? "text-red-600" : "text-slate-900"}`}>
                               {fmt(existencia)} <span className="text-xs font-semibold text-slate-500">{p.unidad}</span>
                             </p>
                             {subproducto ? (
