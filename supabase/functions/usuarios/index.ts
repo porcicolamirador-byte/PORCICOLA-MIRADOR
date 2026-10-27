@@ -4,8 +4,9 @@
 //   { accion: "crear", usuario, nombre, pin, rol?, permisos? }
 //   { accion: "actualizar", id, nombre?, rol?, permisos?, activo?, pin? }
 //   { accion: "eliminar", id }   → borra la cuenta para siempre (sus registros se conservan)
+//   { accion: "reiniciar", pin }  → borra TODOS los datos de la granja (no los usuarios); pide el PIN del administrador
 //   { accion: "yo" }   → perfil del usuario que llama (cualquier usuario activo)
-import { admin, contrasenaDe, correoDe, CORS, json, PIN_VALIDO, usuarioDeLaPeticion, USUARIO_VALIDO } from "../_compartido/comun.ts";
+import { admin, contrasenaDe, publico, correoDe, CORS, json, PIN_VALIDO, usuarioDeLaPeticion, USUARIO_VALIDO } from "../_compartido/comun.ts";
 
 const PERMISOS = ["eliminar", "bodega", "ajustes", "contabilidad"] as const;
 const limpiarPermisos = (p: unknown) => {
@@ -123,6 +124,22 @@ Deno.serve(async (req) => {
       if (error) return json({ error: "No se pudo eliminar el usuario" }, 500);
       await admin.rpc("registrar_intento_pin", { p_usuario: actual.usuario, p_exito: true });
       return json({ eliminado: id, usuario: actual.usuario });
+    }
+
+    if (accion === "reiniciar") {
+      const pin = String(cuerpo.pin ?? "");
+      if (!PIN_VALIDO.test(pin)) return json({ error: "Escribe tu PIN de 4 dígitos" }, 400);
+      const { data: bloqueo } = await admin.rpc("bloqueo_pin", { p_usuario: yo.usuario });
+      if (bloqueo) return json({ error: "Demasiados intentos. Espera unos minutos." }, 429);
+      const { error: errPin } = await publico().auth.signInWithPassword({ email: correoDe(yo.usuario), password: await contrasenaDe(yo.usuario, pin) });
+      if (errPin) {
+        const { data: hasta } = await admin.rpc("registrar_intento_pin", { p_usuario: yo.usuario, p_exito: false });
+        return json({ error: hasta ? "Demasiados intentos. Espera 15 minutos." : "PIN incorrecto" }, hasta ? 429 : 401);
+      }
+      await admin.rpc("registrar_intento_pin", { p_usuario: yo.usuario, p_exito: true });
+      const { data: generacion, error } = await admin.rpc("reiniciar_base", { p_por: yo.usuario });
+      if (error) throw error;
+      return json({ generacion });
     }
 
     return json({ error: "Acción desconocida" }, 400);

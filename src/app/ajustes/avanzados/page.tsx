@@ -1,8 +1,9 @@
 "use client";
 
-import { leerLog, registrarLog } from "@/lib/log";
-import { reemplazarClave } from "@/lib/sincronizar";
-import { consumoNube, ErrorNube, perfilGuardado, type ConsumoNube } from "@/lib/nube";
+import { leerLog } from "@/lib/log";
+import { borrarTodoLocal } from "@/lib/sincronizar";
+import { consumoNube, ErrorNube, perfilGuardado, reiniciarBaseNube, type ConsumoNube } from "@/lib/nube";
+import Modal from "@/components/Modal";
 import { useEffect, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
@@ -21,7 +22,7 @@ import {
   CONSUMO_CERDAS_POR_DEFECTO,
   type ConsumoCerdas,
 } from "@/lib/config";
-import { clavesDeLaApp, codigoDe, hoy, leerCorrales, leerProductos, notificarCambio, useVersionDatos } from "@/lib/datos";
+import { codigoDe, hoy, leerCorrales, leerProductos, notificarCambio, useVersionDatos } from "@/lib/datos";
 import CatalogoProductos from "@/components/CatalogoProductos";
 import CatalogoCorrales from "@/components/CatalogoCorrales";
 
@@ -48,16 +49,7 @@ export default function AjustesAvanzadosPage() {
     if (!ajustesDesbloqueados()) router.replace("/ajustes");
   }, [router]);
 
-  const borrarTodo = async () => {
-    if (!(await confirmar({ titulo: "Borrar todos los datos", mensaje: "Se borrará toda la información de la granja en la nube y en todos los teléfonos.", aceptar: "Continuar", destructivo: true }))) return;
-    if (!(await confirmar({ titulo: "¿Estás seguro?", mensaje: "Esta acción no se puede deshacer. Te recomendamos exportar un respaldo antes desde Ajustes.", aceptar: "Borrar todo", destructivo: true }))) return;
-    // Se borra aquí y en la nube (todos los teléfonos)
-    for (const k of clavesDeLaApp()) reemplazarClave(k, null);
-    registrarLog([{ accion: "Eliminación", modulo: "Datos", detalle: "Se borraron todos los datos de la granja" }]);
-    notificarCambio();
-    setConfig(leerConfig());
-    await avisar({ titulo: "Datos borrados", mensaje: "Se borró la información de la granja. Los demás teléfonos se actualizarán al conectarse." });
-  };
+  const [reiniciar, setReiniciar] = useState(false);
 
   const guardar = (cambios: Partial<ConfigGranja>) => {
     setConfig(guardarConfig(cambios));
@@ -242,18 +234,21 @@ export default function AjustesAvanzadosPage() {
             </svg>
           </button>
         </li>
+        {esAdmin && (
         <li>
-          <button type="button" onClick={borrarTodo} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-rose-50">
+          <button type="button" onClick={() => setReiniciar(true)} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-rose-50">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-600" aria-hidden="true">
               <IconoAjuste nombre="papelera" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-medium text-rose-600">Borrar todos los datos</span>
-              <span className="block text-xs text-slate-500">Toda la información de la granja, en todos los teléfonos</span>
+              <span className="block text-[15px] font-medium text-rose-600">Borrar toda la base de datos</span>
+              <span className="block text-xs text-slate-500">Todas las granjas, en la nube y en todos los teléfonos</span>
             </span>
           </button>
         </li>
+        )}
       </Grupo>
+      {reiniciar && <ReinicioBase onCerrar={() => setReiniciar(false)} />}
 
     </ModuloPage>
   );
@@ -850,6 +845,76 @@ function Alimentacion({
   );
 }
 
+
+/* ───────────── Reinicio total de la base de datos ───────────── */
+
+function ReinicioBase({ onCerrar }: { onCerrar: () => void }) {
+  const [texto, setTexto] = useState("");
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState("");
+  const [borrando, setBorrando] = useState(false);
+  const listo = texto.trim().toUpperCase() === "BORRAR" && /^\d{4}$/.test(pin);
+
+  const enviar = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!listo || borrando) return;
+    setBorrando(true);
+    setError("");
+    try {
+      const generacion = await reiniciarBaseNube(pin);
+      borrarTodoLocal(generacion);
+      notificarCambio();
+      onCerrar();
+      await avisar({
+        titulo: "Base de datos en blanco",
+        mensaje: "Se borró toda la información. Los demás teléfonos quedarán en blanco apenas se abran con internet. Los usuarios y sus PIN se conservan.",
+      });
+      window.location.href = "/";
+    } catch (err) {
+      setError(err instanceof ErrorNube || err instanceof Error ? err.message : "No se pudo borrar. Revisa la conexión.");
+      setBorrando(false);
+    }
+  };
+
+  const campo =
+    "block w-full rounded-xl bg-slate-50 px-3.5 py-2.5 text-base text-slate-900 ring-1 ring-slate-200 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500";
+
+  return (
+    <Modal abierta etiqueta="Zona de peligro" titulo="Borrar toda la base de datos" subtitulo="No se puede deshacer" icono="⚠️" onCerrar={borrando ? () => {} : onCerrar}>
+      <form onSubmit={enviar} className="flex flex-col gap-3.5">
+        <div className="rounded-xl bg-rose-50 px-3.5 py-3 text-[13px] leading-snug text-rose-800 ring-1 ring-rose-100">
+          Se borrarán <b>todas las granjas</b>: cerdas, lotes, bodega, contabilidad, registros de actividad y lo eliminado. Quedará en blanco en la nube y en todos los teléfonos.
+          <span className="mt-1.5 block text-rose-700">Se conservan los usuarios, sus PIN y permisos. Exporta un respaldo antes si lo necesitas.</span>
+        </div>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium text-slate-700">Escribe BORRAR para confirmar</span>
+          <input value={texto} onChange={(e) => setTexto(e.target.value)} autoCapitalize="characters" autoComplete="off" placeholder="BORRAR" className={`${campo} uppercase`} />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium text-slate-700">Tu PIN de administrador</span>
+          <input
+            type="password"
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={4}
+            value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+            placeholder="••••"
+            className={`${campo} text-center tracking-[0.5em]`}
+          />
+        </label>
+        {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
+        <button
+          type="submit"
+          disabled={!listo || borrando}
+          className="mt-1 w-full rounded-2xl bg-rose-600 py-3 text-base font-semibold text-white shadow-sm active:bg-rose-700 disabled:opacity-40"
+        >
+          {borrando ? "Borrando…" : "Borrar todo"}
+        </button>
+      </form>
+    </Modal>
+  );
+}
 
 /* ───────────── Consumo aproximado de las cerdas ───────────── */
 

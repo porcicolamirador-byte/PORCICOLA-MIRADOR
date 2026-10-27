@@ -113,6 +113,8 @@ interface Meta {
   logSubido?: string;
   /** Ya se empezó en blanco en este teléfono (no se vuelve a borrar) */
   inicializado?: boolean;
+  /** Generación de la base: si en la nube cambia, la base se reinició y se borra lo local */
+  generacion?: number;
 }
 
 function leerJson<T>(clave: string, porDefecto: T): T {
@@ -399,6 +401,15 @@ function ejecutarSincronizacion(): Promise<void> {
       if (typeof navigator !== "undefined" && !navigator.onLine) return ponerEstado("sin-conexion");
       ponerEstado("sincronizando");
 
+      // Si el administrador reinició la base, este teléfono también queda en blanco
+      const meta0 = leerMeta();
+      const filas = await api<{ generacion: number }[]>("reinicio?select=generacion&id=eq.1").catch(() => null);
+      const remota = filas?.[0] ? Number(filas[0].generacion) : null;
+      if (remota !== null) {
+        if (meta0.inicializado && meta0.generacion !== undefined && meta0.generacion !== remota) borrarTodoLocal(remota);
+        else if (meta0.generacion !== remota) guardarMeta({ ...meta0, generacion: remota });
+      }
+
       // Primera vez en este teléfono: se empieza en blanco con lo que hay en la nube
       const meta = leerMeta();
       if (!meta.inicializado) {
@@ -410,7 +421,7 @@ function ejecutarSincronizacion(): Promise<void> {
         } finally {
           aplicandoRemoto = false;
         }
-        guardarMeta({ cursor: null, usuarioId: perfilGuardado()?.id ?? sesion.user_id, logSubido: new Date().toISOString(), inicializado: true });
+        guardarMeta({ cursor: null, usuarioId: perfilGuardado()?.id ?? sesion.user_id, logSubido: new Date().toISOString(), inicializado: true, generacion: remota ?? undefined });
         window.dispatchEvent(new Event("storage"));
       }
 
@@ -447,6 +458,27 @@ export function reemplazarClave(clave: string, valor: unknown | null) {
   if (valor === null) localStorage.removeItem(clave);
   else localStorage.setItem(clave, JSON.stringify(valor));
   capturarCambio(clave, antes, valor === null ? (Array.isArray(antes) ? [] : null) : valor);
+}
+
+/**
+ * Deja este teléfono en blanco después de un reinicio de la base: borra los
+ * datos de todas las granjas, lo pendiente por subir y el registro, y vuelve a
+ * la granja principal. La sesión, el PIN y el Face ID se conservan.
+ */
+export function borrarTodoLocal(generacion: number) {
+  aplicandoRemoto = true;
+  try {
+    const borrar: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith("granja-guardada:")) borrar.push(k);
+    }
+    for (const k of [...clavesLocales(), ...borrar, CLAVE_GRANJAS, CLAVE_GRANJA_ACTUAL, CLAVE_COLA, "registro-actividad"]) localStorage.removeItem(k);
+  } finally {
+    aplicandoRemoto = false;
+  }
+  guardarMeta({ cursor: null, usuarioId: leerMeta().usuarioId, logSubido: new Date().toISOString(), inicializado: true, generacion });
+  window.dispatchEvent(new Event("storage"));
 }
 
 /** Borra el estado de sincronización (al cerrar sesión no hace falta: los datos son de la granja) */
