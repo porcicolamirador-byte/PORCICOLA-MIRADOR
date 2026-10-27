@@ -847,18 +847,25 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
   };
 
   return (
-    <Hoja abierta titulo={nuevo ? "Nuevo gasto de producción" : "Gastos de producción"} onCerrar={nuevo ? () => setNuevo(false) : onCerrar}>
+    <Modal
+      abierta
+      etiqueta="Bodega"
+      titulo={nuevo ? "Nuevo gasto" : "Gastos de producción"}
+      subtitulo={nuevo ? "Gastos de producción" : `${gastos.length} registrados`}
+      icono="🧾"
+      onCerrar={nuevo ? () => setNuevo(false) : onCerrar}
+    >
       {nuevo ? (
         <form onSubmit={guardar} className="flex flex-col gap-3.5">
           <Campo etiqueta="Producto o servicio">
-            <Entrada value={descripcion} onChange={(v) => setDescripcion(v.slice(0, 80))} placeholder="Ej. Desinfectante, jeringas, ivermectina…" required />
+            <Entrada value={descripcion} onChange={(v) => setDescripcion(v.slice(0, 80))} placeholder="Dato" required />
           </Campo>
           <div className="grid grid-cols-2 gap-3">
             <Campo etiqueta="Cantidad">
-              <Entrada value={cantidad} onChange={(v) => setCantidad(v.slice(0, 40))} placeholder="Ej. 3 frascos" />
+              <Entrada value={cantidad} onChange={(v) => setCantidad(v.slice(0, 40))} placeholder="Dato" />
             </Campo>
             <Campo etiqueta="Valor total">
-              <EntradaPesos value={valor} onChange={setValor} required />
+              <EntradaPesos value={valor} onChange={setValor} placeholder="Dato" required />
             </Campo>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -917,6 +924,6 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
           )}
         </div>
       )}
-    </Hoja>
+    </Modal>
   );
 }

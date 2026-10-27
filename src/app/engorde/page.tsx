@@ -937,14 +937,14 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
           {accion === "gasto" && (
             <>
               <Campo etiqueta="Producto o servicio">
-                <Entrada value={gastoDesc} onChange={(v) => setGastoDesc(v.slice(0, 80))} placeholder="Ej. Ivermectina, vacuna circovirus…" required />
+                <Entrada value={gastoDesc} onChange={(v) => setGastoDesc(v.slice(0, 80))} placeholder="Dato" required />
               </Campo>
               <div className="grid grid-cols-2 gap-3">
                 <Campo etiqueta="Cantidad">
-                  <Entrada value={gastoCant} onChange={(v) => setGastoCant(v.slice(0, 40))} placeholder="Ej. 2 frascos" />
+                  <Entrada value={gastoCant} onChange={(v) => setGastoCant(v.slice(0, 40))} placeholder="Dato" />
                 </Campo>
                 <Campo etiqueta="Valor total">
-                  <EntradaPesos value={valor} onChange={setValor} required />
+                  <EntradaPesos value={valor} onChange={setValor} placeholder="Dato" required />
                 </Campo>
               </div>
               <Campo etiqueta="Categoría en Contabilidad">
