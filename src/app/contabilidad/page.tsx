@@ -1,6 +1,8 @@
 "use client";
 
 import Modal from "@/components/Modal";
+import PagoFactura from "@/components/PagoFactura";
+import { leerFacturas, leerProductos, saldoFactura, totalFactura } from "@/lib/datos";
 import { useMemo, useState, type FormEvent } from "react";
 import ModuloPage from "@/components/ModuloPage";
 import { Boton, Campo, Entrada, IconoMas, SeccionDesplegable, Selector, Vacio, EntradaPesos } from "@/components/ui";
@@ -123,6 +125,8 @@ export default function ContabilidadPage() {
           ))}
         </div>
       </section>
+
+      <FacturasCredito version={version} />
 
       <ContabilidadLotes version={version} />
 
@@ -272,6 +276,76 @@ function cuentasLote(l: Lote, movimientos = leerMovimientos()) {
   const ingresosLote = movimientos.filter((m) => m.tipo === "ingreso" && m.loteId === l.id);
   const ingresos = ingresosLote.reduce((s, m) => s + m.monto, 0);
   return { alimento, otros, total, sinPrecio, porAnimal: l.vivos > 0 ? total / l.vivos : 0, ingresos, ingresosLote, utilidad: ingresos - total };
+}
+
+/* Facturas de Bodega a crédito con saldo pendiente: se abonan o pagan desde aquí */
+function FacturasCredito({ version }: { version: number }) {
+  const facturas = useMemo(
+    () => (version < 0 ? [] : leerFacturas().filter((f) => f.pago === "credito" && saldoFactura(f) > 0).sort((a, b) => a.fecha.localeCompare(b.fecha))),
+    [version],
+  );
+  const [abierta, setAbierta] = useState<string | null>(null);
+  // Se busca entre todas: al pagarla deja la lista pero el módulo sigue abierto mostrando "pagada"
+  const factura = abierta ? (leerFacturas().find((f) => f.id === abierta) ?? null) : null;
+  if (facturas.length === 0 && !factura) return null;
+  const deuda = facturas.reduce((t, f) => t + saldoFactura(f), 0);
+
+  return (
+    <section>
+      <h2 className="mb-1.5 flex items-baseline justify-between gap-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+        <span>Facturas a crédito · por pagar</span>
+        <span className="normal-case tracking-normal font-semibold text-orange-600">{formatoPesos(deuda)}</span>
+      </h2>
+      {facturas.length > 0 && (
+        <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-orange-200">
+          {facturas.map((f) => {
+            const total = totalFactura(f);
+            const saldo = saldoFactura(f);
+            return (
+              <li key={f.id}>
+                <button type="button" onClick={() => setAbierta(f.id)} className="flex w-full items-center gap-2.5 px-3 py-2 text-left active:bg-slate-50">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-slate-900">
+                      Factura {f.numero}
+                      {f.proveedor ? <span className="font-normal text-slate-500"> · {f.proveedor}</span> : null}
+                    </span>
+                    <span className="mt-1 block h-1 overflow-hidden rounded-full bg-slate-100">
+                      <span className="block h-full rounded-full bg-sky-500" style={{ width: `${total > 0 ? ((total - saldo) / total) * 100 : 0}%` }} />
+                    </span>
+                    <span className="mt-0.5 block truncate text-[11px] text-slate-500">
+                      {formatoFecha(f.fecha, true)} · total {formatoPesos(total)}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-right">
+                    <span className="block text-sm font-bold tabular-nums text-orange-600">{formatoPesos(saldo)}</span>
+                    <span className="block text-[10px] text-slate-400">saldo</span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {factura && (
+        <Modal
+          abierta
+          etiqueta="Contabilidad · Factura a crédito"
+          titulo={`Factura ${factura.numero}`}
+          subtitulo={`${formatoFecha(factura.fecha, true)}${factura.proveedor ? ` · ${factura.proveedor}` : ""}`}
+          icono="🧾"
+          onCerrar={() => setAbierta(null)}
+        >
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between rounded-2xl bg-sky-50 px-4 py-3 ring-1 ring-sky-100">
+              <span className="text-sm font-medium text-sky-900">Total</span>
+              <span className="text-lg font-bold tabular-nums text-sky-900">{formatoPesos(totalFactura(factura))}</span>
+            </div>
+            <PagoFactura factura={factura} productos={leerProductos()} />
+          </div>
+        </Modal>
+      )}
+    </section>
+  );
 }
 
 function ContabilidadLotes({ version }: { version: number }) {

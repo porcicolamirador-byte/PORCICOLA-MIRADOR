@@ -9,6 +9,7 @@ import { puede } from "@/lib/nube";
 import DialogoClave from "@/components/DialogoClave";
 import { leerConfig } from "@/lib/config";
 import Modal from "@/components/Modal";
+import PagoFactura from "@/components/PagoFactura";
 import { calcularConsumoCerdas, type ConsumoAlimentoCerdas } from "@/lib/consumoCerdas";
 import { CATEGORIAS_BODEGA, IconoCategoria, RecuadroCategoria } from "@/components/CatalogoProductos";
 import {
@@ -29,7 +30,6 @@ import {
   migrarBodegaAnterior,
   nuevoId,
   totalFactura,
-  abonadoFactura,
   saldoFactura,
   useVersionDatos,
   type CategoriaBodega,
@@ -800,68 +800,8 @@ function DetalleFactura({ factura: f, productos, onCerrar }: { factura: Factura;
     onCerrar();
   };
 
-  /* ── Pago: contado / crédito y abonos ── */
   const credito = f.pago === "credito";
-  const total = totalFactura(f);
-  const abonado = abonadoFactura(f);
-  const saldo = saldoFactura(f);
   const conGasto = f.registrarGasto ?? Boolean(f.movimientoId);
-  const primero = productos.find((p) => p.id === f.lineas[0]?.productoId);
-  const categoria = primero ? CATEGORIA_GASTO[primero.categoria] : "Otros gastos";
-  const descripcion = (pre: string) => `${pre} ${f.numero}${f.proveedor ? ` · ${f.proveedor}` : ""}`;
-  const [abonando, setAbonando] = useState(false);
-  const [montoAbono, setMontoAbono] = useState("");
-  const [fechaAbono, setFechaAbono] = useState(hoy());
-  const [errorAbono, setErrorAbono] = useState("");
-
-  const actualizar = (cambios: Partial<Factura>) => guardarFacturas(leerFacturas().map((x) => (x.id === f.id ? { ...x, ...cambios } : x)));
-  const conPermiso = () => {
-    if (puede("bodega")) return true;
-    void avisarSinPermisoBodega();
-    return false;
-  };
-
-  const abonar = (monto: number, fecha: string) => {
-    if (!conPermiso()) return;
-    if (!(monto > 0)) return setErrorAbono("Escribe el valor del abono.");
-    if (monto > saldo + 0.5) return setErrorAbono(`El abono no puede ser mayor que el saldo (${formatoPesos(saldo)}).`);
-    let movimientoId: string | undefined;
-    if (conGasto) {
-      movimientoId = nuevoId();
-      guardarMovimientos([...leerMovimientos(), { id: movimientoId, fecha, tipo: "gasto", categoria, descripcion: descripcion("Abono factura"), monto }]);
-    }
-    actualizar({ abonos: [...(f.abonos ?? []), { id: nuevoId(), fecha, monto, movimientoId }] });
-    setAbonando(false);
-    setMontoAbono("");
-    setFechaAbono(hoy());
-    setErrorAbono("");
-  };
-
-  const eliminarAbono = async (id: string) => {
-    if (!conPermiso()) return;
-    const a = (f.abonos ?? []).find((x) => x.id === id);
-    if (!a) return;
-    if (!(await confirmar({ titulo: "Eliminar abono", mensaje: `Se quitará el abono de ${formatoPesos(a.monto)}${a.movimientoId ? " y su gasto en Contabilidad" : ""}.`, aceptar: "Eliminar", destructivo: true }))) return;
-    actualizar({ abonos: (f.abonos ?? []).filter((x) => x.id !== id) });
-    if (a.movimientoId) guardarMovimientos(leerMovimientos().filter((m) => m.id !== a.movimientoId));
-  };
-
-  /** Solo una factura a crédito puede pasar a contado (las de contado no cambian) */
-  const cambiarMetodo = async () => {
-    if (!conPermiso()) return;
-    if (credito) {
-      if (!(await confirmar({ titulo: "Cambiar a contado", mensaje: `La factura quedará pagada completa el ${formatoFecha(f.fecha, true)}. Los abonos registrados se reemplazan por un solo pago.`, aceptar: "Cambiar" }))) return;
-      const quitar = new Set((f.abonos ?? []).map((a) => a.movimientoId).filter(Boolean));
-      let movimientos = leerMovimientos().filter((m) => !quitar.has(m.id));
-      let movimientoId: string | undefined;
-      if (conGasto && total > 0) {
-        movimientoId = nuevoId();
-        movimientos = [...movimientos, { id: movimientoId, fecha: f.fecha, tipo: "gasto", categoria, descripcion: descripcion("Factura"), monto: total }];
-      }
-      guardarMovimientos(movimientos);
-      actualizar({ pago: "contado", abonos: undefined, movimientoId, registrarGasto: conGasto });
-    }
-  };
 
   return (
     <Modal
@@ -879,90 +819,7 @@ function DetalleFactura({ factura: f, productos, onCerrar }: { factura: Factura;
         </div>
         {f.nota && <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs italic text-slate-500">{f.nota}</p>}
 
-        {/* Pago */}
-        <section className="overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/80">
-          <div className="flex items-center justify-between gap-2 px-3.5 pt-3">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Método de pago</p>
-              <p className="text-sm font-semibold text-slate-900">{credito ? "Crédito" : "Contado"}</p>
-            </div>
-            <Insignia clase={credito ? (saldo > 0 ? "bg-orange-50 text-orange-700 ring-orange-200" : "bg-sky-50 text-sky-700 ring-sky-200") : "bg-sky-50 text-sky-700 ring-sky-200"}>
-              {credito ? (saldo > 0 ? "Con saldo" : "Pagada") : "Pagada"}
-            </Insignia>
-          </div>
-          {credito && (
-            <div className="px-3.5 pt-2.5">
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                <div className="h-full rounded-full bg-sky-500" style={{ width: `${total > 0 ? Math.min(100, (abonado / total) * 100) : 100}%` }} />
-              </div>
-              <div className="mt-1.5 flex justify-between text-xs">
-                <span className="text-slate-500">
-                  Abonado <b className="text-slate-800 tabular-nums">{formatoPesos(abonado)}</b>
-                </span>
-                <span className="text-slate-500">
-                  Saldo <b className={`tabular-nums ${saldo > 0 ? "text-orange-600" : "text-sky-700"}`}>{formatoPesos(saldo)}</b>
-                </span>
-              </div>
-            </div>
-          )}
-          {credito && abonando && (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                abonar(num(montoAbono), fechaAbono);
-              }}
-              className="mx-3.5 mt-3 flex flex-col gap-2.5 rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200"
-            >
-              <div className="grid grid-cols-2 gap-2">
-                <Campo etiqueta="Valor del abono">
-                  <EntradaPesos value={montoAbono} onChange={(v) => { setMontoAbono(v); setErrorAbono(""); }} />
-                </Campo>
-                <Campo etiqueta="Fecha">
-                  <Entrada type="date" value={fechaAbono} onChange={setFechaAbono} required />
-                </Campo>
-              </div>
-              {errorAbono && <p className="text-xs font-medium text-rose-600">{errorAbono}</p>}
-              <div className="grid grid-cols-2 gap-2">
-                <Boton variante="secundario" onClick={() => { setAbonando(false); setErrorAbono(""); }}>Cancelar</Boton>
-                <Boton type="submit">Guardar abono</Boton>
-              </div>
-            </form>
-          )}
-          <div className="flex flex-wrap gap-2 px-3.5 py-3">
-            {credito && saldo > 0 && !abonando && (
-              <>
-                <Boton onClick={() => conPermiso() && setAbonando(true)} className="flex-1">Registrar abono</Boton>
-                <Boton variante="secundario" onClick={() => abonar(saldo, hoy())} className="flex-1">Pagar saldo</Boton>
-              </>
-            )}
-            {credito ? (
-              <button type="button" onClick={() => void cambiarMetodo()} className="w-full rounded-full py-1.5 text-xs font-semibold text-sky-700 active:bg-sky-50">
-                Cambiar a contado
-              </button>
-            ) : (
-              <p className="w-full text-center text-[11px] text-slate-400">Pagada de contado · el método de pago no se puede cambiar</p>
-            )}
-          </div>
-          {credito && (f.abonos?.length ?? 0) > 0 && (
-            <div className="border-t border-slate-100 p-2">
-              <SeccionDesplegable titulo="Abonos" cantidad={f.abonos!.length}>
-                <ul className="divide-y divide-slate-100 bg-white">
-                  {[...f.abonos!].sort((a, b) => b.fecha.localeCompare(a.fecha)).map((a) => (
-                    <li key={a.id} className="flex items-center gap-3 px-3.5 py-2.5">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold tabular-nums text-slate-900">{formatoPesos(a.monto)}</p>
-                        <p className="text-[11px] text-slate-500">{formatoFecha(a.fecha, true)}</p>
-                      </div>
-                      <button type="button" onClick={() => void eliminarAbono(a.id)} className="shrink-0 rounded-full px-2.5 py-1 text-xs font-medium text-rose-600 active:bg-rose-50">
-                        Eliminar
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </SeccionDesplegable>
-            </div>
-          )}
-        </section>
+        <PagoFactura factura={f} productos={productos} />
 
         <SeccionDesplegable titulo="Productos" cantidad={f.lineas.length}>
         <ul className="divide-y divide-slate-100 bg-white">
