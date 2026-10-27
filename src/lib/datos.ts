@@ -414,6 +414,8 @@ export const PRODUCTOS_PREESTABLECIDOS: ProductoBodega[] = [
   { id: "pre-IN-01", codigo: "IN-01", nombre: "Iniciación Cerdos", categoria: "Alimento", unidad: "bultos", kgPorUnidad: 40, minimo: 0, activo: true, preestablecido: true },
   { id: "pre-ML-01", codigo: "ML-01", nombre: "Maxi lechones 337", categoria: "Alimento", unidad: "bultos", kgPorUnidad: 40, minimo: 0, activo: true, preestablecido: true },
   { id: "pre-MC-01", codigo: "MC-01", nombre: "Maxi Cerdos 337 Fin.", categoria: "Alimento", unidad: "bultos", kgPorUnidad: 40, minimo: 0, activo: true, preestablecido: true },
+  { id: "pre-CG-01", codigo: "CG-01", nombre: "Maxi Cerdas Gestación", categoria: "Alimento", unidad: "bultos", kgPorUnidad: 40, minimo: 0, activo: true, preestablecido: true },
+  { id: "pre-CL-01", codigo: "CL-01", nombre: "Maxi Cerdas Lactancia", categoria: "Alimento", unidad: "bultos", kgPorUnidad: 40, minimo: 0, activo: true, preestablecido: true },
 ];
 export interface LineaFactura {
   productoId: string;
