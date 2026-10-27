@@ -29,6 +29,8 @@ export interface PerfilNube {
   nombre: string;
   rol: "admin" | "trabajador";
   permisos: Partial<Record<PermisoNube, boolean>>;
+  /** Granjas a las que entra (null o vacío de campo = todas, incluidas las nuevas) */
+  granjas?: string[] | null;
   activo?: boolean;
   creado_en?: string;
 }
@@ -210,6 +212,16 @@ export async function actualizarPerfil(): Promise<PerfilNube | null> {
 }
 
 /** ¿El usuario de este teléfono puede hacer algo? (el administrador puede todo) */
+/** ¿Este usuario puede entrar a la granja? (admin y "todas" → siempre) */
+export function puedeVerGranja(id: string, perfil = perfilGuardado()): boolean {
+  if (!perfil) return true;
+  return perfil.rol === "admin" || !Array.isArray(perfil.granjas) || perfil.granjas.includes(id);
+}
+/** Solo quien tiene acceso a todas las granjas puede crear granjas nuevas */
+export function puedeCrearGranjas(perfil = perfilGuardado()): boolean {
+  return !!perfil && (perfil.rol === "admin" || !Array.isArray(perfil.granjas));
+}
+
 export function puede(permiso: PermisoNube): boolean {
   const p = perfilGuardado();
   return !!p && (p.rol === "admin" || p.permisos?.[permiso] === true);
@@ -219,12 +231,12 @@ export function puede(permiso: PermisoNube): boolean {
 
 export const listarUsuarios = () => llamarFuncion<{ usuarios: PerfilNube[] }>("usuarios", { accion: "listar" }).then((r) => r.usuarios);
 
-export const crearUsuario = (datos: { usuario: string; nombre: string; pin: string; rol?: PerfilNube["rol"]; permisos?: PerfilNube["permisos"] }) =>
+export const crearUsuario = (datos: { usuario: string; nombre: string; pin: string; rol?: PerfilNube["rol"]; permisos?: PerfilNube["permisos"]; granjas?: string[] | null }) =>
   llamarFuncion<{ usuario: PerfilNube }>("usuarios", { accion: "crear", ...datos }).then((r) => r.usuario);
 
 export const actualizarUsuario = (
   id: string,
-  cambios: Partial<Pick<PerfilNube, "nombre" | "rol" | "permisos" | "activo">> & { pin?: string },
+  cambios: Partial<Pick<PerfilNube, "nombre" | "rol" | "permisos" | "activo" | "granjas">> & { pin?: string },
 ) => llamarFuncion<{ usuario: PerfilNube }>("usuarios", { accion: "actualizar", id, ...cambios }).then((r) => r.usuario);
 
 /** Borra un usuario para siempre (solo administrador). Sus registros se conservan. */

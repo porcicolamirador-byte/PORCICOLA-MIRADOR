@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import Modal from "@/components/Modal";
 import { Boton, Campo, Entrada } from "@/components/ui";
+import { puedeCrearGranjas, puedeVerGranja } from "@/lib/nube";
 import { cambiarGranja, crearGranja, granjaActual, leerGranjas, nombreGranjaActual, sincronizar } from "@/lib/sincronizar";
 import { registrarLog } from "@/lib/log";
 import SummaryCard from "@/components/SummaryCard";
@@ -292,6 +293,7 @@ export default function Dashboard() {
           bgColor={COLOR_PAGINA}
           onTitulo={() => setVerGranjas(true)}
           actions={
+            puedeCrearGranjas() ? (
             <button
               type="button"
               onClick={() => setCrearGranjaAbierto(true)}
@@ -302,6 +304,7 @@ export default function Dashboard() {
                 <path d="M12 5v14M5 12h14" />
               </svg>
             </button>
+            ) : undefined
           }
         />
 
@@ -468,7 +471,8 @@ function abrirGranja(id: string) {
 
 function SelectorGranjas({ abierto, onCerrar, onNueva }: { abierto: boolean; onCerrar: () => void; onNueva: () => void }) {
   if (!abierto) return null;
-  const granjas = leerGranjas();
+  // Solo las granjas a las que el usuario tiene acceso
+  const granjas = leerGranjas().filter((g) => puedeVerGranja(g.id));
   const actual = granjaActual();
   return (
     <Modal abierta etiqueta="Porcícola" titulo="Granjas" subtitulo="Cada granja tiene sus propios datos" icono={ICONO_GRANJA} onCerrar={onCerrar}>
@@ -497,9 +501,11 @@ function SelectorGranjas({ abierto, onCerrar, onNueva }: { abierto: boolean; onC
             );
           })}
         </ul>
-        <Boton onClick={onNueva} className="w-full py-3">
-          + Nueva granja
-        </Boton>
+        {puedeCrearGranjas() && (
+          <Boton onClick={onNueva} className="w-full py-3">
+            + Nueva granja
+          </Boton>
+        )}
       </div>
     </Modal>
   );

@@ -17,7 +17,7 @@
  * guardadas aparte y se cambian con cambiarGranja().
  */
 
-import { api, perfilGuardado, sesionGuardada } from "@/lib/nube";
+import { api, perfilGuardado, puedeVerGranja, sesionGuardada } from "@/lib/nube";
 
 /* ───────────── Qué se sincroniza ───────────── */
 
@@ -424,6 +424,13 @@ function ejecutarSincronizacion(): Promise<void> {
         }
         guardarMeta({ cursor: null, usuarioId: perfilGuardado()?.id ?? sesion.user_id, logSubido: new Date().toISOString(), inicializado: true, generacion: remota ?? undefined });
         window.dispatchEvent(new Event("storage"));
+      }
+
+      // Si el administrador le quitó el acceso a la granja actual, pasa a una permitida
+      const perfil = perfilGuardado();
+      if (perfil && !puedeVerGranja(granjaActual(), perfil)) {
+        const permitida = leerGranjas().find((g) => puedeVerGranja(g.id, perfil));
+        if (permitida) cambiarGranja(permitida.id);
       }
 
       await subir();

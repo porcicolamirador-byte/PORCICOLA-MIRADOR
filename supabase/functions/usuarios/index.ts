@@ -2,13 +2,16 @@
 // Acciones:
 //   { accion: "listar" }
 //   { accion: "crear", usuario, nombre, pin, rol?, permisos? }
-//   { accion: "actualizar", id, nombre?, rol?, permisos?, activo?, pin? }
+//   { accion: "actualizar", id, nombre?, rol?, permisos?, granjas?, activo?, pin? }   (granjas: null = todas)
 //   { accion: "eliminar", id }   → borra la cuenta para siempre (sus registros se conservan)
 //   { accion: "reiniciar", pin }  → borra TODOS los datos de la granja (no los usuarios); pide el PIN del administrador
 //   { accion: "yo" }   → perfil del usuario que llama (cualquier usuario activo)
 import { admin, contrasenaDe, publico, correoDe, CORS, json, PIN_VALIDO, usuarioDeLaPeticion, USUARIO_VALIDO } from "../_compartido/comun.ts";
 
 const PERMISOS = ["eliminar", "bodega", "ajustes", "contabilidad"] as const;
+/** null = todas las granjas (incluidas las nuevas); lista = solo esas */
+const limpiarGranjas = (g: unknown): string[] | null =>
+  Array.isArray(g) ? [...new Set(g.filter((x): x is string => typeof x === "string" && /^[a-z0-9]{1,40}$/i.test(x)))].slice(0, 50) : null;
 const limpiarPermisos = (p: unknown) => {
   const o = (p && typeof p === "object" ? p : {}) as Record<string, unknown>;
   return Object.fromEntries(PERMISOS.map((k) => [k, o[k] === true]));
@@ -37,7 +40,7 @@ Deno.serve(async (req) => {
 
   try {
     if (accion === "listar") {
-      const { data, error } = await admin.from("perfiles").select("id, usuario, nombre, rol, permisos, activo, creado_en").order("creado_en");
+      const { data, error } = await admin.from("perfiles").select("id, usuario, nombre, rol, permisos, granjas, activo, creado_en").order("creado_en");
       if (error) throw error;
       return json({ usuarios: data });
     }
@@ -61,8 +64,8 @@ Deno.serve(async (req) => {
       if (error || !creado.user) return json({ error: "No se pudo crear el usuario" }, 500);
       const { data: perfil, error: e2 } = await admin
         .from("perfiles")
-        .insert({ id: creado.user.id, usuario, nombre, rol, permisos: limpiarPermisos(cuerpo.permisos) })
-        .select("id, usuario, nombre, rol, permisos, activo, creado_en")
+        .insert({ id: creado.user.id, usuario, nombre, rol, permisos: limpiarPermisos(cuerpo.permisos), granjas: limpiarGranjas(cuerpo.granjas) })
+        .select("id, usuario, nombre, rol, permisos, granjas, activo, creado_en")
         .single();
       if (e2) {
         await admin.auth.admin.deleteUser(creado.user.id);
@@ -81,6 +84,7 @@ Deno.serve(async (req) => {
       if (cuerpo.rol === "admin" || cuerpo.rol === "trabajador") cambios.rol = cuerpo.rol;
       if (cuerpo.permisos !== undefined) cambios.permisos = limpiarPermisos(cuerpo.permisos);
       if (typeof cuerpo.activo === "boolean") cambios.activo = cuerpo.activo;
+      if (cuerpo.granjas !== undefined) cambios.granjas = limpiarGranjas(cuerpo.granjas);
 
       // El administrador no puede quitarse a sí mismo el rol ni desactivarse (quedaría sin acceso)
       if (id === yo.id && (cambios.rol === "trabajador" || cambios.activo === false)) {
@@ -99,7 +103,7 @@ Deno.serve(async (req) => {
         .from("perfiles")
         .update(cambios)
         .eq("id", id)
-        .select("id, usuario, nombre, rol, permisos, activo, creado_en")
+        .select("id, usuario, nombre, rol, permisos, granjas, activo, creado_en")
         .single();
       if (error) throw error;
 

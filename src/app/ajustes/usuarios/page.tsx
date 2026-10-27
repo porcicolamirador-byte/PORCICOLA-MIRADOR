@@ -7,6 +7,7 @@ import Modal from "@/components/Modal";
 import { Boton, Campo, Entrada, IconoMas, Interruptor } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
 import { ajustesDesbloqueados } from "@/lib/acceso";
+import { leerGranjas } from "@/lib/sincronizar";
 import { actualizarUsuario, crearUsuario, eliminarUsuario, ErrorNube, listarUsuarios, perfilGuardado, type PerfilNube, type PermisoNube } from "@/lib/nube";
 import { registrarLog } from "@/lib/log";
 import { leerConfig } from "@/lib/config";
@@ -27,6 +28,12 @@ const icono = (
     <path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5" />
   </svg>
 );
+
+function resumenGranjas(u: PerfilNube) {
+  if (u.rol === "admin" || !Array.isArray(u.granjas)) return "todas las granjas";
+  const nombres = leerGranjas().filter((g) => u.granjas!.includes(g.id)).map((g) => g.nombre);
+  return nombres.length ? nombres.join(", ") : "ninguna granja";
+}
 
 function resumenPermisos(u: PerfilNube) {
   if (u.rol === "admin") return "Todos los permisos";
@@ -140,6 +147,7 @@ function ListaUsuarios({ titulo, usuarios, yoId, onElegir }: { titulo: string; u
                 </span>
                 <span className="block truncate text-xs text-slate-500">
                   @{u.usuario} · {resumenPermisos(u)}
+                  {u.rol !== "admin" && Array.isArray(u.granjas) ? ` · ${resumenGranjas(u)}` : ""}
                 </span>
               </span>
               <span
@@ -206,6 +214,10 @@ function EditorUsuario({
   const [nombreUsuario, setNombreUsuario] = useState(usuario?.usuario ?? "");
   const [rol, setRol] = useState<PerfilNube["rol"]>(usuario?.rol ?? "trabajador");
   const [permisos, setPermisos] = useState<PerfilNube["permisos"]>(usuario?.permisos ?? {});
+  // Granjas: todas (incluidas las nuevas) o solo las elegidas
+  const [todasGranjas, setTodasGranjas] = useState(!Array.isArray(usuario?.granjas));
+  const [granjasSel, setGranjasSel] = useState<string[]>(Array.isArray(usuario?.granjas) ? usuario!.granjas! : []);
+  const listaGranjas = leerGranjas();
   const [activo, setActivo] = useState(usuario?.activo !== false);
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
@@ -217,6 +229,8 @@ function EditorUsuario({
     if (!nombre.trim()) return setError("Escribe el nombre.");
     if (nuevo && nombreUsuario.length < 3) return setError("El usuario debe tener al menos 3 caracteres.");
     if ((nuevo || pin) && !/^\d{4}$/.test(pin)) return setError("El PIN debe tener 4 números.");
+    if (rol === "trabajador" && !todasGranjas && granjasSel.length === 0) return setError("Elige al menos una granja o marca «Todas las granjas».");
+    const granjas = rol === "admin" || todasGranjas ? null : granjasSel;
     if (!nuevo && usuario && usuario.activo !== false && !activo) {
       const ok = await confirmar({
         titulo: `Desactivar a ${usuario.nombre}`,
@@ -230,7 +244,7 @@ function EditorUsuario({
     setOcupado(true);
     try {
       if (nuevo) {
-        const u = await crearUsuario({ usuario: nombreUsuario, nombre: nombre.trim(), pin, rol, permisos });
+        const u = await crearUsuario({ usuario: nombreUsuario, nombre: nombre.trim(), pin, rol, permisos, granjas });
         registrarLog([{ accion: "Creación", modulo: "Usuarios", detalle: `Usuario @${u.usuario} (${u.nombre}) · ${u.rol === "admin" ? "administrador" : "usuario"}` }]);
         onGuardado(u, true);
         await avisar({ titulo: "Usuario creado", mensaje: `Comparte con ${u.nombre} su usuario "${u.usuario}" y su PIN. Podrá entrar desde su teléfono.` });
@@ -239,12 +253,14 @@ function EditorUsuario({
           nombre: nombre.trim(),
           rol,
           permisos,
+          granjas,
           activo,
           ...(pin ? { pin } : {}),
         });
         const cambios = [
           usuario!.rol !== rol ? `rol ${rol === "admin" ? "administrador" : "usuario"}` : "",
           JSON.stringify(usuario!.permisos ?? {}) !== JSON.stringify(u.permisos ?? {}) ? `permisos: ${resumenPermisos(u)}` : "",
+          JSON.stringify(usuario!.granjas ?? null) !== JSON.stringify(u.granjas ?? null) ? `granjas: ${resumenGranjas(u)}` : "",
           usuario!.activo !== false && !activo ? "desactivado" : "",
           usuario!.activo === false && activo ? "reactivado" : "",
           pin ? "PIN cambiado" : "",
@@ -316,6 +332,38 @@ function EditorUsuario({
           </div>
         ) : (
           <p className="rounded-xl bg-sky-50 px-3 py-2.5 text-xs text-sky-900 ring-1 ring-sky-100">El administrador tiene todos los permisos y puede administrar usuarios.</p>
+        )}
+
+        {rol === "trabajador" && (
+          <div>
+            <span className="mb-1.5 block text-[13px] font-medium text-slate-700">Granjas</span>
+            <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200">
+              <li>
+                <label className="flex cursor-pointer items-center gap-3 px-3.5 py-2.5">
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-medium text-slate-900">Todas las granjas</span>
+                    <span className="block text-xs text-slate-500">Incluye las que se creen más adelante</span>
+                  </span>
+                  <Interruptor activo={todasGranjas} onCambiar={setTodasGranjas} />
+                </label>
+              </li>
+              {!todasGranjas &&
+                listaGranjas.map((g) => (
+                  <li key={g.id}>
+                    <label className="flex cursor-pointer items-center gap-3 px-3.5 py-2.5">
+                      <span className="min-w-0 flex-1 truncate text-[15px] text-slate-800">{g.nombre}</span>
+                      <Interruptor
+                        activo={granjasSel.includes(g.id)}
+                        onCambiar={(v) => setGranjasSel((x) => (v ? [...new Set([...x, g.id])] : x.filter((id) => id !== g.id)))}
+                      />
+                    </label>
+                  </li>
+                ))}
+            </ul>
+            <p className="mt-1.5 px-1 text-[11px] text-slate-500">
+              {todasGranjas ? "Entra a todas las granjas y puede crear granjas nuevas." : "Solo ve y registra datos en las granjas elegidas. Las granjas nuevas no se le agregan solas."}
+            </p>
+          </div>
         )}
 
         {!nuevo && !esYo && (

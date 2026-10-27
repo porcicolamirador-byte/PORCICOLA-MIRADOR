@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
       const { data: bloqueo } = await admin.rpc("bloqueo_pin", { p_usuario: usuario });
       if (bloqueo) return json({ error: "Demasiados intentos. Espera unos minutos.", bloqueadoHasta: bloqueo }, 429);
 
-      const { data: perfil } = await admin.from("perfiles").select("id, usuario, nombre, rol, permisos, activo").eq("usuario", usuario).maybeSingle();
+      const { data: perfil } = await admin.from("perfiles").select("id, usuario, nombre, rol, permisos, granjas, activo").eq("usuario", usuario).maybeSingle();
       const sesion = perfil?.activo ? await entrar(usuario, pin) : null;
       if (!sesion) {
         const { data: hasta } = await admin.rpc("registrar_intento_pin", { p_usuario: usuario, p_exito: false });
