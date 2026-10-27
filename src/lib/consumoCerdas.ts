@@ -43,8 +43,9 @@ export interface ConsumoAlimentoCerdas {
  * estado que muestra Gestación):
  *  - Parto → lactancia;
  *  - Inseminación con el día de cambio (100) cumplido → pre-parto (alimento de lactancia);
+ *  - Baja → no come (no se cuenta);
  *  - cualquier otro estado (inseminación antes del día 100, celo, destete,
- *    aborto, baja, tratamiento, evento o sin registros) → alimento de gestación.
+ *    aborto, tratamiento, evento o sin registros) → alimento de gestación.
  */
 function contarCerdas(diaCambio: number) {
   const hoyIso = hoy();
@@ -54,6 +55,8 @@ function contarCerdas(diaCambio: number) {
   let lactando = 0;
   for (const c of leerCerdas()) {
     const ultimo = leerHistorial(c.id)[0];
+    // Dada de baja: ya no come, no se le descuenta alimento
+    if (ultimo?.tipo === "Baja") continue;
     if (ultimo?.tipo === "Parto") lactando++;
     else if (ultimo?.tipo === "Inseminación") {
       if (diasEntre(ultimo.fecha, hoyIso) >= diaCambio) preparto++;
