@@ -102,7 +102,7 @@ export function generarPdfLote(d: DatosPdfLote): Blob {
     paginas.push(L);
     L.rect(0, 0, ANCHO, 6, AZUL);
     L.texto(M, 34, `${d.codigo} · ${d.nombre}`, 10, P900, true);
-    der(L, DER, 34, `Estado contable lote ${d.codigo} (continuación)`, 8.5, P500);
+    der(L, DER, 34, `Reporte contable lote ${d.codigo} (continuación)`, 8.5, P500);
     L.linea(M, DER, 44, P200, 0.6);
     y = 66;
   };
@@ -116,7 +116,7 @@ export function generarPdfLote(d: DatosPdfLote): Blob {
   }
   const xt = d.logo ? M + 74 : M;
   L.texto(xt, 36, `PORCÍCOLA ${d.granja}`.toUpperCase(), 8, [186, 230, 253], true);
-  L.texto(xt, 60, `Estado contable lote ${d.codigo}`, 19, BLANCO, true);
+  L.texto(xt, 60, `Reporte contable lote ${d.codigo}`, 19, BLANCO, true);
   L.texto(xt, 77, d.nombre, 10, [224, 242, 254], true);
   der(L, DER, 36, `Generado el ${d.fechaGeneracion}`, 8, [186, 230, 253]);
 
@@ -259,7 +259,7 @@ export function generarPdfLote(d: DatosPdfLote): Blob {
   /* ── Pie de página ── */
   paginas.forEach((p, i) => {
     p.linea(M, DER, 806, P200, 0.6);
-    p.texto(M, 822, `Porcícola ${d.granja} · Estado contable ${d.codigo} · Cifras en pesos colombianos (COP)`, 7.5, P400);
+    p.texto(M, 822, `Porcícola ${d.granja} · Reporte contable ${d.codigo} · Cifras en pesos colombianos (COP)`, 7.5, P400);
     der(p, DER, 822, `Página ${i + 1} de ${paginas.length}`, 7.5, P400);
   });
 
