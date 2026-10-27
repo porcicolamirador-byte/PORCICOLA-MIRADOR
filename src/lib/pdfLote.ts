@@ -161,7 +161,29 @@ export function generarPdfLote(d: DatosPdfLote): Blob {
     L.texto(xx + 10, y + 15, recortar(x.t, w - 20, 7.5, true).toUpperCase(), 7.5, P500, true);
     L.texto(xx + 10, y + 33, recortar(x.v, w - 20, 14, true), 14, x.c, true);
   });
-  y += 64;
+  y += 52;
+
+  // Con la contabilidad de la madre: costos del lote y de la madre por separado
+  const costoMadre = costos.filter((m) => m.categoria.startsWith("Madre")).reduce((t, m) => t + m.valor, 0);
+  if (costoMadre > 0 || costos.some((m) => m.categoria.startsWith("Madre"))) {
+    const costoLote = totalCostos - costoMadre;
+    L.rect(M, y, ANCHO_UTIL, 22, P50, 6);
+    const partes = [
+      { t: "Costos del lote", v: pesos(costoLote) },
+      { t: "Costos de la madre", v: pesos(costoMadre) },
+      { t: "Total costos", v: pesos(totalCostos) },
+    ];
+    const wp = ANCHO_UTIL / 3;
+    partes.forEach((p, i) => {
+      const x0 = M + i * wp + 10;
+      L.texto(x0, y + 14.5, p.t, 7.5, P500);
+      der(L, M + (i + 1) * wp - 10, y + 14.5, p.v, 8.5, P900, true);
+      if (i > 0) L.rect(M + i * wp, y + 5, 0.6, 12, P200);
+    });
+    y += 34;
+  } else {
+    y += 12;
+  }
 
   /* ── Estado de resultados ── */
   titulo("Estado de resultados");
