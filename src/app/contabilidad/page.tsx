@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import ModuloPage from "@/components/ModuloPage";
-import { Boton, Campo, Dato, Entrada, Hoja, IconoMas, Selector, Tarjeta, Vacio, EntradaPesos } from "@/components/ui";
+import { Boton, Campo, Entrada, Hoja, IconoMas, SeccionDesplegable, Selector, Vacio, EntradaPesos } from "@/components/ui";
 import {
   formatoFecha,
   formatoPesos,
@@ -95,43 +95,50 @@ export default function ContabilidadPage() {
         </Boton>
       }
     >
-      <div className="flex items-center justify-between rounded-2xl bg-slate-100 p-1">
-        <button type="button" onClick={() => setMes(moverMes(mes, -1))} aria-label="Mes anterior"
-          className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-600 hover:bg-white">‹</button>
-        <span className="text-sm font-semibold text-slate-900">{nombreMes(mes)}</span>
-        <button type="button" onClick={() => setMes(moverMes(mes, 1))} aria-label="Mes siguiente"
-          className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-600 hover:bg-white">›</button>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <Dato titulo="Ingresos" valor={datos ? formatoPesos(datos.ingresos) : "–"} />
-        <Dato titulo="Gastos" valor={datos ? formatoPesos(datos.gastos) : "–"} />
-      </div>
-      <div
-        className={`rounded-2xl px-4 py-3 ${balance >= 0 ? "bg-sky-900 text-white" : "bg-rose-600 text-white"}`}
-      >
-        <p className="text-xs opacity-80">Balance del mes</p>
-        <p className="text-2xl font-semibold tabular-nums">{datos ? formatoPesos(balance) : "–"}</p>
-      </div>
+      {/* Resumen del mes: mes, ingresos, gastos y balance en una sola tarjeta */}
+      <section className="overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200">
+        <div className="flex items-center justify-between border-b border-slate-100 px-1.5 py-1">
+          <button type="button" onClick={() => setMes(moverMes(mes, -1))} aria-label="Mes anterior"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-lg text-slate-500 active:bg-slate-100">‹</button>
+          <span className="text-sm font-semibold capitalize text-slate-900">{nombreMes(mes)}</span>
+          <button type="button" onClick={() => setMes(moverMes(mes, 1))} aria-label="Mes siguiente"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-lg text-slate-500 active:bg-slate-100">›</button>
+        </div>
+        <div className="grid grid-cols-3 divide-x divide-slate-100">
+          {[
+            { t: "Ingresos", v: datos ? formatoPesos(datos.ingresos) : "–", c: "text-sky-700" },
+            { t: "Gastos", v: datos ? formatoPesos(datos.gastos) : "–", c: "text-slate-900" },
+            { t: "Balance", v: datos ? formatoPesos(balance) : "–", c: balance >= 0 ? "text-sky-700" : "text-rose-600" },
+          ].map((x) => (
+            <div key={x.t} className="min-w-0 px-2 py-2.5 text-center">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{x.t}</p>
+              <p className={`truncate text-[15px] font-bold tabular-nums ${x.c}`}>{x.v}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <ContabilidadLotes version={version} />
 
       {datos && datos.porCategoria.length > 0 && (
-        <Tarjeta titulo="Gastos por categoría">
-          <ul className="flex flex-col gap-2.5">
+        <SeccionDesplegable titulo="Gastos por categoría" cantidad={datos.porCategoria.length}>
+          <ul className="flex flex-col gap-2 p-3">
             {datos.porCategoria.map(([cat, monto]) => (
               <li key={cat}>
-                <div className="flex justify-between gap-2 text-sm">
+                <div className="flex justify-between gap-2 text-[13px]">
                   <span className="truncate text-slate-700">{cat}</span>
-                  <span className="shrink-0 font-semibold tabular-nums">{formatoPesos(monto)}</span>
+                  <span className="shrink-0 font-semibold tabular-nums">
+                    {formatoPesos(monto)}
+                    <span className="ml-1.5 text-[11px] font-normal text-slate-400">{Math.round((monto / datos.gastos) * 100)} %</span>
+                  </span>
                 </div>
-                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                  <div className="h-full rounded-full bg-stone-500" style={{ width: `${(monto / datos.gastos) * 100}%` }} />
+                <div className="mt-1 h-1 overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-full rounded-full bg-sky-600" style={{ width: `${(monto / datos.gastos) * 100}%` }} />
                 </div>
               </li>
             ))}
           </ul>
-        </Tarjeta>
+        </SeccionDesplegable>
       )}
 
       {datos === null ? (
@@ -143,12 +150,13 @@ export default function ContabilidadPage() {
           accion={<Boton onClick={() => setNuevo(true)}>Registrar movimiento</Boton>}
         />
       ) : (
-        <Tarjeta titulo="Movimientos">
-          <ul className="flex flex-col divide-y divide-slate-100">
+        <section>
+          <h2 className="mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Movimientos · {datos.movs.length}</h2>
+          <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200">
             {datos.movs.map((m) => (
-              <li key={m.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+              <li key={m.id} className="flex items-center gap-2.5 px-3 py-2">
                 <span
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-base font-bold ${
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${
                     m.tipo === "ingreso" ? "bg-sky-50 text-sky-700" : "bg-rose-50 text-rose-700"
                   }`}
                   aria-hidden="true"
@@ -156,24 +164,29 @@ export default function ContabilidadPage() {
                   {m.tipo === "ingreso" ? "+" : "−"}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-slate-900">{m.descripcion || m.categoria}</p>
-                  <p className="truncate text-xs text-slate-500">
+                  <p className="truncate text-[13px] font-semibold text-slate-900">{m.descripcion || m.categoria}</p>
+                  <p className="truncate text-[11px] text-slate-500">
                     {m.categoria} · {formatoFecha(m.fecha)}
                   </p>
                 </div>
-                <div className="flex shrink-0 flex-col items-end">
-                  <span className={`text-sm font-semibold tabular-nums ${m.tipo === "ingreso" ? "text-sky-700" : "text-slate-900"}`}>
-                    {m.tipo === "ingreso" ? "+" : "−"}
-                    {formatoPesos(m.monto)}
-                  </span>
-                  <button type="button" onClick={() => eliminar(m.id)} className="text-[11px] text-slate-400 hover:text-rose-600">
-                    Quitar
-                  </button>
-                </div>
+                <span className={`shrink-0 text-[13px] font-semibold tabular-nums ${m.tipo === "ingreso" ? "text-sky-700" : "text-slate-900"}`}>
+                  {m.tipo === "ingreso" ? "+" : "−"}
+                  {formatoPesos(m.monto)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => eliminar(m.id)}
+                  aria-label={`Quitar ${m.descripcion || m.categoria}`}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-300 active:bg-rose-50 active:text-rose-600"
+                >
+                  <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" aria-hidden="true">
+                    <path d="M5 5l10 10M15 5L5 15" />
+                  </svg>
+                </button>
               </li>
             ))}
           </ul>
-        </Tarjeta>
+        </section>
       )}
 
       <NuevoMovimiento abierta={nuevo} onCerrar={() => setNuevo(false)} />
@@ -263,14 +276,17 @@ function ContabilidadLotes({ version }: { version: number }) {
   const totalGeneral = lotes.reduce((s, l) => s + cuentasLote(l).total, 0);
 
   return (
-    <Tarjeta titulo="Contabilidad por lote">
-      <p className="-mt-1 mb-2 text-xs text-slate-500">Lotes activos · todo lo gastado desde que ingresaron · {formatoPesos(totalGeneral)} en total</p>
-      <ul className="flex flex-col gap-1.5">
+    <section>
+      <h2 className="mb-1.5 flex items-baseline justify-between gap-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+        <span>Por lote · activos</span>
+        <span className="normal-case tracking-normal text-slate-500">{formatoPesos(totalGeneral)} desde su ingreso</span>
+      </h2>
+      <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200">
         {lotes.map((l) => {
           const c = cuentasLote(l);
           return (
             <li key={l.id}>
-              <button type="button" onClick={() => setAbierto(l.id)} className="flex w-full items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5 text-left active:bg-slate-100">
+              <button type="button" onClick={() => setAbierto(l.id)} className="flex w-full items-center gap-2.5 px-3 py-2 text-left active:bg-slate-50">
                 <span className="shrink-0 rounded-lg bg-sky-100 px-2 py-0.5 text-xs font-bold tabular-nums text-sky-800">{l.codigo ?? "Lote"}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-slate-900">{l.nombre && l.nombre !== l.codigo ? l.nombre : `${l.vivos} animales`}</span>
@@ -288,7 +304,7 @@ function ContabilidadLotes({ version }: { version: number }) {
         })}
       </ul>
       {lote && <DetalleCuentasLote lote={lote} onCerrar={() => setAbierto(null)} />}
-    </Tarjeta>
+    </section>
   );
 }
 
