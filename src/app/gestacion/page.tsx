@@ -711,7 +711,7 @@ export default function Gestacion() {
             })}
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             {filtradas.map((cerda, index) => {
               const historial = historiales.get(cerda.id) ?? [];
 
@@ -779,7 +779,7 @@ export default function Gestacion() {
                   </div>
 
                   <div
-                    className="relative z-10 cursor-pointer bg-white py-3 pl-4 pr-3"
+                    className="relative z-10 cursor-pointer bg-white py-2.5 pl-4 pr-2.5"
                     onClick={() => {
                       if (isSwiped) {
                         setSwipedIndex(null);
@@ -798,21 +798,21 @@ export default function Gestacion() {
                     {/* Franja de color = estado */}
                     <div className={`absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b ${obtenerBarraColor(estadoLabel)}`} />
 
-                    <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-2">
                       {/* Cabecera: arete + raza + estado */}
                       <div className="flex items-center gap-3">
                         {/* El ID se ve como un arete de oreja */}
-                        <div className="relative flex h-12 min-w-[3.5rem] max-w-[6.5rem] shrink-0 items-center justify-center rounded-xl bg-amber-300 px-2.5 pt-1.5 shadow-inner">
+                        <div className="relative flex h-10 min-w-[3.25rem] max-w-[6rem] shrink-0 items-center justify-center rounded-lg bg-amber-300 px-2 pt-1 shadow-inner">
                           <span
                             aria-hidden="true"
                             className="absolute left-1/2 top-1 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-amber-50/90 ring-1 ring-amber-600/40"
                           />
-                          <span className="truncate text-lg font-black tabular-nums text-amber-950">{cerda.id}</span>
+                          <span className="truncate text-base font-black tabular-nums text-amber-950">{cerda.id}</span>
                         </div>
 
-                        <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
                           <p className="truncate text-sm font-semibold text-slate-900">{cerda.raza}</p>
-                          <span className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${obtenerEstadoStyles(estadoLabel)}`}>
+                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${obtenerEstadoStyles(estadoLabel)}`}>
                             <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
                             {estadoLabel}
                           </span>
@@ -825,14 +825,14 @@ export default function Gestacion() {
                             e.stopPropagation();
                             setSwipedIndex(isSwiped ? null : index);
                           }}
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xl leading-none text-slate-400 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600"
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xl leading-none text-slate-400 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600"
                         >
                           ⋯
                         </button>
                       </div>
 
                       {/* Datos clave */}
-                      <div className="space-y-2 text-sm text-slate-600 empty:hidden">
+                      <div className="space-y-1.5 text-sm text-slate-600 empty:hidden">
                         {progresoGestacion !== null && estadoLabel === "Gestación" ? (
                           <div>
                             <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
@@ -845,7 +845,7 @@ export default function Gestacion() {
                               aria-valuemin={0}
                               aria-valuemax={100}
                               aria-label="Progreso de gestación"
-                              className="h-2 w-full overflow-hidden rounded-full bg-slate-100"
+                              className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100"
                             >
                               <div
                                 className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-300"
@@ -858,39 +858,35 @@ export default function Gestacion() {
                         {cerda.caracteristicas ? (
                           <p className="flex items-start gap-2">
                             <span aria-hidden="true">📝</span>
-                            <span className="line-clamp-2">{cerda.caracteristicas}</span>
+                            <span className="line-clamp-1 text-xs">{cerda.caracteristicas}</span>
                           </p>
                         ) : null}
                       </div>
 
-                      {/* Panel de estado */}
-                      <div className={`rounded-xl border px-3 py-2 ${panelStyles.bg} ${panelStyles.border}`}>
+                      {/* Panel de estado (una sola línea) */}
+                      <div className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-1.5 ${panelStyles.bg} ${panelStyles.border}`}>
                         {estadoLabel === "Gestación" && diasParaParto !== null ? (
-                          <div className="flex items-end justify-between gap-2">
-                            <div>
-                              <p className={`text-xs font-medium ${panelStyles.title}`}>Parto estimado</p>
-                              <p className={`text-base font-bold ${panelStyles.content}`}>
-                                {formatearFechaCorta(calcularParto(ultimaInseminacion?.fecha || cerda.fecha))}
-                              </p>
-                            </div>
-                            <p className={`text-sm font-semibold ${panelStyles.secondary}`}>
+                          <>
+                            <p className={`min-w-0 truncate text-sm font-bold ${panelStyles.content}`}>
+                              <span className={`mr-1.5 text-xs font-medium ${panelStyles.title}`}>Parto</span>
+                              {formatearFechaCorta(calcularParto(ultimaInseminacion?.fecha || cerda.fecha))}
+                            </p>
+                            <p className={`shrink-0 text-xs font-semibold ${panelStyles.secondary}`}>
                               {diasParaParto === 1 ? "Queda 1 día" : `Quedan ${diasParaParto} días`}
                             </p>
-                          </div>
-                        ) : ultimoRegistro?.tipo === "Evento" ? (
-                          <>
-                            <p className={`text-xs font-medium ${panelStyles.title}`}>Evento</p>
-                            <p className={`text-sm font-semibold ${panelStyles.content}`}>Nuevo evento registrado</p>
-                          </>
-                        ) : estadoLabel === "Lactancia" ? (
-                          <>
-                            <p className={`text-xs font-medium ${panelStyles.title}`}>Lactancia</p>
-                            <p className={`text-sm font-semibold ${panelStyles.content}`}>{ultimoRegistro?.mensaje || "En lactancia"}</p>
                           </>
                         ) : (
                           <>
-                            <p className={`text-xs font-medium ${panelStyles.title}`}>Seguimiento</p>
-                            <p className={`text-sm font-semibold ${panelStyles.content}`}>{ultimoRegistro?.mensaje || "Pendiente"}</p>
+                            <span className={`shrink-0 text-xs font-medium ${panelStyles.title}`}>
+                              {ultimoRegistro?.tipo === "Evento" ? "Evento" : estadoLabel === "Lactancia" ? "Lactancia" : "Seguimiento"}
+                            </span>
+                            <span className={`min-w-0 text-right text-[13px] font-semibold leading-snug ${panelStyles.content}`}>
+                              {ultimoRegistro?.tipo === "Evento"
+                                ? "Nuevo evento registrado"
+                                : estadoLabel === "Lactancia"
+                                  ? ultimoRegistro?.mensaje || "En lactancia"
+                                  : ultimoRegistro?.mensaje || "Pendiente"}
+                            </span>
                           </>
                         )}
                       </div>
