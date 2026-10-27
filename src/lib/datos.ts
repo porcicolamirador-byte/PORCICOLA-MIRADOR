@@ -158,6 +158,8 @@ export interface Movimiento {
   origen?: "produccion";
   /** Cantidad escrita libremente (gastos de producción), p. ej. "3 frascos" */
   cantidad?: string;
+  /** Cerda a la que corresponde el gasto (p. ej. la genética de una inseminación) */
+  cerdaId?: string;
 }
 
 export type ZonaMonitoreo = "Maternidad" | "Gestación" | "Precebo" | "Engorde";

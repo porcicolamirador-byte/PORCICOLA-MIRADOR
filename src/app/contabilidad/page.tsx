@@ -2,7 +2,7 @@
 
 import Modal from "@/components/Modal";
 import PagoFactura, { PagoCredito } from "@/components/PagoFactura";
-import { calcularInventario, codigoDe, guardarCuentasPorPagar, guardarFacturas, leerCuentasPorPagar, leerFacturas, leerProductos, leerSalidas, saldoCuenta, saldoFactura, totalFactura } from "@/lib/datos";
+import { calcularInventario, codigoDe, leerCerdas, guardarCuentasPorPagar, guardarFacturas, leerCuentasPorPagar, leerFacturas, leerProductos, leerSalidas, saldoCuenta, saldoFactura, totalFactura } from "@/lib/datos";
 import { useMemo, useState, type FormEvent } from "react";
 import ModuloPage from "@/components/ModuloPage";
 import { Boton, Campo, Entrada, IconoMas, SeccionDesplegable, Selector, Vacio, EntradaPesos } from "@/components/ui";
@@ -30,6 +30,7 @@ const CATEGORIAS: Record<Movimiento["tipo"], string[]> = {
   ingreso: ["Venta de cerdos de engorde", "Venta de lechones", "Venta de cerdas de descarte", "Otros ingresos"],
   gasto: [
     "Alimento",
+    "Genética",
     "Insumos",
     "Medicamentos y vacunas",
     "Mano de obra",
@@ -82,6 +83,15 @@ export default function ContabilidadPage() {
   }, [version, mes]);
 
   const eliminar = async (id: string) => {
+    // Genética de una inseminación: se elimina desde el registro de la cerda
+    const mov = leerMovimientos().find((m) => m.id === id);
+    if (mov?.cerdaId && leerCerdas().some((c) => c.id === mov.cerdaId)) {
+      await avisar({
+        titulo: "Gasto de una cerda",
+        mensaje: `Este gasto es de la cerda ${mov.cerdaId}. Elimínalo primero desde su registro de inseminación en Gestación.`,
+      });
+      return;
+    }
     // Gasto registrado desde un lote: se elimina primero desde el lote
     const loteDelGasto = leerLotes().find((l) => (l.gastos ?? []).some((g) => g.movimientoId === id));
     if (loteDelGasto) {

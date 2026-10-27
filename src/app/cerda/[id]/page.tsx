@@ -6,7 +6,16 @@ import { useParams, useRouter } from "next/navigation";
 import usePageBackground from "@/hooks/usePageBackground";
 import { cargarLogoJpeg, entregarPdf, generarPdfFicha, type LogoJpeg } from "@/lib/pdfFicha";
 import { confirmar } from "@/components/Dialogo";
-import { eliminarLotesDePartos, lotesDeParto, nombreLote, useVersionDatos } from "@/lib/datos";
+import {
+  eliminarLotesDePartos,
+  formatoPesos,
+  guardarMovimientos,
+  leerMovimientos,
+  lotesDeParto,
+  nombreLote,
+  nuevoId,
+  useVersionDatos,
+} from "@/lib/datos";
 import { leerConfig } from "@/lib/config";
 
 const DIAS_GESTACION = 114;
@@ -162,6 +171,7 @@ export default function CerdaDetalle() {
   const [tipo, setTipo] = useState("Inseminación");
   const [fecha, setFecha] = useState("");
   const [descripcion, setDescripcion] = useState("");
+  const [valorGenetica, setValorGenetica] = useState("");
   const [filtro, setFiltro] = useState("Todos");
   const [mensajeAviso, setMensajeAviso] = useState("");
   const [mostrarInfo, setMostrarInfo] = useState(false);
@@ -211,6 +221,7 @@ export default function CerdaDetalle() {
       setTipo("Inseminación");
       setFecha("");
       setDescripcion("");
+      setValorGenetica("");
     }
   }, [mostrarForm]);
 
@@ -234,6 +245,8 @@ export default function CerdaDetalle() {
     const r = registros[index];
     const nuevos = registros.filter((_, i) => i !== index);
     guardar(nuevos);
+    // El gasto de la genética se borra de Contabilidad con la inseminación
+    if (r?.movimientoId) guardarMovimientos(leerMovimientos().filter((m) => m.id !== r.movimientoId));
     // El lote de engorde creado con ese parto se borra junto con el parto
     if (r?.tipo === "Parto" && r.codigoParto) eliminarLotesDePartos({ codigos: [String(r.codigoParto)] });
   }
@@ -243,7 +256,9 @@ export default function CerdaDetalle() {
     setSwipedIndex(null);
     if (!r) return;
     const lotes = r.tipo === "Parto" && r.codigoParto ? lotesDeParto(String(r.codigoParto)) : [];
-    const base = r.fecha ? `Se borrará el registro del ${formatearFechaCorta(r.fecha)}.` : "Se borrará este registro.";
+    const base =
+      (r.fecha ? `Se borrará el registro del ${formatearFechaCorta(r.fecha)}.` : "Se borrará este registro.") +
+      (r.movimientoId ? ` También se quitará de Contabilidad el gasto de la genética (${formatoPesos(Number(r.valorGenetica) || 0)}).` : "");
     const ok = await confirmar({
       titulo: `Eliminar ${String(r.tipo || "registro").toLowerCase()}`,
       mensaje: lotes.length
@@ -258,7 +273,9 @@ export default function CerdaDetalle() {
   async function eliminarHistorialCompleto() {
     setMostrarMenu(false);
     if (!(await confirmar({ titulo: "Eliminar historial", mensaje: "Se borrarán todos los registros de esta cerda y los lotes de Engorde creados con sus partos. Esta acción no se puede deshacer.", aceptar: "Eliminar", destructivo: true }))) return;
+    const conGasto = new Set(registros.map((r) => r.movimientoId).filter(Boolean));
     borrarConRegistro(`historial-${id}`);
+    if (conGasto.size) guardarMovimientos(leerMovimientos().filter((m) => !conGasto.has(m.id)));
     eliminarLotesDePartos({ cerdaId: String(id) });
     setRegistros([]);
     setMostrarMenu(false);
@@ -420,9 +437,23 @@ export default function CerdaDetalle() {
       }
     }
 
-    let nuevo: any = { tipo, fecha, descripcion };
+    const genetica = Number(valorGenetica.replace(/\D/g, "")) || 0;
+    if (tipo === "Inseminación" && genetica <= 0) {
+      mostrarAviso("Ingresa el valor de la genética");
+      return;
+    }
+
+    let nuevo: any = { id: nuevoId(), tipo, fecha, descripcion };
 
     if (tipo === "Inseminación") {
+      // Gasto de la genética en Contabilidad, ligado a la cerda por su ID
+      const movimientoId = nuevoId();
+      guardarMovimientos([
+        ...leerMovimientos(),
+        { id: movimientoId, fecha, tipo: "gasto", categoria: "Genética", descripcion: `Genética · inseminación cerda ${id}`, monto: genetica, cerdaId: String(id) },
+      ]);
+      nuevo.valorGenetica = genetica;
+      nuevo.movimientoId = movimientoId;
       const partoEst = calcularParto(fecha);
       nuevo.partoEstimado = partoEst;
       nuevo.mensaje = `Parto estimado: ${formatearFechaCorta(partoEst)}`;
@@ -465,6 +496,7 @@ export default function CerdaDetalle() {
     setMostrarForm(false);
     setFecha("");
     setDescripcion("");
+    setValorGenetica("");
   }
 
   // If a new registro was just created via the parto page, open it to show details
@@ -941,6 +973,7 @@ export default function CerdaDetalle() {
                                     )}
 
                                     {r.mensaje && <p className="mt-1.5 text-xs text-slate-600">{r.mensaje}</p>}
+                                    {r.valorGenetica ? <p className="mt-0.5 text-xs text-slate-500">Genética: {formatoPesos(Number(r.valorGenetica))}</p> : null}
                                     {(r.descripcion || r.notas) && (
                                       <p className="mt-1 text-xs italic text-slate-500">{r.descripcion || r.notas}</p>
                                     )}
@@ -1021,6 +1054,25 @@ export default function CerdaDetalle() {
                     className="w-full max-w-[220px] mt-1 px-4 py-2 rounded-2xl bg-gray-100 border border-gray-300 text-black outline-none box-border"
                   />
                 </div>
+
+                {/* VALOR DE LA GENÉTICA (solo inseminación) */}
+                {tipo === "Inseminación" && (
+                  <div>
+                    <label className="block text-sm text-gray-600 font-medium">Valor de la genética *</label>
+                    <div className="relative mt-1 w-full max-w-[220px]">
+                      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-black/50">$</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={valorGenetica ? Number(valorGenetica).toLocaleString("es-CO") : ""}
+                        onChange={(e) => setValorGenetica(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                        placeholder="Dato"
+                        className="w-full pl-8 pr-4 py-2 rounded-2xl bg-gray-100 border border-gray-300 text-black outline-none box-border"
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">Se registra como gasto en Contabilidad a nombre de esta cerda.</p>
+                  </div>
+                )}
 
                 {/* DESCRIPCIÓN */}
                 <div>
