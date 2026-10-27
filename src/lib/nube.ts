@@ -229,3 +229,19 @@ export const actualizarUsuario = (
 
 /** Borra un usuario para siempre (solo administrador). Sus registros se conservan. */
 export const eliminarUsuario = (id: string) => llamarFuncion<{ eliminado: string; usuario: string }>("usuarios", { accion: "eliminar", id });
+
+export interface ConsumoNube {
+  base_bytes: number;
+  datos_bytes: number;
+  registro_bytes: number;
+  documentos: number;
+  borrados: number;
+  registro: number;
+  usuarios: number;
+  usuarios_activos: number;
+  por_coleccion: Record<string, number>;
+  ultimo_cambio: string | null;
+}
+
+/** Espacio y registros que ocupa la granja en la nube (solo administrador) */
+export const consumoNube = () => api<ConsumoNube>("rpc/consumo_nube", { method: "POST", body: "{}" });

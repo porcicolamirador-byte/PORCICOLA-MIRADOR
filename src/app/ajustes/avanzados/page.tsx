@@ -2,7 +2,7 @@
 
 import { leerLog, registrarLog } from "@/lib/log";
 import { reemplazarClave } from "@/lib/sincronizar";
-import { perfilGuardado } from "@/lib/nube";
+import { consumoNube, ErrorNube, perfilGuardado, type ConsumoNube } from "@/lib/nube";
 import { useEffect, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
@@ -207,6 +207,14 @@ export default function AjustesAvanzadosPage() {
         </Desplegable>
       </Grupo>
 
+      {esAdmin && (
+        <Grupo titulo="Nube">
+          <Desplegable icono="nube" titulo="Consumo de la base de datos" resumen="Plan gratuito" abierto={abierto === "consumo"} onAlternar={() => alternar("consumo")}>
+            <ConsumoBase />
+          </Desplegable>
+        </Grupo>
+      )}
+
       <Grupo titulo="Datos">
         <li>
           <button type="button" onClick={() => router.push("/ajustes/registro")} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-50">
@@ -314,6 +322,12 @@ const TRAZOS_AJUSTES = {
     <>
       <circle cx="9" cy="8" r="3.5" />
       <path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5" />
+    </>
+  ),
+  nube: (
+    <>
+      <path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.5a4 4 0 0 1-.5 7.97z" />
+      <path d="M12 12v5M9.5 14.5 12 17l2.5-2.5" />
     </>
   ),
   registro: (
@@ -825,3 +839,111 @@ function Alimentacion({
   );
 }
 
+
+/* ───────────── Consumo de la base de datos en la nube ───────────── */
+
+const LIMITE_GRATIS_MB = 500;
+const NOMBRES_COLECCION: Record<string, string> = {
+  cerdas: "Cerdas",
+  historial: "Registros de cerdas",
+  "engorde-lotes": "Lotes de engorde",
+  tratamientos: "Tratamientos",
+  "contabilidad-movimientos": "Movimientos contables",
+  "monitoreo-lecturas": "Lecturas de monitoreo",
+  "bioseguridad-visitas": "Visitas",
+  "bodega-productos": "Productos de bodega",
+  "bodega-facturas": "Facturas",
+  "bodega-salidas": "Salidas de bodega",
+  corrales: "Corrales",
+  "config-granja": "Configuración",
+  ajustes: "Ajustes",
+  "bioseguridad-checks": "Checklist de bioseguridad",
+};
+
+const mb = (bytes: number) => bytes / (1024 * 1024);
+const fmtMb = (bytes: number) => `${mb(bytes).toLocaleString("es-CO", { maximumFractionDigits: mb(bytes) < 10 ? 2 : 1 })} MB`;
+const fmtN = (n: number) => n.toLocaleString("es-CO");
+
+function ConsumoBase() {
+  const [datos, setDatos] = useState<ConsumoNube | null>(null);
+  const [error, setError] = useState("");
+  const [cargando, setCargando] = useState(false);
+
+  const cargar = () => {
+    setCargando(true);
+    setError("");
+    consumoNube()
+      .then(setDatos)
+      .catch((e) => setError(e instanceof ErrorNube && e.estado === 0 ? "Sin conexión. Se necesita internet para ver el consumo." : "No se pudo leer el consumo."))
+      .finally(() => setCargando(false));
+  };
+  useEffect(cargar, []);
+
+  if (error)
+    return (
+      <p className="rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-900 ring-1 ring-amber-100">
+        {error}{" "}
+        <button type="button" onClick={cargar} className="font-semibold text-sky-700">
+          Reintentar
+        </button>
+      </p>
+    );
+  if (!datos) return <div className="h-32 animate-pulse rounded-2xl bg-slate-100" />;
+
+  const usado = mb(datos.base_bytes);
+  const pct = Math.min(100, (usado / LIMITE_GRATIS_MB) * 100);
+  const color = pct > 90 ? "bg-red-500" : pct > 75 ? "bg-orange-500" : "bg-sky-600";
+  const colecciones = Object.entries(datos.por_coleccion).sort((a, b) => b[1] - a[1]);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="rounded-2xl bg-white p-3.5 ring-1 ring-slate-100">
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="text-lg font-bold tabular-nums text-slate-900">
+            {fmtMb(datos.base_bytes)} <span className="text-sm font-medium text-slate-500">de {LIMITE_GRATIS_MB} MB</span>
+          </p>
+          <span className="text-sm font-bold tabular-nums text-sky-700">{pct < 1 ? pct.toFixed(1) : Math.round(pct)} %</span>
+        </div>
+        <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
+          <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.max(pct, 0.8)}%` }} />
+        </div>
+        <p className="mt-1.5 text-[11px] text-slate-500">
+          Incluye unos 10 MB que ocupa la base de datos vacía. Los datos de la granja ocupan {fmtMb(datos.datos_bytes + datos.registro_bytes)}.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-3 gap-1.5 text-center">
+        {[
+          { t: "Datos", v: fmtN(datos.documentos) },
+          { t: "Registro", v: fmtN(datos.registro) },
+          { t: "Usuarios", v: `${datos.usuarios_activos}/${datos.usuarios}` },
+        ].map((x) => (
+          <div key={x.t} className="rounded-xl bg-white px-2 py-2 ring-1 ring-slate-100">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{x.t}</p>
+            <p className="text-[15px] font-bold tabular-nums text-slate-900">{x.v}</p>
+          </div>
+        ))}
+      </div>
+
+      {colecciones.length > 0 && (
+        <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-100">
+          {colecciones.map(([c, n]) => (
+            <li key={c} className="flex items-center justify-between px-3.5 py-2 text-sm">
+              <span className="text-slate-700">{NOMBRES_COLECCION[c] ?? c}</span>
+              <span className="font-semibold tabular-nums text-slate-900">{fmtN(n)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p className="px-1 text-[11px] leading-snug text-slate-500">
+        Plan gratuito de Supabase: si la base pasa de 500 MB queda en solo lectura. Último cambio{" "}
+        {datos.ultimo_cambio ? new Date(datos.ultimo_cambio.replace(/(\.\d{3})\d+/, "$1")).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" }) : "—"}.
+        {datos.borrados ? ` ${fmtN(datos.borrados)} elementos borrados se guardan como marca para que los demás teléfonos también los borren.` : ""}
+      </p>
+      <Boton variante="secundario" onClick={cargar} disabled={cargando} className="w-full">
+        {cargando ? "Actualizando…" : "Actualizar"}
+      </Boton>
+    </div>
+  );
+}
