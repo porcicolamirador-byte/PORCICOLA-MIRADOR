@@ -51,6 +51,10 @@ export interface ConsumoCerdas {
   /** Códigos de bodega del alimento de cada tipo */
   codigoGestacion: string;
   codigoLactancia: string;
+  /** Descontar cada día de bodega el alimento de gestación estimado */
+  descontarGestacion: boolean;
+  /** Primer día que se descuenta (AAAA-MM-DD); vacío = desde hoy */
+  descuentoDesde: string;
 }
 
 export const CONSUMO_CERDAS_POR_DEFECTO: ConsumoCerdas = {
@@ -60,6 +64,8 @@ export const CONSUMO_CERDAS_POR_DEFECTO: ConsumoCerdas = {
   diaCambio: 100,
   codigoGestacion: "CG-01",
   codigoLactancia: "CL-01",
+  descontarGestacion: true,
+  descuentoDesde: "",
 };
 
 function leerConsumoCerdas(v: unknown): ConsumoCerdas {
@@ -74,6 +80,8 @@ function leerConsumoCerdas(v: unknown): ConsumoCerdas {
     const x = o[k];
     if (typeof x === "string" && x.trim()) r[k] = x.trim().toUpperCase();
   }
+  r.descontarGestacion = o.descontarGestacion !== false;
+  if (typeof o.descuentoDesde === "string" && /^\d{4}-\d{2}-\d{2}$/.test(o.descuentoDesde)) r.descuentoDesde = o.descuentoDesde;
   return r;
 }
 

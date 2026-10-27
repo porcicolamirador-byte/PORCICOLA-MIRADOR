@@ -1,5 +1,6 @@
 "use client";
 
+import { aplicarDescuentoCerdas } from "@/lib/consumoCerdas";
 import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
@@ -80,14 +81,16 @@ export default function PuertaAcceso({ children }: { children: ReactNode }) {
   // Sincronización con la nube mientras la app está abierta
   useEffect(() => {
     if (!conSesion || !abierta) return;
-    void sincronizar();
+    // Después de cada sincronización se aplica el descuento diario del alimento de las cerdas
+    const ciclo = () => void sincronizar().finally(aplicarDescuentoCerdas);
+    ciclo();
     const t = setInterval(() => {
-      if (document.visibilityState === "visible") void sincronizar();
+      if (document.visibilityState === "visible") ciclo();
     }, 30_000);
     const alVolver = () => {
-      if (document.visibilityState === "visible") void sincronizar();
+      if (document.visibilityState === "visible") ciclo();
     };
-    const conInternet = () => void sincronizar();
+    const conInternet = () => ciclo();
     document.addEventListener("visibilitychange", alVolver);
     window.addEventListener("online", conInternet);
     return () => {

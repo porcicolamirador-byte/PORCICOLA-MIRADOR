@@ -831,9 +831,14 @@ function TarjetaConsumoCerdas() {
         <Modal abierta etiqueta="Bodega" titulo="Consumo de cerdas" subtitulo="Aproximado según las reglas de Ajustes" icono="🐷" onCerrar={() => setAbierta(false)}>
           <div className="flex flex-col gap-3">
             <BloqueConsumo titulo="Alimento de gestación" a={datos.gestacion} />
+            {leerConfig().consumoCerdas.descontarGestacion && (
+              <p className="-mt-1 rounded-xl bg-sky-50 px-3 py-2 text-[11px] leading-snug text-sky-800 ring-1 ring-sky-100">
+                El alimento de gestación se descuenta solo de la bodega cada día (salida «Consumo automático cerdas»).
+              </p>
+            )}
             <BloqueConsumo titulo="Alimento de lactancia" a={datos.lactancia} />
             <p className="px-1 text-[11px] leading-snug text-slate-500">
-              Es una estimación: no descuenta de la bodega. Las cantidades y el día de cambio se ajustan en Ajustes → Consumo de cerdas.
+              Es una estimación. Las cantidades y el día de cambio se ajustan en Ajustes → Consumo de cerdas.
             </p>
           </div>
         </Modal>

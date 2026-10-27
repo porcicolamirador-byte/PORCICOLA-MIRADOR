@@ -21,7 +21,7 @@ import {
   CONSUMO_CERDAS_POR_DEFECTO,
   type ConsumoCerdas,
 } from "@/lib/config";
-import { clavesDeLaApp, codigoDe, leerCorrales, leerProductos, notificarCambio, useVersionDatos } from "@/lib/datos";
+import { clavesDeLaApp, codigoDe, hoy, leerCorrales, leerProductos, notificarCambio, useVersionDatos } from "@/lib/datos";
 import CatalogoProductos from "@/components/CatalogoProductos";
 import CatalogoCorrales from "@/components/CatalogoCorrales";
 
@@ -862,9 +862,11 @@ function ConsumoCerdasAjuste({ actual, onGuardar }: { actual: ConsumoCerdas; onG
   });
   const [valores, setValores] = useState(aTexto(actual));
   const [codigos, setCodigos] = useState({ codigoGestacion: actual.codigoGestacion, codigoLactancia: actual.codigoLactancia });
+  const [descontar, setDescontar] = useState(actual.descontarGestacion);
   const [base, setBase] = useState(actual);
   if (base !== actual) {
     setBase(actual);
+    setDescontar(actual.descontarGestacion);
     setValores(aTexto(actual));
     setCodigos({ codigoGestacion: actual.codigoGestacion, codigoLactancia: actual.codigoLactancia });
   }
@@ -886,6 +888,9 @@ function ConsumoCerdasAjuste({ actual, onGuardar }: { actual: ConsumoCerdas; onG
     lactancia: num(valores.lactancia),
     diaCambio: num(valores.diaCambio),
     ...codigos,
+    descontarGestacion: descontar,
+    // Al activarlo se empieza a descontar desde hoy (no se cobran días anteriores)
+    descuentoDesde: descontar && !actual.descontarGestacion ? hoy() : actual.descuentoDesde,
   };
   const valido =
     [nueva.gestacion, nueva.preparto, nueva.lactancia].every((n) => Number.isFinite(n) && n >= 0 && n <= 50) &&
@@ -950,7 +955,14 @@ function ConsumoCerdasAjuste({ actual, onGuardar }: { actual: ConsumoCerdas; onG
       <p className={titulo}>Alimento de gestación</p>
       <div className={caja}>
         {selector("codigoGestacion", "Producto")}
-        {campoKg("gestacion", "Gestación", "Cerdas gestantes y vacías")}
+        {campoKg("gestacion", "Gestación", "Cerdas en cualquier estado, menos pre-parto y lactancia")}
+        <label className="flex items-center gap-3 px-3.5 py-2.5">
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm text-slate-800">Descontar de bodega cada día</span>
+            <span className="block text-[11px] text-slate-500">Saca sola la salida diaria de este alimento</span>
+          </span>
+          <Interruptor activo={descontar} onCambiar={setDescontar} />
+        </label>
       </div>
       <p className={titulo}>Alimento de lactancia</p>
       <div className={caja}>
