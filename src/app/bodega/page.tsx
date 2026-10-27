@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
-import { Boton, Campo, Chevron, Chips, Entrada, Hoja, IconoMas, Insignia, SeccionDesplegable, Selector, Vacio, EntradaPesos } from "@/components/ui";
+import { Boton, Campo, Chevron, Chips, Entrada, IconoMas, Insignia, SeccionDesplegable, Selector, Vacio, EntradaPesos } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
 import { puede } from "@/lib/nube";
 import DialogoClave from "@/components/DialogoClave";
@@ -576,7 +576,14 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
   };
 
   return (
-    <Hoja abierta titulo={salida ? "Registrar salida" : p.nombre} onCerrar={salida ? volver : onCerrar}>
+    <Modal
+      abierta
+      etiqueta={salida ? p.nombre : "Bodega"}
+      titulo={salida ? "Registrar salida" : p.nombre}
+      subtitulo={salida ? undefined : `${p.codigo ? `${p.codigo} · ` : ""}${p.categoria}`}
+      icono={<IconoCategoria categoria={p.categoria} className="h-7 w-7" />}
+      onCerrar={salida ? volver : onCerrar}
+    >
       {!salida ? (
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-3 rounded-2xl bg-sky-50/70 p-4 ring-1 ring-sky-100">
@@ -674,7 +681,7 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
           )}
           {destino === "otro" && (
             <Campo etiqueta="Nota">
-              <Entrada value={nota} onChange={setNota} placeholder="Ej. cerdas de gestación" />
+              <Entrada value={nota} onChange={setNota} placeholder="Dato" />
             </Campo>
           )}
           {destino && destino !== "otro" && num(cantidad) > 0 && kgDeCantidad(num(cantidad), p.unidad, p.kgPorUnidad) > 0 && (
@@ -689,7 +696,7 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
           </div>
         </form>
       )}
-    </Hoja>
+    </Modal>
   );
 }
 
@@ -727,16 +734,22 @@ function DetalleFactura({ factura: f, productos, onCerrar }: { factura: Factura;
   };
 
   return (
-    <Hoja abierta titulo={`Factura ${f.numero}`} onCerrar={onCerrar}>
+    <Modal
+      abierta
+      etiqueta="Bodega · Factura"
+      titulo={`Factura ${f.numero}`}
+      subtitulo={`${formatoFecha(f.fecha, true)}${f.proveedor ? ` · ${f.proveedor}` : ""}`}
+      icono="🧾"
+      onCerrar={onCerrar}
+    >
       <div className="flex flex-col gap-4">
-        <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm ring-1 ring-slate-100">
-          <p className="text-slate-500">
-            {formatoFecha(f.fecha, true)}
-            {f.proveedor ? ` · ${f.proveedor}` : ""}
-          </p>
-          {f.nota && <p className="mt-1 text-xs italic text-slate-500">{f.nota}</p>}
+        <div className="flex items-center justify-between rounded-2xl bg-sky-50 px-4 py-3 ring-1 ring-sky-100">
+          <span className="text-sm font-medium text-sky-900">Total</span>
+          <span className="text-lg font-bold text-sky-900 tabular-nums">{formatoPesos(totalFactura(f))}</span>
         </div>
-        <ul className="divide-y divide-slate-100 rounded-2xl ring-1 ring-slate-100">
+        {f.nota && <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs italic text-slate-500">{f.nota}</p>}
+        <SeccionDesplegable titulo="Productos" cantidad={f.lineas.length}>
+        <ul className="divide-y divide-slate-100 bg-white">
           {f.lineas.map((l, i) => {
             const p = productos.find((x) => x.id === l.productoId);
             return (
@@ -757,16 +770,13 @@ function DetalleFactura({ factura: f, productos, onCerrar }: { factura: Factura;
             );
           })}
         </ul>
-        <div className="flex items-center justify-between rounded-2xl bg-sky-50 px-4 py-3 ring-1 ring-sky-100">
-          <span className="text-sm font-medium text-sky-900">Total</span>
-          <span className="text-lg font-bold text-sky-900 tabular-nums">{formatoPesos(totalFactura(f))}</span>
-        </div>
+        </SeccionDesplegable>
         {f.movimientoId && <p className="text-center text-xs text-slate-500">Registrada como gasto en Contabilidad.</p>}
         <button type="button" onClick={eliminar} className="self-center rounded-full px-4 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50">
           Eliminar factura
         </button>
       </div>
-    </Hoja>
+    </Modal>
   );
 }
 
