@@ -65,12 +65,14 @@ const PREFIJOS_AUTO = { gestacion: "auto-cg-", lactancia: "auto-cl-" } as const;
 export const esSalidaAutomatica = (s: SalidaBodega) => s.id.startsWith("auto-cg-") || s.id.startsWith("auto-cl-");
 
 /**
- * Descuenta de bodega, una vez por día, el alimento estimado de las cerdas:
+ * Descuenta de bodega el alimento estimado de las cerdas:
  *  - gestación: cerdas gestantes y en otros estados × kg de gestación;
  *  - lactancia: pre-parto × kg de pre-parto + lactando × kg de lactancia.
+ * La salida de HOY se recalcula en cuanto cambia algo (se crea una cerda,
+ * se registra un parto…), así el descuento es inmediato. Los días pasados ya
+ * no cambian; si hubo días sin abrir la app se ponen al día (máximo 60).
  * Cada día tiene un id fijo por alimento para que varios teléfonos no lo
- * dupliquen. Si hubo días sin abrir la app se ponen al día (máximo 60).
- * Nunca deja la existencia en negativo.
+ * dupliquen. Nunca deja la existencia en negativo.
  */
 export function aplicarDescuentoCerdas() {
   if (typeof window === "undefined") return;
@@ -83,40 +85,45 @@ export function aplicarDescuentoCerdas() {
       reglas.descuentoDesde = hoyIso;
     }
     const salidas = leerSalidas();
-    const existentes = new Set(salidas.map((s) => s.id));
+    const porId = new Map(salidas.map((s) => [s.id, s]));
     const desde = reglas.descuentoDesde > sumarDias(hoyIso, -59) ? reglas.descuentoDesde : sumarDias(hoyIso, -59);
-    const faltan = (prefijo: string) => {
-      const dias: string[] = [];
-      for (let f = desde; f <= hoyIso; f = sumarDias(f, 1)) if (!existentes.has(prefijo + f)) dias.push(f);
-      return dias;
-    };
-    const diasG = faltan(PREFIJOS_AUTO.gestacion);
-    const diasL = faltan(PREFIJOS_AUTO.lactancia);
-    if (diasG.length === 0 && diasL.length === 0) return;
 
     const cuenta = contarCerdas(reglas.diaCambio);
     const inventario = calcularInventario();
     const todos = leerProductos();
-    const nuevas: SalidaBodega[] = [];
+    const cambios = new Map<string, SalidaBodega>();
 
-    const descontar = (codigo: string, prefijo: string, dias: string[], kgDia: number, nota: string) => {
-      if (dias.length === 0 || kgDia <= 0) return;
+    const descontar = (codigo: string, prefijo: string, kgDia: number, nota: string) => {
       const productos = todos.filter((p) => codigoDe(p) === codigo && p.activo !== false);
       const producto = productos.find((p) => p.unidad === "bultos") ?? productos[0];
       if (!producto) return;
       const item = inventario.find((i) => i.producto.id === producto.id);
       if (!item || item.sinCompras) return;
-      let disponible = item.disponible; // en la unidad del producto
-      for (const f of dias) {
-        const cantidad = Math.min(kgDia / factorKg(producto), disponible);
-        if (cantidad <= 0.0001) break;
+      const deHoy = porId.get(prefijo + hoyIso);
+      // Lo de hoy se vuelve a calcular: se devuelve lo que ya se había descontado hoy
+      let disponible = item.disponible + (deHoy && deHoy.productoId === producto.id ? Number(deHoy.cantidad) || 0 : 0);
+      const porDia = kgDia / factorKg(producto);
+      for (let f = desde; f <= hoyIso; f = sumarDias(f, 1)) {
+        const id = prefijo + f;
+        const esHoy = f === hoyIso;
+        if (!esHoy && porId.has(id)) continue;
+        const cantidad = Math.round(Math.max(0, Math.min(porDia, disponible)) * 1000) / 1000;
+        if (esHoy && deHoy) {
+          if (Math.abs((Number(deHoy.cantidad) || 0) - cantidad) < 0.0005 && deHoy.nota === nota && deHoy.productoId === producto.id) return;
+          cambios.set(id, { ...deHoy, productoId: producto.id, cantidad, nota });
+          return;
+        }
+        if (cantidad <= 0) {
+          if (esHoy) return;
+          continue;
+        }
         disponible -= cantidad;
-        nuevas.push({ id: prefijo + f, productoId: producto.id, fecha: f, hora: "06:00", cantidad: Math.round(cantidad * 1000) / 1000, nota });
+        cambios.set(id, { id, productoId: producto.id, fecha: f, hora: "06:00", cantidad, nota });
       }
     };
 
     const cerdasG = cuenta.gestantes + cuenta.vacias;
-    descontar(reglas.codigoGestacion, PREFIJOS_AUTO.gestacion, diasG, cerdasG * reglas.gestacion, `Consumo automático cerdas · ${cerdasG} × ${reglas.gestacion} kg`);
+    descontar(reglas.codigoGestacion, PREFIJOS_AUTO.gestacion, cerdasG * reglas.gestacion, `Consumo automático cerdas · ${cerdasG} × ${reglas.gestacion} kg`);
     const partes = [
       cuenta.preparto ? `${cuenta.preparto} pre-parto × ${reglas.preparto} kg` : "",
       cuenta.lactando ? `${cuenta.lactando} lactando × ${reglas.lactancia} kg` : "",
@@ -124,11 +131,14 @@ export function aplicarDescuentoCerdas() {
     descontar(
       reglas.codigoLactancia,
       PREFIJOS_AUTO.lactancia,
-      diasL,
       cuenta.preparto * reglas.preparto + cuenta.lactando * reglas.lactancia,
-      `Consumo automático lactancia · ${partes.join(" + ")}`,
+      `Consumo automático lactancia · ${partes.join(" + ") || "sin cerdas"}`,
     );
-    if (nuevas.length) guardarSalidas([...salidas, ...nuevas]);
+    if (cambios.size === 0) return;
+    // La de hoy se actualiza (aunque quede en 0) en vez de borrarse: borrar exige permiso
+    const lista = salidas.map((s) => cambios.get(s.id) ?? s);
+    for (const [id, s] of cambios) if (!porId.has(id) && s.cantidad > 0) lista.push(s);
+    guardarSalidas(lista);
   } catch {
     // es solo una estimación: si algo falla no se descuenta
   }

@@ -1,6 +1,7 @@
 "use client";
 
 import { aplicarDescuentoCerdas } from "@/lib/consumoCerdas";
+import { useVersionDatos } from "@/lib/datos";
 import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
@@ -77,6 +78,15 @@ export default function PuertaAcceso({ children }: { children: ReactNode }) {
     }, 60_000);
     return () => clearInterval(t);
   }, [abierta]);
+
+  // Descuento del alimento de las cerdas: se recalcula en cuanto cambian los datos
+  // (crear una cerda, registrar un parto…), sin esperar a la sincronización
+  const versionDatos = useVersionDatos();
+  useEffect(() => {
+    if (!abierta) return;
+    const t = setTimeout(aplicarDescuentoCerdas, 800);
+    return () => clearTimeout(t);
+  }, [abierta, versionDatos]);
 
   // Sincronización con la nube mientras la app está abierta
   useEffect(() => {
