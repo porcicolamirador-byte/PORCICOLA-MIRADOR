@@ -162,14 +162,16 @@ function contabilidadMadre(lote: Lote): { movimientos: MovimientoLotePdf[]; nota
   const reglas = leerConfig().consumoCerdas;
   const productos = leerProductos();
   const inventario = calcularInventario();
-  const precioKg = (codigo: string) => {
+  const datosAlimento = (codigo: string) => {
     const conCodigo = productos.filter((p) => codigoDe(p) === codigo);
     const p = conCodigo.find((x) => x.unidad === "bultos") ?? conCodigo[0];
     const item = p ? inventario.find((i) => i.producto.id === p.id) : undefined;
-    return item && item.ultimoPrecio > 0 ? item.ultimoPrecio / factorKg(item.producto) : 0;
+    return { nombre: p?.nombre ?? codigo, precio: item && item.ultimoPrecio > 0 ? item.ultimoPrecio / factorKg(item.producto) : 0 };
   };
-  const precioG = precioKg(reglas.codigoGestacion);
-  const precioL = precioKg(reglas.codigoLactancia);
+  const alimentoG = datosAlimento(reglas.codigoGestacion);
+  const alimentoL = datosAlimento(reglas.codigoLactancia);
+  const precioG = alimentoG.precio;
+  const precioL = alimentoL.precio;
   const asc = [...historial].reverse();
   let kgG = 0;
   let kgL = 0;
@@ -184,8 +186,8 @@ function contabilidadMadre(lote: Lote): { movimientos: MovimientoLotePdf[]; nota
     else kgG += reglas.gestacion;
   }
   const kgTxt = (n: number) => `${numero(n)} kg`;
-  if (kgG > 0) movimientos.push({ fecha: hasta, fechaDesde: desde, concepto: `Alimento gestación (estimado) · ${kgTxt(kgG)}`, categoria: "Madre · alimento", tipo: "costo", valor: Math.round(kgG * precioG) });
-  if (kgL > 0) movimientos.push({ fecha: hasta, fechaDesde: desde, concepto: `Alimento lactancia (estimado) · ${kgTxt(kgL)}`, categoria: "Madre · alimento", tipo: "costo", valor: Math.round(kgL * precioL) });
+  if (kgG > 0) movimientos.push({ fecha: hasta, fechaDesde: desde, concepto: `Alimento gestación (estimado) · ${kgTxt(kgG)}${precioG ? "" : " · sin precio"}`, categoria: "Madre · alimento", tipo: "costo", valor: Math.round(kgG * precioG) });
+  if (kgL > 0) movimientos.push({ fecha: hasta, fechaDesde: desde, concepto: `Alimento lactancia (estimado) · ${kgTxt(kgL)}${precioL ? "" : " · sin precio"}`, categoria: "Madre · alimento", tipo: "costo", valor: Math.round(kgL * precioL) });
 
   // Genética de las inseminaciones del periodo
   for (const h of historial) {
@@ -202,11 +204,13 @@ function contabilidadMadre(lote: Lote): { movimientos: MovimientoLotePdf[]; nota
     }
   }
 
-  const sinPrecio = (kgG > 0 && precioG === 0) || (kgL > 0 && precioL === 0);
+  const sinPrecio = [kgG > 0 && precioG === 0 ? alimentoG.nombre : "", kgL > 0 && precioL === 0 ? alimentoL.nombre : ""].filter(Boolean);
   const nota =
     `Incluye la contabilidad de la madre (cerda ${cerdaId}) del ${formatoFecha(desde, true)} al ${formatoFecha(hasta, true)}` +
     `${desteteAntes ? " (del destete anterior" : llegada ? " (desde su llegada" : " (desde la inseminación de esta camada"}${desteteDespues ? " al destete de esta camada)" : " hasta hoy; aún sin destete)"}. ` +
     `El alimento es estimado según las reglas de consumo de cerdas y el último precio de compra.` +
-    (sinPrecio ? " Hay alimento sin precio de compra: se valoró en $0." : "");
+    (sinPrecio.length
+      ? ` ${sinPrecio.join(" y ")} no tiene${sinPrecio.length > 1 ? "n" : ""} ninguna factura con precio en Bodega: sus kilos aparecen, pero valorados en $0 hasta que se ingrese una compra.`
+      : "");
   return { movimientos, nota };
 }
