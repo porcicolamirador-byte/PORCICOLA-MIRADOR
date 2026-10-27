@@ -31,6 +31,8 @@ export interface PerfilNube {
   permisos: Partial<Record<PermisoNube, boolean>>;
   /** Granjas a las que entra (null o vacío de campo = todas, incluidas las nuevas) */
   granjas?: string[] | null;
+  /** Último cambio de PIN hecho por el administrador */
+  pin_actualizado?: string | null;
   activo?: boolean;
   creado_en?: string;
 }
@@ -202,7 +204,16 @@ export async function crearPrimerAdministrador(usuario: string, nombre: string, 
 /** Vuelve a leer el perfil del servidor (rol y permisos actualizados) */
 export async function actualizarPerfil(): Promise<PerfilNube | null> {
   try {
+    const antes = perfilGuardado();
     const r = await llamarFuncion<{ perfil: PerfilNube }>("usuarios", { accion: "yo" });
+    // El administrador le cambió el PIN: en este teléfono hay que entrar de nuevo con el PIN nuevo
+    if (antes && r.perfil.pin_actualizado && r.perfil.pin_actualizado !== (antes.pin_actualizado ?? null)) {
+      try {
+        localStorage.removeItem("app-pin-local");
+      } catch {}
+      guardarSesion(null, null);
+      return null;
+    }
     guardarSesion(sesionGuardada(), r.perfil);
     return r.perfil;
   } catch (e) {

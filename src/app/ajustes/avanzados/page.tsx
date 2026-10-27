@@ -93,49 +93,28 @@ export default function AjustesAvanzadosPage() {
       </Grupo>
       )}
 
-      {/* Solo el administrador ve y cambia las claves */}
+      {/* Solo el administrador decide en qué acciones se pide el PIN de quien usa el teléfono */}
       {esAdmin && (
-      <Grupo titulo="Claves">
-        <Desplegable icono="papelera" titulo="Clave de eliminación" resumen={config.claveEliminarActiva ? "Activa" : "Desactivada"} abierto={abierto === "eliminar"} onAlternar={() => alternar("eliminar")}>
+      <Grupo titulo="Confirmar con PIN">
+        <Desplegable icono="papelera" titulo="Eliminar" resumen={config.claveEliminarActiva ? "Pide PIN" : "No pide"} abierto={abierto === "eliminar"} onAlternar={() => alternar("eliminar")}>
           <ActivarClave
             activa={config.claveEliminarActiva}
             donde="Gestación al eliminar una cerda"
             onCambiar={(v) => guardar({ claveEliminarActiva: v })}
           />
-          <CambiarClave
-            titulo="Clave de eliminación"
-            descripcion="Se pide en Gestación para eliminar una cerda."
-            icono="🗑️"
-            actual={config.claveEliminar}
-            onGuardar={(clave) => guardar({ claveEliminar: clave })}
-          />
         </Desplegable>
-        <Desplegable icono="factura" titulo="Clave de facturas" resumen={config.claveFacturasActiva ? "Activa" : "Desactivada"} abierto={abierto === "facturas"} onAlternar={() => alternar("facturas")}>
+        <Desplegable icono="factura" titulo="Ingresar facturas" resumen={config.claveFacturasActiva ? "Pide PIN" : "No pide"} abierto={abierto === "facturas"} onAlternar={() => alternar("facturas")}>
           <ActivarClave
             activa={config.claveFacturasActiva}
             donde="Bodega al cargar una factura"
             onCambiar={(v) => guardar({ claveFacturasActiva: v })}
           />
-          <CambiarClave
-            titulo="Clave de facturas"
-            descripcion="Se pide en Bodega para cargar una factura."
-            icono="🧾"
-            actual={config.claveFacturas}
-            onGuardar={(clave) => guardar({ claveFacturas: clave })}
-          />
         </Desplegable>
-        <Desplegable icono="lote" titulo="Clave de lotes" resumen={config.claveLotesActiva ? "Activa" : "Desactivada"} abierto={abierto === "lotes"} onAlternar={() => alternar("lotes")}>
+        <Desplegable icono="lote" titulo="Eliminar lotes" resumen={config.claveLotesActiva ? "Pide PIN" : "No pide"} abierto={abierto === "lotes"} onAlternar={() => alternar("lotes")}>
           <ActivarClave
             activa={config.claveLotesActiva}
             donde="Engorde al eliminar un lote"
             onCambiar={(v) => guardar({ claveLotesActiva: v })}
-          />
-          <CambiarClave
-            titulo="Clave de lotes"
-            descripcion="Se pide en Engorde para eliminar un lote."
-            icono="🐷"
-            actual={config.claveLotes}
-            onGuardar={(clave) => guardar({ claveLotes: clave })}
           />
         </Desplegable>
       </Grupo>
@@ -436,7 +415,7 @@ function ActivarClave({
   return (
     <label className="mb-3 flex cursor-pointer items-center gap-3 rounded-2xl bg-white px-3.5 py-3 ring-1 ring-slate-100">
       <span className="min-w-0 flex-1">
-        <span className="block text-[15px] font-medium text-slate-900">Pedir clave</span>
+        <span className="block text-[15px] font-medium text-slate-900">Pedir PIN</span>
         <span className="block text-xs text-slate-500">
           {activa ? `Activada: se pide ${donde.startsWith("al ") ? donde : `en ${donde}`}` : textoDesactivada ?? `Desactivada: no se pide en ${donde}`}
         </span>
@@ -446,103 +425,6 @@ function ActivarClave({
   );
 }
 
-function CambiarClave({
-  titulo,
-  descripcion,
-  icono,
-  actual,
-  onGuardar,
-  longitud = 4,
-}: {
-  titulo: string;
-  descripcion: string;
-  icono: string;
-  actual: string;
-  onGuardar: (clave: string) => void;
-  longitud?: number;
-}) {
-  const [claveActual, setClaveActual] = useState("");
-  const [nueva, setNueva] = useState("");
-  const [repetir, setRepetir] = useState("");
-  const [error, setError] = useState("");
-
-  const solo4 = (v: string) => v.replace(/\D/g, "").slice(0, longitud);
-  const puntos = "•".repeat(longitud);
-
-  const enviar = async (e: FormEvent) => {
-    e.preventDefault();
-    if (claveActual !== actual) return setError("La clave actual no es correcta.");
-    if (!new RegExp(`^\\d{${longitud}}$`).test(nueva)) return setError(`La nueva clave debe tener ${longitud} números.`);
-    if (nueva !== repetir) return setError("Las claves nuevas no coinciden.");
-    if (nueva === actual) return setError("La nueva clave es igual a la actual.");
-    if (!(await confirmar({ titulo: `Cambiar ${titulo.toLowerCase()}`, mensaje: "A partir de ahora se pedirá la nueva clave.", aceptar: "Cambiar" }))) return;
-    onGuardar(nueva);
-    setClaveActual("");
-    setNueva("");
-    setRepetir("");
-    setError("");
-    await avisar({ titulo: "Clave actualizada", mensaje: `La ${titulo.toLowerCase()} se cambió correctamente.` });
-  };
-
-  return (
-    <>
-      <Encabezado icono={icono} titulo={titulo} descripcion={descripcion} />
-      <form onSubmit={enviar} className="flex flex-col gap-3">
-        <label>
-          <Etiqueta>Clave actual</Etiqueta>
-          <input
-            type="password"
-            inputMode="numeric"
-            autoComplete="off"
-            value={claveActual}
-            onChange={(e) => {
-              setClaveActual(solo4(e.target.value));
-              setError("");
-            }}
-            placeholder={puntos}
-            className={claseCampo}
-          />
-        </label>
-        <div className="grid grid-cols-2 gap-3">
-          <label>
-            <Etiqueta>Nueva clave</Etiqueta>
-            <input
-              type="password"
-              inputMode="numeric"
-              autoComplete="off"
-              value={nueva}
-              onChange={(e) => {
-                setNueva(solo4(e.target.value));
-                setError("");
-              }}
-              placeholder={puntos}
-              className={claseCampo}
-            />
-          </label>
-          <label>
-            <Etiqueta>Repetir</Etiqueta>
-            <input
-              type="password"
-              inputMode="numeric"
-              autoComplete="off"
-              value={repetir}
-              onChange={(e) => {
-                setRepetir(solo4(e.target.value));
-                setError("");
-              }}
-              placeholder={puntos}
-              className={claseCampo}
-            />
-          </label>
-        </div>
-        {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
-        <Boton type="submit" className="w-full py-3" disabled={!claveActual || !nueva || !repetir}>
-          Cambiar clave
-        </Boton>
-      </form>
-    </>
-  );
-}
 
 function DiasDestete({ min, max, onGuardar }: { min: number; max: number; onGuardar: (min: number, max: number) => void }) {
   const [desde, setDesde] = useState(String(min));

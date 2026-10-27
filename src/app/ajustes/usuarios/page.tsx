@@ -103,7 +103,7 @@ export default function UsuariosPage() {
               <ListaUsuarios titulo={`Activos · ${activos.length}`} usuarios={activos} yoId={yo?.id} onElegir={setEditando} />
               {inactivos.length > 0 && <ListaUsuarios titulo={`Desactivados · ${inactivos.length}`} usuarios={inactivos} yoId={yo?.id} onElegir={setEditando} />}
               <p className="px-1 text-xs text-slate-500">
-                Cada persona entra con su usuario y PIN de 4 números la primera vez en su teléfono; después puede usar Face ID. Tras 5 PIN incorrectos el usuario queda bloqueado 15 minutos.
+                Cada persona entra con su usuario y PIN de 6 números la primera vez en su teléfono; después puede usar Face ID. Tras 5 PIN incorrectos el usuario queda bloqueado 15 minutos.
               </p>
             </>
           )}
@@ -164,7 +164,7 @@ function ListaUsuarios({ titulo, usuarios, yoId, onElegir }: { titulo: string; u
 }
 
 const limpiarUsuario = (v: string) => v.toLowerCase().replace(/[^a-z0-9._-]/g, "").slice(0, 30);
-const soloPin = (v: string) => v.replace(/\D/g, "").slice(0, 4);
+const soloPin = (v: string) => v.replace(/\D/g, "").slice(0, 6);
 
 function EditorUsuario({
   usuario,
@@ -228,7 +228,7 @@ function EditorUsuario({
     setError("");
     if (!nombre.trim()) return setError("Escribe el nombre.");
     if (nuevo && nombreUsuario.length < 3) return setError("El usuario debe tener al menos 3 caracteres.");
-    if ((nuevo || pin) && !/^\d{4}$/.test(pin)) return setError("El PIN debe tener 4 números.");
+    if ((nuevo || pin) && !/^\d{6}$/.test(pin)) return setError("El PIN debe tener 6 números.");
     if (rol === "trabajador" && !todasGranjas && granjasSel.length === 0) return setError("Elige al menos una granja o marca «Todas las granjas».");
     const granjas = rol === "admin" || todasGranjas ? null : granjasSel;
     if (!nuevo && usuario && usuario.activo !== false && !activo) {
@@ -288,8 +288,8 @@ function EditorUsuario({
             <Entrada value={nombreUsuario} onChange={(v) => setNombreUsuario(limpiarUsuario(v))} placeholder="Ej. juan" />
           </Campo>
         )}
-        <Campo etiqueta={nuevo ? "PIN (4 números)" : "Nuevo PIN (déjalo vacío para no cambiarlo)"}>
-          <Entrada type="password" inputMode="numeric" value={pin} onChange={(v) => setPin(soloPin(v))} placeholder="••••" />
+        <Campo etiqueta={nuevo ? "PIN (6 números)" : "Nuevo PIN de 6 números (déjalo vacío para no cambiarlo)"}>
+          <Entrada type="password" inputMode="numeric" value={pin} onChange={(v) => setPin(soloPin(v))} placeholder="••••••" />
         </Campo>
 
         <div>
@@ -394,14 +394,12 @@ function EditorUsuario({
     </Modal>
       <DialogoClave
         abierto={pedirClave}
-        titulo="Clave de eliminación"
-        mensaje={`Ingresa la clave para eliminar a ${usuario?.nombre ?? ""}.`}
+        titulo="Confirma con tu PIN"
+        mensaje={`Escribe tu PIN para eliminar a ${usuario?.nombre ?? ""}.`}
         aceptar="Eliminar"
-        onValidar={(codigo) => {
-          if (codigo !== leerConfig().claveEliminar) return false;
+        onConfirmado={() => {
           setPedirClave(false);
           void eliminar();
-          return true;
         }}
         onCerrar={() => setPedirClave(false)}
       />

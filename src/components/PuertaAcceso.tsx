@@ -16,7 +16,7 @@ import {
   perfilGuardado,
   type PerfilNube,
 } from "@/lib/nube";
-import { bloqueoActivo, estaDesbloqueada, marcarDesbloqueada, olvidarPinLocal, pinLocalCorrecto, recordarPinLocal, tocarDesbloqueo } from "@/lib/bloqueo";
+import { bloqueoActivo, estaDesbloqueada, largoPinLocal, marcarDesbloqueada, olvidarPinLocal, pinLocalCorrecto, recordarPinLocal, tocarDesbloqueo } from "@/lib/bloqueo";
 import { sincronizar } from "@/lib/sincronizar";
 import { CLAVE_FACEID_APP, desactivarFaceId, faceIdActivo, verificarFaceId } from "@/lib/faceid";
 
@@ -98,7 +98,10 @@ export default function PuertaAcceso({ children }: { children: ReactNode }) {
       if (document.visibilityState === "visible") ciclo();
     }, 30_000);
     const alVolver = () => {
-      if (document.visibilityState === "visible") ciclo();
+      if (document.visibilityState !== "visible") return;
+      ciclo();
+      // Revisa permisos, granjas y si el administrador le cambió el PIN
+      if (navigator.onLine) void actualizarPerfil();
     };
     const conInternet = () => ciclo();
     document.addEventListener("visibilitychange", alVolver);
@@ -150,8 +153,22 @@ function Marco({ children }: { children: ReactNode }) {
   );
 }
 
-/** Teclado numérico de 4 dígitos al estilo del iPhone */
-function TecladoPin({ titulo, ayuda, error, ocupado, onCompleto }: { titulo: string; ayuda?: string; error?: string; ocupado?: boolean; onCompleto: (pin: string) => void }) {
+/** Teclado numérico (6 dígitos por defecto) al estilo del iPhone */
+function TecladoPin({
+  titulo,
+  ayuda,
+  error,
+  ocupado,
+  largo = 6,
+  onCompleto,
+}: {
+  titulo: string;
+  ayuda?: string;
+  error?: string;
+  ocupado?: boolean;
+  largo?: number;
+  onCompleto: (pin: string) => void;
+}) {
   const [pin, setPin] = useState("");
   const [sacudir, setSacudir] = useState(false);
 
@@ -165,17 +182,17 @@ function TecladoPin({ titulo, ayuda, error, ocupado, onCompleto }: { titulo: str
 
   const tocar = (d: string) => {
     if (ocupado) return;
-    const nuevo = (pin + d).slice(0, 4);
+    const nuevo = (pin + d).slice(0, largo);
     setPin(nuevo);
-    if (nuevo.length === 4) setTimeout(() => onCompleto(nuevo), 120);
+    if (nuevo.length === largo) setTimeout(() => onCompleto(nuevo), 120);
   };
 
   return (
     <div className="flex flex-col items-center">
       <p className="text-[15px] font-medium text-slate-900">{titulo}</p>
       {ayuda && <p className="mt-0.5 text-center text-xs text-slate-500">{ayuda}</p>}
-      <div className={`mt-4 flex gap-4 ${sacudir ? "pin-sacudir" : ""}`} aria-label={`${pin.length} de 4 números`}>
-        {[0, 1, 2, 3].map((i) => (
+      <div className={`mt-4 flex gap-4 ${sacudir ? "pin-sacudir" : ""}`} aria-label={`${pin.length} de ${largo} números`}>
+        {Array.from({ length: largo }, (_, i) => i).map((i) => (
           <span key={i} className={`h-3.5 w-3.5 rounded-full ring-1 ring-slate-400 ${i < pin.length ? "bg-sky-600 ring-sky-600" : ""}`} />
         ))}
       </div>
@@ -216,6 +233,7 @@ function PantallaEntrar({ onEntrar }: { onEntrar: (pin: { usuario: string; pin: 
   const [sinInternet, setSinInternet] = useState(false);
   const [usuario, setUsuario] = useState("");
   const [paso, setPaso] = useState<"usuario" | "pin">("usuario");
+  const [largoEntrada, setLargoEntrada] = useState(6);
   const [error, setError] = useState("");
   const [ocupado, setOcupado] = useState(false);
 
@@ -292,7 +310,25 @@ function PantallaEntrar({ onEntrar }: { onEntrar: (pin: { usuario: string; pin: 
         </form>
       ) : (
         <div className="mt-5">
-          <TecladoPin titulo={`Hola, ${usuario}`} ayuda="Escribe tu PIN de 4 números" error={error} ocupado={ocupado} onCompleto={entrar} />
+          <TecladoPin
+            key={largoEntrada}
+            titulo={`Hola, ${usuario}`}
+            ayuda={`Escribe tu PIN de ${largoEntrada} números`}
+            error={error}
+            ocupado={ocupado}
+            largo={largoEntrada}
+            onCompleto={entrar}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              setLargoEntrada((l) => (l === 6 ? 4 : 6));
+              setError("");
+            }}
+            className="mx-auto mt-3 block text-xs font-medium text-slate-500"
+          >
+            {largoEntrada === 6 ? "Soy administrador y mi PIN aún es de 4 números" : "Usar PIN de 6 números"}
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -378,7 +414,7 @@ function CrearAdministrador({ onEntrar }: { onEntrar: (pin: { usuario: string; p
           <TecladoPin
             key={paso}
             titulo={paso === "pin" ? "Elige tu PIN" : "Repite tu PIN"}
-            ayuda="4 números que usarás para entrar"
+            ayuda="6 números que usarás para entrar"
             error={error}
             ocupado={ocupado}
             onCompleto={(p) => {
@@ -451,7 +487,7 @@ function PantallaDesbloquear({ perfil, onAbrir }: { perfil: PerfilNube | null; o
         </div>
       ) : (
         <div className="mt-6">
-          <TecladoPin titulo="Escribe tu PIN" error={error} ocupado={ocupado} onCompleto={conPin} />
+          <TecladoPin titulo="Escribe tu PIN" error={error} ocupado={ocupado} largo={largoPinLocal()} onCompleto={conPin} />
           {conFaceId && (
             <button type="button" onClick={() => setUsarPin(false)} className="mx-auto mt-4 block text-sm font-medium text-sky-700">
               Usar Face ID

@@ -32,6 +32,8 @@ interface PinLocal {
   usuario: string;
   sal: string;
   resumen: string;
+  /** Cantidad de números del PIN (4 los anteriores, 6 los nuevos) */
+  largo?: number;
 }
 
 const aHex = (b: ArrayBuffer | Uint8Array) => Array.from(new Uint8Array(b), (x) => x.toString(16).padStart(2, "0")).join("");
@@ -46,7 +48,7 @@ async function resumir(pin: string, sal: string) {
 export async function recordarPinLocal(usuario: string, pin: string) {
   try {
     const sal = `${usuario}:${aHex(crypto.getRandomValues(new Uint8Array(16)))}`;
-    const dato: PinLocal = { usuario, sal, resumen: await resumir(pin, sal) };
+    const dato: PinLocal = { usuario, sal, resumen: await resumir(pin, sal), largo: pin.length };
     localStorage.setItem(CLAVE_PIN, JSON.stringify(dato));
   } catch {
     // sin almacenamiento: se pedirá iniciar sesión de nuevo
@@ -62,6 +64,51 @@ export async function pinLocalCorrecto(pin: string): Promise<boolean> {
     return false;
   }
 }
+
+/** Números del PIN guardado en este teléfono (6 por defecto) */
+export function largoPinLocal(): number {
+  try {
+    const dato = JSON.parse(localStorage.getItem(CLAVE_PIN) || "null") as PinLocal | null;
+    return dato ? (dato.largo ?? 4) : 6;
+  } catch {
+    return 6;
+  }
+}
+export const hayPinLocal = () => {
+  try {
+    return localStorage.getItem(CLAVE_PIN) !== null;
+  } catch {
+    return false;
+  }
+};
+
+/*
+ * Confirmar una acción con el PIN propio (eliminar, facturas, lotes…).
+ * Funciona sin internet; 5 intentos fallidos bloquean 15 minutos.
+ */
+const CLAVE_FALLOS = "pin-accion-fallos";
+export async function verificarPinPropio(pin: string): Promise<"ok" | "incorrecto" | "bloqueado" | "sin-pin"> {
+  let f = { n: 0, hasta: 0 };
+  try {
+    f = { ...f, ...JSON.parse(localStorage.getItem(CLAVE_FALLOS) || "{}") };
+  } catch {}
+  if (f.hasta > Date.now()) return "bloqueado";
+  if (!hayPinLocal()) return "sin-pin";
+  if (await pinLocalCorrecto(pin)) {
+    try {
+      localStorage.removeItem(CLAVE_FALLOS);
+    } catch {}
+    return "ok";
+  }
+  const n = f.n + 1;
+  const nuevo = n >= 5 ? { n: 0, hasta: Date.now() + 15 * 60 * 1000 } : { n, hasta: 0 };
+  try {
+    localStorage.setItem(CLAVE_FALLOS, JSON.stringify(nuevo));
+  } catch {}
+  return n >= 5 ? "bloqueado" : "incorrecto";
+}
+export const mensajePin = (r: "incorrecto" | "bloqueado" | "sin-pin") =>
+  r === "bloqueado" ? "Demasiados intentos. Espera 15 minutos." : r === "sin-pin" ? "Vuelve a iniciar sesión en este teléfono." : "PIN incorrecto";
 
 export function olvidarPinLocal() {
   try {

@@ -1074,14 +1074,12 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
     </Modal>
           <DialogoClave
             abierto={pedirClave}
-            titulo="Clave de lotes"
-            mensaje={`Ingresa la clave para eliminar ${nombreLote(lote)}.`}
+            titulo="Confirma con tu PIN"
+            mensaje={`Escribe tu PIN para eliminar ${nombreLote(lote)}.`}
             aceptar="Continuar"
-            onValidar={(codigo) => {
-              if (codigo !== leerConfig().claveLotes) return false;
+            onConfirmado={() => {
               setPedirClave(false);
               void eliminar();
-              return true;
             }}
             onCerrar={() => setPedirClave(false)}
           />

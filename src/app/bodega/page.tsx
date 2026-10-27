@@ -322,14 +322,12 @@ export default function BodegaPage() {
         <>
         <DialogoClave
           abierto={pedirClave}
-          titulo="Clave de facturas"
-          mensaje="Ingresa el código para cargar una factura."
+          titulo="Confirma con tu PIN"
+          mensaje="Escribe tu PIN para cargar una factura."
           aceptar="Continuar"
-          onValidar={(codigo) => {
-            if (codigo !== leerConfig().claveFacturas) return false;
+          onConfirmado={() => {
             setPedirClave(false);
             setNuevaFactura(true);
-            return true;
           }}
           onCerrar={() => setPedirClave(false)}
         />

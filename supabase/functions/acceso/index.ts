@@ -3,7 +3,7 @@
 //   { accion: "estado" }                              → { hayUsuarios }
 //   { accion: "entrar", usuario, pin }                → sesión de Supabase
 //   { accion: "crear-admin", usuario, nombre, pin }   → crea el primer administrador (solo si no hay usuarios)
-import { admin, contrasenaDe, correoDe, CORS, json, PIN_VALIDO, publico, USUARIO_VALIDO } from "../_compartido/comun.ts";
+import { admin, contrasenaDe, correoDe, CORS, json, PIN_ENTRADA, PIN_VALIDO, publico, USUARIO_VALIDO } from "../_compartido/comun.ts";
 
 async function entrar(usuario: string, pin: string) {
   const supa = publico();
@@ -40,9 +40,10 @@ Deno.serve(async (req) => {
     const usuario = String(cuerpo.usuario ?? "").trim().toLowerCase();
     const pin = String(cuerpo.pin ?? "");
     if (!USUARIO_VALIDO.test(usuario)) return json({ error: "Usuario no válido (3 a 30 letras minúsculas, números, punto o guion)" }, 400);
-    if (!PIN_VALIDO.test(pin)) return json({ error: "El PIN debe tener 4 números" }, 400);
+    if (!PIN_ENTRADA.test(pin)) return json({ error: "El PIN debe tener 6 números" }, 400);
 
     if (accion === "crear-admin") {
+      if (!PIN_VALIDO.test(pin)) return json({ error: "El PIN debe tener 6 números" }, 400);
       const { count } = await admin.from("perfiles").select("id", { count: "exact", head: true });
       if ((count ?? 0) > 0) return json({ error: "Ya existe un administrador" }, 409);
       const nombre = String(cuerpo.nombre ?? "").trim().slice(0, 60) || usuario;
@@ -66,7 +67,11 @@ Deno.serve(async (req) => {
       const { data: bloqueo } = await admin.rpc("bloqueo_pin", { p_usuario: usuario });
       if (bloqueo) return json({ error: "Demasiados intentos. Espera unos minutos.", bloqueadoHasta: bloqueo }, 429);
 
-      const { data: perfil } = await admin.from("perfiles").select("id, usuario, nombre, rol, permisos, granjas, activo").eq("usuario", usuario).maybeSingle();
+      const { data: perfil } = await admin.from("perfiles").select("id, usuario, nombre, rol, permisos, granjas, pin_actualizado, activo").eq("usuario", usuario).maybeSingle();
+      // Los PIN de 4 números ya no sirven, salvo para un administrador que aún no lo cambia
+      if (pin.length === 4 && perfil && perfil.rol !== "admin") {
+        return json({ error: "Ahora el PIN es de 6 números. Pídele al administrador tu PIN nuevo." }, 401);
+      }
       const sesion = perfil?.activo ? await entrar(usuario, pin) : null;
       if (!sesion) {
         const { data: hasta } = await admin.rpc("registrar_intento_pin", { p_usuario: usuario, p_exito: false });

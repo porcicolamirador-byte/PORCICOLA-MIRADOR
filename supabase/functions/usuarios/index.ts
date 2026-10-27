@@ -6,7 +6,7 @@
 //   { accion: "eliminar", id }   → borra la cuenta para siempre (sus registros se conservan)
 //   { accion: "reiniciar", pin }  → borra TODOS los datos de la granja (no los usuarios); pide el PIN del administrador
 //   { accion: "yo" }   → perfil del usuario que llama (cualquier usuario activo)
-import { admin, contrasenaDe, publico, correoDe, CORS, json, PIN_VALIDO, usuarioDeLaPeticion, USUARIO_VALIDO } from "../_compartido/comun.ts";
+import { admin, contrasenaDe, publico, correoDe, CORS, json, PIN_ENTRADA, PIN_VALIDO, usuarioDeLaPeticion, USUARIO_VALIDO } from "../_compartido/comun.ts";
 
 const PERMISOS = ["eliminar", "bodega", "ajustes", "contabilidad"] as const;
 /** null = todas las granjas (incluidas las nuevas); lista = solo esas */
@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
 
   try {
     if (accion === "listar") {
-      const { data, error } = await admin.from("perfiles").select("id, usuario, nombre, rol, permisos, granjas, activo, creado_en").order("creado_en");
+      const { data, error } = await admin.from("perfiles").select("id, usuario, nombre, rol, permisos, granjas, pin_actualizado, activo, creado_en").order("creado_en");
       if (error) throw error;
       return json({ usuarios: data });
     }
@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
       const nombre = String(cuerpo.nombre ?? "").trim().slice(0, 60);
       const rol = cuerpo.rol === "admin" ? "admin" : "trabajador";
       if (!USUARIO_VALIDO.test(usuario)) return json({ error: "Usuario no válido (3 a 30 letras minúsculas, números, punto o guion)" }, 400);
-      if (!PIN_VALIDO.test(pin)) return json({ error: "El PIN debe tener 4 números" }, 400);
+      if (!PIN_VALIDO.test(pin)) return json({ error: "El PIN debe tener 6 números" }, 400);
       if (!nombre) return json({ error: "Escribe el nombre" }, 400);
       const { data: existe } = await admin.from("perfiles").select("id").eq("usuario", usuario).maybeSingle();
       if (existe) return json({ error: "Ese usuario ya existe" }, 409);
@@ -64,8 +64,8 @@ Deno.serve(async (req) => {
       if (error || !creado.user) return json({ error: "No se pudo crear el usuario" }, 500);
       const { data: perfil, error: e2 } = await admin
         .from("perfiles")
-        .insert({ id: creado.user.id, usuario, nombre, rol, permisos: limpiarPermisos(cuerpo.permisos), granjas: limpiarGranjas(cuerpo.granjas) })
-        .select("id, usuario, nombre, rol, permisos, granjas, activo, creado_en")
+        .insert({ id: creado.user.id, usuario, nombre, rol, permisos: limpiarPermisos(cuerpo.permisos), granjas: limpiarGranjas(cuerpo.granjas), pin_actualizado: new Date().toISOString() })
+        .select("id, usuario, nombre, rol, permisos, granjas, pin_actualizado, activo, creado_en")
         .single();
       if (e2) {
         await admin.auth.admin.deleteUser(creado.user.id);
@@ -93,9 +93,11 @@ Deno.serve(async (req) => {
 
       if (cuerpo.pin !== undefined) {
         const pin = String(cuerpo.pin);
-        if (!PIN_VALIDO.test(pin)) return json({ error: "El PIN debe tener 4 números" }, 400);
+        if (!PIN_VALIDO.test(pin)) return json({ error: "El PIN debe tener 6 números" }, 400);
         const { error } = await admin.auth.admin.updateUserById(id, { password: await contrasenaDe(actual.usuario, pin) });
         if (error) return json({ error: "No se pudo cambiar el PIN" }, 500);
+        // Su teléfono le pedirá entrar con el PIN nuevo
+        cambios.pin_actualizado = new Date().toISOString();
         await admin.rpc("registrar_intento_pin", { p_usuario: actual.usuario, p_exito: true });
       }
 
@@ -103,7 +105,7 @@ Deno.serve(async (req) => {
         .from("perfiles")
         .update(cambios)
         .eq("id", id)
-        .select("id, usuario, nombre, rol, permisos, granjas, activo, creado_en")
+        .select("id, usuario, nombre, rol, permisos, granjas, pin_actualizado, activo, creado_en")
         .single();
       if (error) throw error;
 
@@ -132,7 +134,7 @@ Deno.serve(async (req) => {
 
     if (accion === "reiniciar") {
       const pin = String(cuerpo.pin ?? "");
-      if (!PIN_VALIDO.test(pin)) return json({ error: "Escribe tu PIN de 4 dígitos" }, 400);
+      if (!PIN_ENTRADA.test(pin)) return json({ error: "Escribe tu PIN de 6 dígitos" }, 400);
       const { data: bloqueo } = await admin.rpc("bloqueo_pin", { p_usuario: yo.usuario });
       if (bloqueo) return json({ error: "Demasiados intentos. Espera unos minutos." }, 429);
       const { error: errPin } = await publico().auth.signInWithPassword({ email: correoDe(yo.usuario), password: await contrasenaDe(yo.usuario, pin) });

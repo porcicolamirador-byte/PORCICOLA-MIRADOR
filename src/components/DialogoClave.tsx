@@ -1,28 +1,31 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { largoPinLocal, mensajePin, verificarPinPropio } from "@/lib/bloqueo";
+import { CLAVE_FACEID_APP, faceIdActivo, verificarFaceId } from "@/lib/faceid";
 
 /**
- * Cuadro con estilo de alerta nativa que pide un código numérico.
- * Llama a onValidar(codigo); si devuelve false muestra "Código incorrecto".
+ * Cuadro con estilo de alerta nativa que pide el PIN de quien usa el teléfono
+ * (o su Face ID) para confirmar una acción delicada. Funciona sin internet y
+ * bloquea 15 minutos tras 5 intentos fallidos.
  */
 export default function DialogoClave({
   abierto,
   titulo,
   mensaje,
-  longitud = 4,
   aceptar = "Continuar",
-  onValidar,
+  onConfirmado,
   onCerrar,
 }: {
   abierto: boolean;
   titulo: string;
   mensaje?: string;
-  longitud?: number;
   aceptar?: string;
-  onValidar: (codigo: string) => boolean;
+  onConfirmado: () => void;
   onCerrar: () => void;
 }) {
+  const longitud = largoPinLocal();
+  const conFaceId = faceIdActivo(CLAVE_FACEID_APP);
   const [codigo, setCodigo] = useState("");
   const [error, setError] = useState("");
   const [sacudir, setSacudir] = useState(false);
@@ -38,13 +41,15 @@ export default function DialogoClave({
 
   if (!abierto) return null;
 
-  const enviar = () => {
-    if (onValidar(codigo)) {
+  const enviar = async () => {
+    const r = await verificarPinPropio(codigo);
+    if (r === "ok") {
       setCodigo("");
       setError("");
+      onConfirmado();
       return;
     }
-    setError("Código incorrecto");
+    setError(mensajePin(r));
     setCodigo("");
     setSacudir(true);
     window.setTimeout(() => setSacudir(false), 400);
@@ -84,16 +89,31 @@ export default function DialogoClave({
               if (error) setError("");
             }}
             onKeyDown={(e) => {
-              if (e.key === "Enter") enviar();
+              if (e.key === "Enter") void enviar();
               if (e.key === "Escape") onCerrar();
             }}
             placeholder={"•".repeat(longitud)}
-            aria-label="Código de confirmación"
+            aria-label="Tu PIN"
             className={`mt-3 h-11 w-full rounded-xl border bg-slate-50 text-center text-xl tracking-[0.6em] text-slate-900 outline-none placeholder:text-slate-300 focus:bg-white focus:ring-2 ${
               error ? "border-red-400 focus:ring-red-200" : "border-slate-200 focus:ring-sky-200"
             }`}
           />
           {error && <p className="mt-2 text-[13px] font-medium text-red-600">{error}</p>}
+          {conFaceId && (
+            <button
+              type="button"
+              onClick={() => {
+                // Desde el toque: el iPhone solo muestra Face ID así
+                verificarFaceId(CLAVE_FACEID_APP).then((ok) => {
+                  if (ok) onConfirmado();
+                  else setError("Face ID no se abrió. Usa tu PIN.");
+                });
+              }}
+              className="mt-2 text-[13px] font-medium text-sky-700"
+            >
+              Usar Face ID
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-2 divide-x divide-slate-200 border-t border-slate-200">
@@ -102,7 +122,7 @@ export default function DialogoClave({
           </button>
           <button
             type="button"
-            onClick={enviar}
+            onClick={() => void enviar()}
             disabled={codigo.length === 0}
             className="py-3 text-[17px] font-semibold text-sky-700 transition active:bg-slate-100 disabled:text-slate-300"
           >

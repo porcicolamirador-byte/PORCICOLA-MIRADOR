@@ -9,6 +9,7 @@ import { Boton, Campo } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
 import { puede } from "@/lib/nube";
 import { leerConfig } from "@/lib/config";
+import { largoPinLocal, mensajePin, verificarPinPropio } from "@/lib/bloqueo";
 import { eliminarLotesDePartos, useVersionDatos } from "@/lib/datos";
 
 const ESTADOS = [
@@ -168,13 +169,17 @@ export default function Gestacion() {
     setMenuIndex(null);
   }
 
-  function confirmarEliminarCerda() {
+  async function confirmarEliminarCerda() {
     if (confirmDeleteIndex === null) return;
 
-    const pideClave = leerConfig().claveEliminarActiva;
-    if (pideClave && deletePinInput !== leerConfig().claveEliminar) {
-      setDeletePinError("Clave incorrecta");
-      return;
+    // Si está activo en Ajustes, se confirma con el PIN de quien usa el teléfono
+    if (leerConfig().claveEliminarActiva) {
+      const r = await verificarPinPropio(deletePinInput);
+      if (r !== "ok") {
+        setDeletePinError(mensajePin(r));
+        setDeletePinInput("");
+        return;
+      }
     }
 
     const cerdaAEliminar = cerdas[confirmDeleteIndex];
@@ -977,7 +982,7 @@ export default function Gestacion() {
                   Eliminar cerda {cerdas[confirmDeleteIndex]?.id || ""}
                 </h2>
                 <p className="mt-1.5 text-[13px] leading-snug text-slate-600">
-                  Se borrarán la cerda, todo su historial y los lotes de Engorde creados con sus partos.{claveEliminarActiva ? " Escribe la clave para confirmar." : ""}
+                  Se borrarán la cerda, todo su historial y los lotes de Engorde creados con sus partos.{claveEliminarActiva ? " Escribe tu PIN para confirmar." : ""}
                 </p>
 
                 {claveEliminarActiva && (<>
@@ -988,15 +993,15 @@ export default function Gestacion() {
                   autoFocus
                   value={deletePinInput}
                   onChange={(e) => {
-                    setDeletePinInput(e.target.value.replace(/\D/g, "").slice(0, 4));
+                    setDeletePinInput(e.target.value.replace(/\D/g, "").slice(0, largoPinLocal()));
                     if (deletePinError) setDeletePinError("");
                   }}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") confirmarEliminarCerda();
+                    if (e.key === "Enter") void confirmarEliminarCerda();
                     if (e.key === "Escape") cancelarEliminarCerda();
                   }}
-                  placeholder="••••"
-                  aria-label="Clave de confirmación"
+                  placeholder={"•".repeat(largoPinLocal())}
+                  aria-label="Tu PIN"
                   className={`mt-3 h-11 w-full rounded-xl border bg-slate-50 text-center text-xl tracking-[0.6em] text-slate-900 outline-none placeholder:text-slate-300 focus:bg-white focus:ring-2 ${
                     deletePinError ? "border-red-400 focus:ring-red-200" : "border-slate-200 focus:ring-sky-200"
                   }`}
@@ -1015,7 +1020,7 @@ export default function Gestacion() {
                 </button>
                 <button
                   type="button"
-                  onClick={confirmarEliminarCerda}
+                  onClick={() => void confirmarEliminarCerda()}
                   className="py-3 text-[17px] font-semibold text-red-600 transition active:bg-slate-100"
                 >
                   Eliminar

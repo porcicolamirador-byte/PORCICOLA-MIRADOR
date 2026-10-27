@@ -43,7 +43,10 @@ export const publico = () =>
   createClient(URL_SUPABASE, llavePublica(), { auth: { persistSession: false, autoRefreshToken: false } });
 
 export const USUARIO_VALIDO = /^[a-z0-9._-]{3,30}$/;
-export const PIN_VALIDO = /^\d{4}$/;
+/** PIN de 6 números (los nuevos y los que asigna el administrador) */
+export const PIN_VALIDO = /^\d{6}$/;
+/** Para entrar: 6 números; los administradores aún pueden usar su PIN anterior de 4 mientras lo cambian */
+export const PIN_ENTRADA = /^(\d{4}|\d{6})$/;
 
 export const correoDe = (usuario: string) => `${usuario}@usuarios.elmirador.app`;
 
