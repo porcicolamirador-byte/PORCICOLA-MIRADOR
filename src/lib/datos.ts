@@ -429,7 +429,21 @@ export interface Factura {
   fecha: string;
   lineas: LineaFactura[];
   nota?: string;
-  /** id del gasto creado en Contabilidad, si se registró */
+  /** id del gasto creado en Contabilidad, si se registró (de contado) */
+  movimientoId?: string;
+  /** Método de pago; sin valor = de contado (facturas anteriores) */
+  pago?: "contado" | "credito";
+  /** Si los pagos se registran como gasto en Contabilidad */
+  registrarGasto?: boolean;
+  /** Abonos de una factura a crédito */
+  abonos?: AbonoFactura[];
+}
+export interface AbonoFactura {
+  id: string;
+  fecha: string;
+  monto: number;
+  nota?: string;
+  /** Gasto creado en Contabilidad por este abono */
   movimientoId?: string;
 }
 export interface SalidaBodega {
@@ -493,6 +507,7 @@ export function leerFacturas(): Factura[] {
   return leer<Factura[]>(CLAVES.facturas, []).map((f) => ({
     ...f,
     lineas: Array.isArray(f.lineas) ? f.lineas : [],
+    abonos: Array.isArray(f.abonos) ? f.abonos : undefined,
   }));
 }
 export const guardarFacturas = (f: Factura[]) => escribir(CLAVES.facturas, f);
@@ -501,6 +516,10 @@ export const guardarSalidas = (s: SalidaBodega[]) => escribir(CLAVES.salidas, s)
 
 export const totalFactura = (f: Factura) =>
   f.lineas.reduce((s, l) => s + (Number(l.cantidad) || 0) * (Number(l.valorUnitario) || 0), 0);
+/** Lo abonado a una factura a crédito */
+export const abonadoFactura = (f: Factura) => (f.abonos ?? []).reduce((s, a) => s + (Number(a.monto) || 0), 0);
+/** Lo que falta por pagar (0 en las de contado) */
+export const saldoFactura = (f: Factura) => (f.pago === "credito" ? Math.max(0, totalFactura(f) - abonadoFactura(f)) : 0);
 
 export interface MovimientoInventario {
   fecha: string;
