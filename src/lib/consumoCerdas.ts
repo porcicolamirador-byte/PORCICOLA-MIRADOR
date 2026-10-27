@@ -8,6 +8,7 @@
  */
 
 import { guardarConfig, leerConfig } from "@/lib/config";
+import { reemplazarClave } from "@/lib/sincronizar";
 import {
   calcularInventario,
   codigoDe,
@@ -38,32 +39,102 @@ export interface ConsumoAlimentoCerdas {
   grupos: { texto: string; cerdas: number; kg: number }[];
 }
 
+type Regla = "g" | "pre" | "lac" | "x";
+
 /**
- * Cerdas en cada regla hoy, según el último registro de la cerda (el mismo
- * estado que muestra Gestación):
- *  - Parto → lactancia;
- *  - Inseminación con el día de cambio (100) cumplido → pre-parto (alimento de lactancia);
- *  - Baja → no come (no se cuenta);
- *  - cualquier otro estado (inseminación antes del día 100, celo, destete,
- *    aborto, tratamiento, evento o sin registros) → alimento de gestación.
+ * Regla de alimento de una cerda según su último registro (el estado que muestra Gestación):
+ *  - Baja → no come ("x");
+ *  - Parto → lactancia ("lac");
+ *  - Inseminación con el día de cambio (100) cumplido → pre-parto ("pre", alimento de lactancia);
+ *  - cualquier otro estado → alimento de gestación ("g").
  */
+function reglaDe(historial: { tipo: string; fecha: string }[], diaCambio: number, hoyIso: string): Regla {
+  const ultimo = historial[0];
+  if (ultimo?.tipo === "Baja") return "x";
+  if (ultimo?.tipo === "Parto") return "lac";
+  if (ultimo?.tipo === "Inseminación") return diasEntre(ultimo.fecha, hoyIso) >= diaCambio ? "pre" : "g";
+  return "g";
+}
+
+/*
+ * Registro del día: qué comió cada cerda en cada comida.
+ * Las cerdas comen dos veces (8 a. m. y 5 p. m.); cada comida es la mitad de la ración.
+ *  - Si cambia de estado antes de las 5 p. m., la comida de la mañana queda con el estado
+ *    anterior y la de la tarde con el nuevo (mitad y mitad).
+ *  - Desde las 5 p. m. el día ya está comido: los cambios cuentan desde mañana.
+ *  - Una cerda nueva antes de las 5 p. m. come solo la comida de la tarde; después, nada hoy.
+ * Se sincroniza entre teléfonos (la última versión gana).
+ */
+const CLAVE_DIA = "consumo-cerdas-dia";
+const HORA_CIERRE = 17;
+interface RegistroDia {
+  fecha: string;
+  cerdas: Record<string, { am: Regla; pm: Regla }>;
+}
+
+function leerDia(): RegistroDia | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(CLAVE_DIA) || "null") as RegistroDia | null;
+    return v && typeof v.fecha === "string" && v.cerdas && typeof v.cerdas === "object" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Registro de hoy actualizado con el estado actual de las cerdas (y si cambió, se guarda) */
+function registroDeHoy(diaCambio: number, guardar: boolean): RegistroDia {
+  const hoyIso = hoy();
+  const hora = new Date().getHours();
+  const previo = leerDia();
+  const actuales = new Map(leerCerdas().map((c) => [c.id, leerHistorial(c.id)] as const));
+  let dia: RegistroDia;
+  if (previo && previo.fecha === hoyIso) {
+    dia = { fecha: hoyIso, cerdas: { ...previo.cerdas } };
+  } else {
+    // Día nuevo: cada cerda empieza con su estado; si hoy ya tiene un registro nuevo,
+    // la mañana queda con lo que comía ayer en la tarde
+    const ayer = previo && previo.fecha === sumarDias(hoyIso, -1) ? previo.cerdas : {};
+    dia = { fecha: hoyIso, cerdas: {} };
+    for (const [id, historial] of actuales) {
+      const ahora = reglaDe(historial, diaCambio, hoyIso);
+      const cambioHoy = historial[0]?.fecha === hoyIso;
+      dia.cerdas[id] = { am: cambioHoy && ayer[id] ? ayer[id].pm : ahora, pm: ahora };
+    }
+  }
+  if (hora < HORA_CIERRE) {
+    for (const [id, historial] of actuales) {
+      const ahora = reglaDe(historial, diaCambio, hoyIso);
+      const e = dia.cerdas[id];
+      if (!e) dia.cerdas[id] = { am: "x", pm: ahora }; // nueva hoy: solo la comida de la tarde
+      else if (e.pm !== ahora) dia.cerdas[id] = { ...e, pm: ahora };
+    }
+    // Eliminada hoy: comió en la mañana, en la tarde ya no
+    for (const id of Object.keys(dia.cerdas)) if (!actuales.has(id) && dia.cerdas[id].pm !== "x") dia.cerdas[id] = { ...dia.cerdas[id], pm: "x" };
+  }
+  if (guardar && JSON.stringify(dia) !== JSON.stringify(previo)) reemplazarClave(CLAVE_DIA, dia);
+  return dia;
+}
+
+/** Kilos de hoy por regla, sumando media ración por cada comida */
+function kilosDeHoy(dia: RegistroDia, reglas: { gestacion: number; preparto: number; lactancia: number }) {
+  const kg: Record<Regla, number> = { g: 0, pre: 0, lac: 0, x: 0 };
+  const cerdas: Record<Regla, number> = { g: 0, pre: 0, lac: 0, x: 0 };
+  const racion: Record<Regla, number> = { g: reglas.gestacion, pre: reglas.preparto, lac: reglas.lactancia, x: 0 };
+  for (const e of Object.values(dia.cerdas)) {
+    kg[e.am] += racion[e.am] / 2;
+    kg[e.pm] += racion[e.pm] / 2;
+    // Cuenta en la regla de su estado actual (o la de la mañana si ya no come)
+    cerdas[e.pm !== "x" ? e.pm : e.am]++;
+  }
+  return { kg, cerdas };
+}
+
+/** Cerdas en cada regla hoy (día completo, para los días anteriores que faltan) */
 function contarCerdas(diaCambio: number) {
   const hoyIso = hoy();
-  let gestantes = 0;
-  let vacias = 0;
-  let preparto = 0;
-  let lactando = 0;
-  for (const c of leerCerdas()) {
-    const ultimo = leerHistorial(c.id)[0];
-    // Dada de baja: ya no come, no se le descuenta alimento
-    if (ultimo?.tipo === "Baja") continue;
-    if (ultimo?.tipo === "Parto") lactando++;
-    else if (ultimo?.tipo === "Inseminación") {
-      if (diasEntre(ultimo.fecha, hoyIso) >= diaCambio) preparto++;
-      else gestantes++;
-    } else vacias++;
-  }
-  return { gestantes, vacias, preparto, lactando };
+  const n: Record<Regla, number> = { g: 0, pre: 0, lac: 0, x: 0 };
+  for (const c of leerCerdas()) n[reglaDe(leerHistorial(c.id), diaCambio, hoyIso)]++;
+  return { gestacion: n.g, preparto: n.pre, lactando: n.lac };
 }
 
 const PREFIJOS_AUTO = { gestacion: "auto-cg-", lactancia: "auto-cl-" } as const;
@@ -94,11 +165,12 @@ export function aplicarDescuentoCerdas() {
     const desde = reglas.descuentoDesde > sumarDias(hoyIso, -59) ? reglas.descuentoDesde : sumarDias(hoyIso, -59);
 
     const cuenta = contarCerdas(reglas.diaCambio);
+    const hoyDia = kilosDeHoy(registroDeHoy(reglas.diaCambio, true), reglas);
     const inventario = calcularInventario();
     const todos = leerProductos();
     const cambios = new Map<string, SalidaBodega>();
 
-    const descontar = (codigo: string, prefijo: string, kgDia: number, nota: string) => {
+    const descontar = (codigo: string, prefijo: string, kgDia: number, kgHoy: number, nota: string) => {
       const productos = todos.filter((p) => codigoDe(p) === codigo && p.activo !== false);
       const producto = productos.find((p) => p.unidad === "bultos") ?? productos[0];
       if (!producto) return;
@@ -108,11 +180,12 @@ export function aplicarDescuentoCerdas() {
       // Lo de hoy se vuelve a calcular: se devuelve lo que ya se había descontado hoy
       let disponible = item.disponible + (deHoy && deHoy.productoId === producto.id ? Number(deHoy.cantidad) || 0 : 0);
       const porDia = kgDia / factorKg(producto);
+      const deHoyKg = kgHoy / factorKg(producto);
       for (let f = desde; f <= hoyIso; f = sumarDias(f, 1)) {
         const id = prefijo + f;
         const esHoy = f === hoyIso;
         if (!esHoy && porId.has(id)) continue;
-        const cantidad = Math.round(Math.max(0, Math.min(porDia, disponible)) * 1000) / 1000;
+        const cantidad = Math.round(Math.max(0, Math.min(esHoy ? deHoyKg : porDia, disponible)) * 1000) / 1000;
         if (esHoy && deHoy) {
           if (Math.abs((Number(deHoy.cantidad) || 0) - cantidad) < 0.0005 && deHoy.nota === nota && deHoy.productoId === producto.id) return;
           cambios.set(id, { ...deHoy, productoId: producto.id, cantidad, nota });
@@ -127,17 +200,20 @@ export function aplicarDescuentoCerdas() {
       }
     };
 
-    const cerdasG = cuenta.gestantes + cuenta.vacias;
-    descontar(reglas.codigoGestacion, PREFIJOS_AUTO.gestacion, cerdasG * reglas.gestacion, `Consumo automático cerdas · ${cerdasG} × ${reglas.gestacion} kg`);
-    const partes = [
-      cuenta.preparto ? `${cuenta.preparto} pre-parto × ${reglas.preparto} kg` : "",
-      cuenta.lactando ? `${cuenta.lactando} lactando × ${reglas.lactancia} kg` : "",
-    ].filter(Boolean);
+    const kgTexto = (n: number) => `${Math.round(n * 10) / 10} kg`;
+    descontar(
+      reglas.codigoGestacion,
+      PREFIJOS_AUTO.gestacion,
+      cuenta.gestacion * reglas.gestacion,
+      hoyDia.kg.g,
+      `Consumo automático cerdas · ${hoyDia.cerdas.g} cerdas · ${kgTexto(hoyDia.kg.g)} hoy`,
+    );
     descontar(
       reglas.codigoLactancia,
       PREFIJOS_AUTO.lactancia,
       cuenta.preparto * reglas.preparto + cuenta.lactando * reglas.lactancia,
-      `Consumo automático lactancia · ${partes.join(" + ") || "sin cerdas"}`,
+      hoyDia.kg.pre + hoyDia.kg.lac,
+      `Consumo automático lactancia · ${hoyDia.cerdas.pre} pre-parto + ${hoyDia.cerdas.lac} lactando · ${kgTexto(hoyDia.kg.pre + hoyDia.kg.lac)} hoy`,
     );
     if (cambios.size === 0) return;
     // La de hoy se actualiza (aunque quede en 0) en vez de borrarse: borrar exige permiso
@@ -151,7 +227,7 @@ export function aplicarDescuentoCerdas() {
 
 export function calcularConsumoCerdas(): { gestacion: ConsumoAlimentoCerdas; lactancia: ConsumoAlimentoCerdas; cerdas: number } {
   const reglas = leerConfig().consumoCerdas;
-  const { gestantes, vacias, preparto, lactando } = contarCerdas(reglas.diaCambio);
+  const hoyDia = kilosDeHoy(registroDeHoy(reglas.diaCambio, false), reglas);
 
   const productos = leerProductos();
   const inventario = calcularInventario();
@@ -166,9 +242,9 @@ export function calcularConsumoCerdas(): { gestacion: ConsumoAlimentoCerdas; lac
     };
   };
 
-  const armar = (codigo: string, grupos: { texto: string; cerdas: number; kgPorCerda: number }[]): ConsumoAlimentoCerdas => {
+  const armar = (codigo: string, grupos: { texto: string; cerdas: number; kg: number }[]): ConsumoAlimentoCerdas => {
     const d = datosProducto(codigo);
-    const lista = grupos.map((g) => ({ texto: g.texto, cerdas: g.cerdas, kg: g.cerdas * g.kgPorCerda }));
+    const lista = grupos.map((g) => ({ texto: g.texto, cerdas: g.cerdas, kg: g.kg }));
     const kgDia = lista.reduce((s, g) => s + g.kg, 0);
     return {
       codigo,
@@ -182,14 +258,13 @@ export function calcularConsumoCerdas(): { gestacion: ConsumoAlimentoCerdas; lac
   };
 
   return {
-    cerdas: gestantes + vacias + preparto + lactando,
+    cerdas: hoyDia.cerdas.g + hoyDia.cerdas.pre + hoyDia.cerdas.lac,
     gestacion: armar(reglas.codigoGestacion, [
-      { texto: `Inseminadas (hasta el día ${reglas.diaCambio})`, cerdas: gestantes, kgPorCerda: reglas.gestacion },
-      { texto: "Otros estados (celo, destete, tratamiento…)", cerdas: vacias, kgPorCerda: reglas.gestacion },
+      { texto: "Gestación y otros estados", cerdas: hoyDia.cerdas.g, kg: hoyDia.kg.g },
     ]),
     lactancia: armar(reglas.codigoLactancia, [
-      { texto: `Pre-parto (día ${reglas.diaCambio} al parto)`, cerdas: preparto, kgPorCerda: reglas.preparto },
-      { texto: "Lactancia (parto al destete)", cerdas: lactando, kgPorCerda: reglas.lactancia },
+      { texto: `Pre-parto (día ${reglas.diaCambio} al parto)`, cerdas: hoyDia.cerdas.pre, kg: hoyDia.kg.pre },
+      { texto: "Lactancia (parto al destete)", cerdas: hoyDia.cerdas.lac, kg: hoyDia.kg.lac },
     ]),
   };
 }

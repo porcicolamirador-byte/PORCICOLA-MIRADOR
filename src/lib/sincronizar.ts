@@ -34,7 +34,7 @@ const LISTAS = new Set([
   "bodega-salidas",
   "corrales",
 ]);
-const VALORES = new Set(["config-granja", "ajustes", "bioseguridad-checks"]);
+const VALORES = new Set(["config-granja", "ajustes", "bioseguridad-checks", "consumo-cerdas-dia"]);
 /** Lista de granjas: es común a todas (no se separa por granja) */
 export const CLAVE_GRANJAS = "granjas";
 const ID_VALOR = "valor";
