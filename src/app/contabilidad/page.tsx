@@ -2,7 +2,7 @@
 
 import Modal from "@/components/Modal";
 import PagoFactura, { PagoCredito } from "@/components/PagoFactura";
-import { calcularInventario, codigoDe, eliminarGastoLote, guardarCuentasPorPagar, guardarFacturas, leerCuentasPorPagar, leerFacturas, leerProductos, leerSalidas, saldoCuenta, saldoFactura, totalFactura } from "@/lib/datos";
+import { calcularInventario, codigoDe, guardarCuentasPorPagar, guardarFacturas, leerCuentasPorPagar, leerFacturas, leerProductos, leerSalidas, saldoCuenta, saldoFactura, totalFactura } from "@/lib/datos";
 import { useMemo, useState, type FormEvent } from "react";
 import ModuloPage from "@/components/ModuloPage";
 import { Boton, Campo, Entrada, IconoMas, SeccionDesplegable, Selector, Vacio, EntradaPesos } from "@/components/ui";
@@ -82,6 +82,15 @@ export default function ContabilidadPage() {
   }, [version, mes]);
 
   const eliminar = async (id: string) => {
+    // Gasto registrado desde un lote: se elimina primero desde el lote
+    const loteDelGasto = leerLotes().find((l) => (l.gastos ?? []).some((g) => g.movimientoId === id));
+    if (loteDelGasto) {
+      await avisar({
+        titulo: "Gasto de un lote",
+        mensaje: `Este gasto se registró en ${nombreLote(loteDelGasto)}. Elimínalo primero desde el lote en Engorde.`,
+      });
+      return;
+    }
     // Gasto de una factura de Bodega cuyos productos ya se consumieron en un lote: no se borra desde aquí
     const factura = leerFacturas().find((f) => f.movimientoId === id || (f.abonos ?? []).some((ab) => ab.movimientoId === id));
     if (factura) {
@@ -412,24 +421,23 @@ function FacturasCredito({ version }: { version: number }) {
 
   const eliminarCuenta = async () => {
     if (!cuenta) return;
+    const lote = leerLotes().find((l) => (l.gastos ?? []).some((g) => g.cuentaId === cuenta.id));
+    if (lote) {
+      await avisar({ titulo: "Gasto de un lote", mensaje: `Este gasto se registró en ${nombreLote(lote)}. Elimínalo primero desde el lote en Engorde.` });
+      return;
+    }
     if (
       !(await confirmar({
         titulo: "Eliminar gasto a crédito",
-        mensaje: `Se borrará "${cuenta.descripcion}"${cuenta.abonos.length ? " y los gastos de sus abonos" : ""}. Si es un gasto de un lote, también se quita del lote.`,
+        mensaje: `Se borrará "${cuenta.descripcion}"${cuenta.abonos.length ? " y los gastos de sus abonos" : ""}.`,
         aceptar: "Eliminar",
         destructivo: true,
       }))
     )
       return;
-    // Si viene de un gasto de lote, se quita también del lote (borra la cuenta y sus abonos)
-    const lote = leerLotes().find((l) => (l.gastos ?? []).some((g) => g.cuentaId === cuenta.id));
-    const gasto = lote?.gastos?.find((g) => g.cuentaId === cuenta.id);
-    if (lote && gasto) eliminarGastoLote(lote.id, gasto.id);
-    else {
-      const quitar = new Set(cuenta.abonos.map((a) => a.movimientoId).filter(Boolean));
-      if (quitar.size) guardarMovimientos(leerMovimientos().filter((m) => !quitar.has(m.id)));
-      guardarCuentasPorPagar(leerCuentasPorPagar().filter((c) => c.id !== cuenta.id));
-    }
+    const quitar = new Set(cuenta.abonos.map((a) => a.movimientoId).filter(Boolean));
+    if (quitar.size) guardarMovimientos(leerMovimientos().filter((m) => !quitar.has(m.id)));
+    guardarCuentasPorPagar(leerCuentasPorPagar().filter((c) => c.id !== cuenta.id));
     setAbierta(null);
   };
 
