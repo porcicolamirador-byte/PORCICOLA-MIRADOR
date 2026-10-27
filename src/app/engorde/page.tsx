@@ -634,7 +634,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   };
 
   const cerrarLote = async () => {
-    if (!(await confirmar({ titulo: `Cerrar ${nombreLote(lote)}`, mensaje: "El lote pasará a la lista de lotes cerrados. Puedes reabrirlo después.", aceptar: "Cerrar lote" }))) return;
+    if (!(await confirmar({ titulo: `Liquidación total · ${nombreLote(lote)}`, mensaje: "El lote pasará a la lista de lotes cerrados. Puedes reabrirlo después.", aceptar: "Liquidar lote" }))) return;
     actualizarLote(lote.id, (l) => ({ ...l, activo: false, fechaSalida: hoy() }));
     onCerrar();
   };
@@ -878,7 +878,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
 
           <div className="flex flex-wrap justify-center gap-2 pt-1">
             {lote.activo ? (
-              <Boton variante="secundario" onClick={cerrarLote} disabled={!corral}>Cerrar lote (venta)</Boton>
+              <Boton variante="secundario" onClick={cerrarLote} disabled={!corral}>Liquidación total del lote</Boton>
             ) : (
               <Boton variante="secundario" onClick={reabrir}>Reabrir lote</Boton>
             )}
