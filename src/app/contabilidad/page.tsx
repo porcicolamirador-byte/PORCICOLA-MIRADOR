@@ -2,7 +2,7 @@
 
 import Modal from "@/components/Modal";
 import PagoFactura, { PagoCredito } from "@/components/PagoFactura";
-import { guardarCuentasPorPagar, leerCuentasPorPagar, leerFacturas, leerProductos, saldoCuenta, saldoFactura, totalFactura } from "@/lib/datos";
+import { codigoDe, guardarCuentasPorPagar, leerCuentasPorPagar, leerFacturas, leerProductos, leerSalidas, saldoCuenta, saldoFactura, totalFactura } from "@/lib/datos";
 import { useMemo, useState, type FormEvent } from "react";
 import ModuloPage from "@/components/ModuloPage";
 import { Boton, Campo, Entrada, IconoMas, SeccionDesplegable, Selector, Vacio, EntradaPesos } from "@/components/ui";
@@ -19,7 +19,7 @@ import {
   type Lote,
   type Movimiento,
 } from "@/lib/datos";
-import { confirmar } from "@/components/Dialogo";
+import { avisar, confirmar } from "@/components/Dialogo";
 import { puede } from "@/lib/nube";
 import { cargarLogoJpeg, entregarPdf } from "@/lib/pdfFicha";
 import { generarPdfContabilidad } from "@/lib/pdfContabilidad";
@@ -74,6 +74,28 @@ export default function ContabilidadPage() {
   }, [version, mes]);
 
   const eliminar = async (id: string) => {
+    // Gasto de una factura de Bodega cuyos productos ya se consumieron en un lote: no se borra desde aquí
+    const factura = leerFacturas().find((f) => f.movimientoId === id || (f.abonos ?? []).some((ab) => ab.movimientoId === id));
+    if (factura) {
+      const productos = leerProductos();
+      const codigos = new Set(
+        factura.lineas
+          .map((l) => productos.find((p) => p.id === l.productoId))
+          .map((p) => (p ? codigoDe(p) : ""))
+          .filter(Boolean),
+      );
+      const ids = new Set([...factura.lineas.map((l) => l.productoId), ...productos.filter((p) => codigos.has(codigoDe(p))).map((p) => p.id)]);
+      const consumido =
+        leerSalidas().some((sd) => sd.loteId && ids.has(sd.productoId) && sd.fecha >= factura.fecha) ||
+        leerLotes().some((l) => l.alimento.some((al) => al.productoId && ids.has(al.productoId) && al.fecha >= factura.fecha));
+      if (consumido) {
+        await avisar({
+          titulo: "No se puede eliminar",
+          mensaje: `Este gasto es de la factura ${factura.numero}${factura.proveedor ? ` de ${factura.proveedor}` : ""} y sus productos ya se consumieron en un lote. Si hay un error, corrígelo desde la factura en Bodega.`,
+        });
+        return;
+      }
+    }
     if (!(await confirmar({ titulo: "Eliminar movimiento", mensaje: "El ingreso o gasto se borrará y el balance del mes se recalculará.", aceptar: "Eliminar", destructivo: true }))) return;
     guardarMovimientos(leerMovimientos().filter((m) => m.id !== id));
   };
