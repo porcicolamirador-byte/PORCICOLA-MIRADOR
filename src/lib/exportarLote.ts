@@ -205,12 +205,9 @@ function contabilidadMadre(lote: Lote): { movimientos: MovimientoLotePdf[]; nota
   }
 
   const sinPrecio = [kgG > 0 && precioG === 0 ? alimentoG.nombre : "", kgL > 0 && precioL === 0 ? alimentoL.nombre : ""].filter(Boolean);
+  const dma = (iso: string) => iso.split("-").reverse().join("/");
   const nota =
-    `Incluye la contabilidad de la madre (cerda ${cerdaId}) del ${formatoFecha(desde, true)} al ${formatoFecha(hasta, true)}` +
-    `${desteteAntes ? " (del destete anterior" : llegada ? " (desde su llegada" : " (desde la inseminación de esta camada"}${desteteDespues ? " al destete de esta camada)" : " hasta hoy; aún sin destete)"}. ` +
-    `El alimento es estimado según las reglas de consumo de cerdas y el último precio de compra.` +
-    (sinPrecio.length
-      ? ` ${sinPrecio.join(" y ")} no tiene${sinPrecio.length > 1 ? "n" : ""} ninguna factura con precio en Bodega: sus kilos aparecen, pero valorados en $0 hasta que se ingrese una compra.`
-      : "");
+    `Madre: cerda ${cerdaId} · ${dma(desde)} – ${dma(hasta)} · alimento estimado` +
+    (sinPrecio.length ? ` · ${sinPrecio.join(" y ")} sin precio de compra ($0)` : "");
   return { movimientos, nota };
 }
