@@ -399,7 +399,7 @@ export default function Dashboard() {
                 key={modulo.nombre}
                 type="button"
                 onClick={() => router.push(modulo.ruta)}
-                className={`flex flex-col items-start gap-3 rounded-3xl border px-3.5 py-3.5 text-left shadow-sm transition active:scale-[0.97] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 ${modulo.card}`}
+                className={`flex flex-col items-center gap-3 rounded-3xl border px-3.5 py-3.5 text-center shadow-sm transition active:scale-[0.97] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 ${modulo.card}`}
               >
                 <div className={`flex h-11 w-11 items-center justify-center rounded-2xl text-2xl ${modulo.tile}`}>
                   <IconoModulo nombre={modulo.nombre} className="h-6 w-6" />
