@@ -147,8 +147,13 @@ function contabilidadMadre(lote: Lote): { movimientos: MovimientoLotePdf[]; nota
   const desteteAntes = historial.find((h) => h.tipo === "Destete" && h.fecha < fechaParto);
   const desteteDespues = [...historial].reverse().find((h) => h.tipo === "Destete" && h.fecha > fechaParto);
   const cerda = leerCerdas().find((c) => c.id === cerdaId) as { fecha?: string } | undefined;
+  // Sin destete anterior (primer parto): desde la inseminación de esta camada, o desde
+  // la llegada de la cerda si llegó antes; nunca después del parto
+  const ia = historial.find((h) => h.tipo === "Inseminación" && h.fecha <= fechaParto && (!desteteAntes || h.fecha >= desteteAntes.fecha));
   const primero = historial[historial.length - 1]?.fecha;
-  const desde = desteteAntes?.fecha ?? cerda?.fecha ?? primero ?? fechaParto;
+  const inicioCiclo = ia?.fecha ?? primero ?? fechaParto;
+  const llegada = cerda?.fecha && cerda.fecha <= inicioCiclo ? cerda.fecha : undefined;
+  const desde = desteteAntes?.fecha ?? llegada ?? inicioCiclo;
   const hasta = desteteDespues?.fecha ?? hoy();
   const enPeriodo = (f: string) => f >= desde && f <= hasta;
   const movimientos: MovimientoLotePdf[] = [];
@@ -200,7 +205,7 @@ function contabilidadMadre(lote: Lote): { movimientos: MovimientoLotePdf[]; nota
   const sinPrecio = (kgG > 0 && precioG === 0) || (kgL > 0 && precioL === 0);
   const nota =
     `Incluye la contabilidad de la madre (cerda ${cerdaId}) del ${formatoFecha(desde, true)} al ${formatoFecha(hasta, true)}` +
-    `${desteteAntes ? " (del destete anterior" : " (desde su llegada"}${desteteDespues ? " al destete de esta camada)" : " hasta hoy; aún sin destete)"}. ` +
+    `${desteteAntes ? " (del destete anterior" : llegada ? " (desde su llegada" : " (desde la inseminación de esta camada"}${desteteDespues ? " al destete de esta camada)" : " hasta hoy; aún sin destete)"}. ` +
     `El alimento es estimado según las reglas de consumo de cerdas y el último precio de compra.` +
     (sinPrecio ? " Hay alimento sin precio de compra: se valoró en $0." : "");
   return { movimientos, nota };
