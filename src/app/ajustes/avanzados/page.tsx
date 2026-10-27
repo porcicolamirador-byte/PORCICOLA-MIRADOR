@@ -18,6 +18,8 @@ import {
   type AlimentacionEstandar,
   type ConfigGranja,
   type ProductosEtapa,
+  CONSUMO_CERDAS_POR_DEFECTO,
+  type ConsumoCerdas,
 } from "@/lib/config";
 import { clavesDeLaApp, codigoDe, leerCorrales, leerProductos, notificarCambio, useVersionDatos } from "@/lib/datos";
 import CatalogoProductos from "@/components/CatalogoProductos";
@@ -175,6 +177,15 @@ export default function AjustesAvanzadosPage() {
             productosActuales={config.productosEtapa}
             onGuardar={(a, productosEtapa) => guardar({ alimentacion: a, productosEtapa })}
           />
+        </Desplegable>
+        <Desplegable
+          icono="alimento"
+          titulo="Consumo de cerdas"
+          resumen={`${config.consumoCerdas.gestacion} · ${config.consumoCerdas.preparto} · ${config.consumoCerdas.lactancia} kg`}
+          abierto={abierto === "consumoCerdas"}
+          onAlternar={() => alternar("consumoCerdas")}
+        >
+          <ConsumoCerdasAjuste actual={config.consumoCerdas} onGuardar={(c) => guardar({ consumoCerdas: c })} />
         </Desplegable>
         <Desplegable
           icono="corral"
@@ -839,6 +850,148 @@ function Alimentacion({
   );
 }
 
+
+/* ───────────── Consumo aproximado de las cerdas ───────────── */
+
+function ConsumoCerdasAjuste({ actual, onGuardar }: { actual: ConsumoCerdas; onGuardar: (c: ConsumoCerdas) => void }) {
+  const aTexto = (c: ConsumoCerdas) => ({
+    gestacion: String(c.gestacion).replace(".", ","),
+    preparto: String(c.preparto).replace(".", ","),
+    lactancia: String(c.lactancia).replace(".", ","),
+    diaCambio: String(c.diaCambio),
+  });
+  const [valores, setValores] = useState(aTexto(actual));
+  const [codigos, setCodigos] = useState({ codigoGestacion: actual.codigoGestacion, codigoLactancia: actual.codigoLactancia });
+  const [base, setBase] = useState(actual);
+  if (base !== actual) {
+    setBase(actual);
+    setValores(aTexto(actual));
+    setCodigos({ codigoGestacion: actual.codigoGestacion, codigoLactancia: actual.codigoLactancia });
+  }
+
+  const catalogo = [
+    ...new Map(
+      leerProductos()
+        .filter((p) => codigoDe(p) && p.activo !== false && p.categoria === "Alimento")
+        .sort((a, b) => Number(a.unidad === "kg") - Number(b.unidad === "kg"))
+        .map((p) => [codigoDe(p), p.nombre] as const)
+        .reverse(),
+    ),
+  ].sort((a, b) => a[0].localeCompare(b[0], "es", { numeric: true }));
+
+  const num = (t: string) => Number((t || "").replace(",", "."));
+  const nueva: ConsumoCerdas = {
+    gestacion: num(valores.gestacion),
+    preparto: num(valores.preparto),
+    lactancia: num(valores.lactancia),
+    diaCambio: num(valores.diaCambio),
+    ...codigos,
+  };
+  const valido =
+    [nueva.gestacion, nueva.preparto, nueva.lactancia].every((n) => Number.isFinite(n) && n >= 0 && n <= 50) &&
+    Number.isInteger(nueva.diaCambio) && nueva.diaCambio >= 1 && nueva.diaCambio <= 120;
+  const sinCambios = (Object.keys(nueva) as (keyof ConsumoCerdas)[]).every((k) => nueva[k] === actual[k]);
+
+  const enviar = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!valido) return;
+    onGuardar(nueva);
+    await avisar({ titulo: "Consumo actualizado", mensaje: "Bodega calculará el consumo aproximado de las cerdas con estas reglas." });
+  };
+
+  const campoKg = (k: "gestacion" | "preparto" | "lactancia", nombre: string, ayuda: string) => (
+    <label className="flex items-center gap-3 px-3.5 py-2">
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm text-slate-800">{nombre}</span>
+        <span className="block text-[11px] text-slate-500">{ayuda}</span>
+      </span>
+      <input
+        type="text"
+        inputMode="decimal"
+        value={valores[k]}
+        onChange={(e) => setValores((v) => ({ ...v, [k]: e.target.value.replace(/[^\d.,]/g, "").slice(0, 5) }))}
+        onFocus={(e) => e.target.select()}
+        aria-label={`${nombre} en kilos por día`}
+        className="h-10 w-16 shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-2 text-right text-base font-semibold tabular-nums text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-sky-200"
+      />
+      <span className="w-12 shrink-0 text-xs text-slate-500">kg/día</span>
+    </label>
+  );
+
+  const selector = (k: "codigoGestacion" | "codigoLactancia", etiqueta: string) => (
+    <label className="flex items-center gap-3 px-3.5 py-2">
+      <span className="w-20 shrink-0 text-xs font-medium text-slate-500">{etiqueta}</span>
+      <span className="relative min-w-0 flex-1">
+        <select
+          value={codigos[k]}
+          onChange={(e) => setCodigos((c) => ({ ...c, [k]: e.target.value }))}
+          className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-3 pr-9 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-sky-200"
+        >
+          {!catalogo.some(([c]) => c === codigos[k]) && <option value={codigos[k]}>{codigos[k]} · sin producto en bodega</option>}
+          {catalogo.map(([c, n]) => (
+            <option key={c} value={c}>
+              {c} · {n}
+            </option>
+          ))}
+        </select>
+        <svg viewBox="0 0 20 20" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M5 8l5 5 5-5" />
+        </svg>
+      </span>
+    </label>
+  );
+
+  const titulo = "-mb-1 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400";
+  const caja = "divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-100";
+
+  return (
+    <form onSubmit={enviar} className="flex flex-col gap-3">
+      <p className="text-xs text-slate-500">Es una estimación por cerda al día; Bodega la usa para calcular cuánto alimento se gasta y para cuántos días alcanza.</p>
+      <p className={titulo}>Alimento de gestación</p>
+      <div className={caja}>
+        {selector("codigoGestacion", "Producto")}
+        {campoKg("gestacion", "Gestación", "Cerdas gestantes y vacías")}
+      </div>
+      <p className={titulo}>Alimento de lactancia</p>
+      <div className={caja}>
+        {selector("codigoLactancia", "Producto")}
+        <label className="flex items-center gap-3 px-3.5 py-2">
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm text-slate-800">Cambio a lactancia</span>
+            <span className="block text-[11px] text-slate-500">Día de gestación en que empieza</span>
+          </span>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={valores.diaCambio}
+            onChange={(e) => setValores((v) => ({ ...v, diaCambio: e.target.value.replace(/\D/g, "").slice(0, 3) }))}
+            onFocus={(e) => e.target.select()}
+            aria-label="Día de gestación para pasar a lactancia"
+            className="h-10 w-16 shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-2 text-right text-base font-semibold tabular-nums text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-sky-200"
+          />
+          <span className="w-12 shrink-0 text-xs text-slate-500">día</span>
+        </label>
+        {campoKg("preparto", "Pre-parto", `Del día ${valores.diaCambio || "—"} al parto`)}
+        {campoKg("lactancia", "Lactancia", "Del parto al destete")}
+      </div>
+      {!valido && <p className="text-sm font-medium text-rose-600">Escribe kilos entre 0 y 50 y un día entre 1 y 120.</p>}
+      <div className="grid grid-cols-2 gap-2">
+        <Boton
+          variante="secundario"
+          onClick={() => {
+            setValores(aTexto(CONSUMO_CERDAS_POR_DEFECTO));
+            setCodigos({ codigoGestacion: CONSUMO_CERDAS_POR_DEFECTO.codigoGestacion, codigoLactancia: CONSUMO_CERDAS_POR_DEFECTO.codigoLactancia });
+          }}
+        >
+          Valores por defecto
+        </Boton>
+        <Boton type="submit" disabled={!valido || sinCambios}>
+          Guardar
+        </Boton>
+      </div>
+    </form>
+  );
+}
 
 /* ───────────── Consumo de la base de datos en la nube ───────────── */
 

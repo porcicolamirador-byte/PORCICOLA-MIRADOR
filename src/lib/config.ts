@@ -38,6 +38,45 @@ export const ALIMENTACION_POR_DEFECTO: AlimentacionEstandar = {
   engorde: 100,
 };
 
+/** Consumo aproximado de las cerdas (kg por cerda al día) y alimento de cada regla */
+export interface ConsumoCerdas {
+  /** Gestación y cerdas vacías: alimento de gestación */
+  gestacion: number;
+  /** Desde el día de cambio hasta el parto: alimento de lactancia */
+  preparto: number;
+  /** Del parto al destete: alimento de lactancia */
+  lactancia: number;
+  /** Día de gestación en que pasa al alimento de lactancia */
+  diaCambio: number;
+  /** Códigos de bodega del alimento de cada tipo */
+  codigoGestacion: string;
+  codigoLactancia: string;
+}
+
+export const CONSUMO_CERDAS_POR_DEFECTO: ConsumoCerdas = {
+  gestacion: 2,
+  preparto: 2,
+  lactancia: 4,
+  diaCambio: 100,
+  codigoGestacion: "CG-01",
+  codigoLactancia: "CL-01",
+};
+
+function leerConsumoCerdas(v: unknown): ConsumoCerdas {
+  const o = (v && typeof v === "object" ? v : {}) as Partial<Record<keyof ConsumoCerdas, unknown>>;
+  const r = { ...CONSUMO_CERDAS_POR_DEFECTO };
+  for (const k of ["gestacion", "preparto", "lactancia"] as const) {
+    const x = o[k];
+    if (typeof x === "number" && Number.isFinite(x) && x >= 0 && x <= 50) r[k] = x;
+  }
+  if (typeof o.diaCambio === "number" && Number.isInteger(o.diaCambio) && o.diaCambio >= 1 && o.diaCambio <= 120) r.diaCambio = o.diaCambio;
+  for (const k of ["codigoGestacion", "codigoLactancia"] as const) {
+    const x = o[k];
+    if (typeof x === "string" && x.trim()) r[k] = x.trim().toUpperCase();
+  }
+  return r;
+}
+
 export interface ConfigGranja {
   /** Código para abrir los ajustes avanzados */
   claveAjustes: string;
@@ -64,6 +103,8 @@ export interface ConfigGranja {
   alimentacion: AlimentacionEstandar;
   /** Productos de bodega (por código) unidos a cada etapa de alimentación */
   productosEtapa: ProductosEtapa;
+  /** Consumo aproximado de alimento de las cerdas */
+  consumoCerdas: ConsumoCerdas;
   /** Permite usar productos de bodega sin existencia (el inventario puede quedar negativo) */
   permitirSinInventario: boolean;
 }
@@ -84,6 +125,7 @@ export const CONFIG_POR_DEFECTO: ConfigGranja = {
   parideras: 0,
   alimentacion: ALIMENTACION_POR_DEFECTO,
   productosEtapa: PRODUCTOS_ETAPA_POR_DEFECTO,
+  consumoCerdas: CONSUMO_CERDAS_POR_DEFECTO,
   permitirSinInventario: false,
 };
 
@@ -139,6 +181,7 @@ export function leerConfig(): ConfigGranja {
           : CONFIG_POR_DEFECTO.parideras,
       alimentacion: leerAlimentacion(c.alimentacion),
       productosEtapa: leerProductosEtapa(c.productosEtapa),
+      consumoCerdas: leerConsumoCerdas(c.consumoCerdas),
       permitirSinInventario: c.permitirSinInventario === true,
     };
   } catch {

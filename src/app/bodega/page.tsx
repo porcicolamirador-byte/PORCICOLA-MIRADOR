@@ -9,6 +9,7 @@ import { puede } from "@/lib/nube";
 import DialogoClave from "@/components/DialogoClave";
 import { leerConfig } from "@/lib/config";
 import Modal from "@/components/Modal";
+import { calcularConsumoCerdas, type ConsumoAlimentoCerdas } from "@/lib/consumoCerdas";
 import { CATEGORIAS_BODEGA, IconoCategoria, RecuadroCategoria } from "@/components/CatalogoProductos";
 import {
   calcularInventario,
@@ -165,6 +166,7 @@ export default function BodegaPage() {
           />
 
           {vista === "inventario" && !q && <TarjetaGastosProduccion />}
+          {vista === "inventario" && !q && <TarjetaConsumoCerdas />}
 
           {datos === null ? (
             <div className="h-40 animate-pulse rounded-3xl bg-slate-100" />
@@ -781,6 +783,107 @@ function DetalleFactura({ factura: f, productos, onCerrar }: { factura: Factura;
 }
 
 /* ───────────── Gastos de producción (módulo fijo de Bodega) ───────────── */
+
+/* Consumo aproximado de alimento de las cerdas (reglas en Ajustes ocultos) */
+const bultosTexto = (kg: number, kgBulto: number) => {
+  const b = kg / (kgBulto || 40);
+  return `${b.toLocaleString("es-CO", { maximumFractionDigits: b < 10 ? 1 : 0 })} bulto${Math.abs(b - 1) < 0.05 ? "" : "s"}`;
+};
+const kgTexto = (kg: number) => `${kg.toLocaleString("es-CO", { maximumFractionDigits: 1 })} kg`;
+
+function TarjetaConsumoCerdas() {
+  const version = useVersionDatos();
+  const [abierta, setAbierta] = useState(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const datos = useMemo(() => (version < 0 ? null : calcularConsumoCerdas()), [version]);
+  if (!datos || datos.cerdas === 0) return null;
+  const minimo = [datos.gestacion, datos.lactancia].filter((a) => a.dias !== null).sort((a, b) => a.dias! - b.dias!)[0];
+  const kgDia = datos.gestacion.kgDia + datos.lactancia.kgDia;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setAbierta(true)}
+        className="flex w-full items-center gap-3 rounded-2xl bg-white p-3 text-left ring-1 ring-slate-200/80 transition active:scale-[0.99]"
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700" aria-hidden="true">
+          <IconoCategoria categoria="Alimento" className="h-5 w-5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5">
+            <span className="truncate text-[15px] font-semibold text-slate-900">Consumo de cerdas</span>
+            <span className="shrink-0 rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 ring-1 ring-sky-200">Aprox.</span>
+          </span>
+          <span className="block truncate text-xs text-slate-500">
+            {datos.cerdas} cerdas · {kgTexto(kgDia)} al día
+          </span>
+        </span>
+        <span className="shrink-0 text-right">
+          <span className={`block text-sm font-bold tabular-nums ${minimo && minimo.dias! <= 7 ? "text-orange-600" : "text-slate-900"}`}>
+            {minimo ? `${minimo.dias} días` : "–"}
+          </span>
+          <span className="block text-[10px] text-slate-400">alcanza</span>
+        </span>
+        <Chevron />
+      </button>
+      {abierta && (
+        <Modal abierta etiqueta="Bodega" titulo="Consumo de cerdas" subtitulo="Aproximado según las reglas de Ajustes" icono="🐷" onCerrar={() => setAbierta(false)}>
+          <div className="flex flex-col gap-3">
+            <BloqueConsumo titulo="Alimento de gestación" a={datos.gestacion} />
+            <BloqueConsumo titulo="Alimento de lactancia" a={datos.lactancia} />
+            <p className="px-1 text-[11px] leading-snug text-slate-500">
+              Es una estimación: no descuenta de la bodega. Las cantidades y el día de cambio se ajustan en Ajustes → Consumo de cerdas.
+            </p>
+          </div>
+        </Modal>
+      )}
+    </>
+  );
+}
+
+function BloqueConsumo({ titulo, a }: { titulo: string; a: ConsumoAlimentoCerdas }) {
+  const alerta = a.dias !== null && a.dias <= 7;
+  return (
+    <section className="overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/80">
+      <div className="flex items-center gap-2 px-3.5 pb-2 pt-3">
+        <span className="shrink-0 rounded-md bg-sky-50 px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-sky-800 ring-1 ring-sky-200">{a.codigo}</span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{titulo}</p>
+          <p className="truncate text-sm font-semibold text-slate-900">{a.nombre}</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-1.5 px-3.5 pb-3 text-center">
+        <div className="rounded-xl bg-slate-50 px-1.5 py-2">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">Al día</p>
+          <p className="text-[13px] font-bold tabular-nums text-slate-900">{kgTexto(a.kgDia)}</p>
+          <p className="text-[10px] text-slate-500">{bultosTexto(a.kgDia, a.kgBulto)}</p>
+        </div>
+        <div className="rounded-xl bg-slate-50 px-1.5 py-2">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">Al mes</p>
+          <p className="text-[13px] font-bold tabular-nums text-slate-900">{bultosTexto(a.kgDia * 30, a.kgBulto)}</p>
+          <p className="text-[10px] text-slate-500">{kgTexto(a.kgDia * 30)}</p>
+        </div>
+        <div className={`rounded-xl px-1.5 py-2 ${alerta ? "bg-orange-50" : "bg-sky-50"}`}>
+          <p className={`text-[10px] font-medium uppercase tracking-wide ${alerta ? "text-orange-600" : "text-sky-700"}`}>Alcanza</p>
+          <p className={`text-[13px] font-bold tabular-nums ${alerta ? "text-orange-600" : "text-sky-900"}`}>
+            {a.dias !== null ? `${a.dias} días` : "–"}
+          </p>
+          <p className="text-[10px] text-slate-500">{a.existenciaKg !== null ? `hay ${bultosTexto(a.existenciaKg, a.kgBulto)}` : "sin producto"}</p>
+        </div>
+      </div>
+      <ul className="divide-y divide-slate-100 border-t border-slate-100">
+        {a.grupos.map((g) => (
+          <li key={g.texto} className="flex items-center gap-2 px-3.5 py-2 text-sm">
+            <span className="min-w-0 flex-1 truncate text-slate-700">{g.texto}</span>
+            <span className="shrink-0 text-xs text-slate-500">{g.cerdas} cerda{g.cerdas === 1 ? "" : "s"}</span>
+            <span className="w-16 shrink-0 text-right font-semibold tabular-nums text-slate-900">{kgTexto(g.kg)}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 function TarjetaGastosProduccion() {
   const version = useVersionDatos();
