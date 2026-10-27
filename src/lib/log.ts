@@ -148,6 +148,7 @@ function cambiosLote(a: Obj, d: Obj): { accion: AccionLog; detalle: string }[] {
   comparar("alimento", "Alimento", (x) =>
     `${x.producto ? `${num(x.cantidad)} ${txt(x.unidad)} ${txt(x.producto)}` : `${num(x.kg)} kg`} (${fechaCorta(x.fecha)}${x.hora ? ` ${txt(x.hora)}` : ""})`,
   );
+  comparar("gastos", "Gasto", (x) => `${txt(x.descripcion)}${x.cantidad ? ` (${txt(x.cantidad)})` : ""} · ${pesos(x.valor)} (${fechaCorta(x.fecha)})`);
   comparar("pesajes", "Pesaje", (x) => `${num(x.pesoPromedio)} kg promedio (${fechaCorta(x.fecha)})`);
   comparar("mortalidad", "Muerte", (x) => `${num(x.cantidad)} animal(es)${x.causa ? ` · ${txt(x.causa)}` : ""} (${fechaCorta(x.fecha)})`);
   if (a.activo !== d.activo) out.push({ accion: "Modificación", detalle: d.activo ? `${n} reabierto` : `${n} cerrado (venta)` });
@@ -157,7 +158,7 @@ function cambiosLote(a: Obj, d: Obj): { accion: AccionLog; detalle: string }[] {
     out.push({ accion: "Modificación", detalle: `Corral de ${n}: ${c ? txt(c.codigo) : "cambiado"}` });
   }
   const resto = (o: Obj) => {
-    const { alimento: _a, pesajes: _p, mortalidad: _m, activo: _ac, corralId: _c, vivos: _v, fechaSalida: _f, ...r } = o;
+    const { alimento: _a, pesajes: _p, mortalidad: _m, activo: _ac, corralId: _c, vivos: _v, fechaSalida: _f, gastos: _g, ...r } = o;
     return JSON.stringify(r);
   };
   if (out.length === 0 && resto(a) !== resto(d)) out.push({ accion: "Modificación", detalle: `${n} modificado` });

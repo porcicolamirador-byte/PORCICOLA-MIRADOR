@@ -3,7 +3,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
-import { Boton, Campo, Chips, Dato, Entrada, IconoMas, SeccionDesplegable, Selector, Vacio } from "@/components/ui";
+import { Boton, Campo, Chips, Dato, Entrada, EntradaPesos, IconoMas, SeccionDesplegable, Selector, Vacio } from "@/components/ui";
 import {
   diasEntre,
   formatoFecha,
@@ -15,6 +15,9 @@ import {
   horaActual,
   kgDeCantidad,
   registrarConsumoLote,
+  registrarGastoLote,
+  eliminarGastoLote,
+  CATEGORIAS_GASTO_LOTE,
   nombreLote,
   siguienteCodigoLote,
   tomarCodigoLote,
@@ -438,9 +441,9 @@ function NuevoLote({ abierta, onCerrar }: { abierta: boolean; onCerrar: () => vo
   );
 }
 
-type Accion = "resumen" | "pesaje" | "muerte" | "alimento" | "editarAlimento" | "corral";
+type Accion = "resumen" | "pesaje" | "muerte" | "alimento" | "editarAlimento" | "corral" | "gasto";
 
-const ICONOS_ACCION: Record<Accion, string> = { resumen: "🐖", pesaje: "⚖️", muerte: "⚠️", alimento: "🥣", editarAlimento: "✏️", corral: "🏚️" };
+const ICONOS_ACCION: Record<Accion, string> = { resumen: "🐖", pesaje: "⚖️", muerte: "⚠️", alimento: "🥣", editarAlimento: "✏️", corral: "🏚️", gasto: "💊" };
 
 /** Espacio que muestra el corral guardado del lote */
 function TarjetaCorral({ corral, onCambiar }: { corral?: Corral; onCambiar?: () => void }) {
@@ -487,6 +490,10 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   const [hora, setHora] = useState(horaActual());
   const [valor, setValor] = useState("");
   const [extra, setExtra] = useState("");
+  // Otro gasto del lote (medicamento, vacuna, insumo…)
+  const [gastoDesc, setGastoDesc] = useState("");
+  const [gastoCant, setGastoCant] = useState("");
+  const [gastoCat, setGastoCat] = useState(CATEGORIAS_GASTO_LOTE[0]);
   const [productoId, setProductoId] = useState("");
   const [corralSel, setCorralSel] = useState(lote.corralId ?? "");
   const [editIdx, setEditIdx] = useState<number | null>(null);
@@ -520,6 +527,9 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   const limpiar = () => {
     setValor("");
     setExtra("");
+    setGastoDesc("");
+    setGastoCant("");
+    setGastoCat(CATEGORIAS_GASTO_LOTE[0]);
     setProductoId("");
     setFecha(hoy());
     setHora(horaActual());
@@ -563,6 +573,13 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
       setCorralSel(corralSel);
       return;
     }
+    if (accion === "gasto") {
+      const monto = Number(valor.replace(/\D/g, "")) || 0;
+      if (!gastoDesc.trim() || monto <= 0) return;
+      registrarGastoLote(lote.id, { descripcion: gastoDesc, cantidad: gastoCant, valor: monto, categoria: gastoCat, fecha, hora });
+      limpiar();
+      return;
+    }
     const n = Number(valor.replace(",", ".")) || 0;
     if (n <= 0) return;
     if (accion === "pesaje") {
@@ -593,6 +610,16 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
     limpiar();
   };
 
+  const borrarGasto = async (gastoId: string, texto: string) => {
+    const ok = await confirmar({
+      titulo: "Eliminar gasto",
+      mensaje: `${texto.replace(/^Gasto: /, "")}. También se quitará de Contabilidad.`,
+      aceptar: "Eliminar",
+      destructivo: true,
+    });
+    if (ok) eliminarGastoLote(lote.id, gastoId);
+  };
+
   const cerrarLote = async () => {
     if (!(await confirmar({ titulo: `Cerrar ${nombreLote(lote)}`, mensaje: "El lote pasará a la lista de lotes cerrados. Puedes reabrirlo después.", aceptar: "Cerrar lote" }))) return;
     actualizarLote(lote.id, (l) => ({ ...l, activo: false, fechaSalida: hoy() }));
@@ -613,6 +640,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
     alimento: "Registrar alimento",
     editarAlimento: "Editar alimento",
     corral: "Corral del lote",
+    gasto: "Otro gasto del lote",
   };
 
   return (
@@ -670,11 +698,31 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
 
           <ConsumoEstablecido lote={lote} />
 
+          {(lote.gastos?.length ?? 0) > 0 && (
+            <div className="flex items-center justify-between rounded-xl bg-white px-3 py-2.5 ring-1 ring-slate-200">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Otros gastos · {lote.gastos!.length}</span>
+              <span className="text-base font-bold tabular-nums text-slate-900">{formatoPesos(lote.gastos!.reduce((s, g) => s + g.valor, 0))}</span>
+            </div>
+          )}
+
           {lote.activo && (
             <div className="flex flex-col gap-2">
-              <Boton onClick={() => setAccion("alimento")} disabled={!corral} className="w-full py-3">
-                Registrar alimento
-              </Boton>
+              <div className="flex gap-2">
+                <Boton onClick={() => setAccion("alimento")} disabled={!corral} className="flex-1 py-3">
+                  Registrar alimento
+                </Boton>
+                <button
+                  type="button"
+                  onClick={() => setAccion("gasto")}
+                  disabled={!corral}
+                  aria-label="Agregar otro gasto (medicamentos, vacunas…)"
+                  className="flex w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-900 text-white transition active:scale-95 disabled:opacity-40"
+                >
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" aria-hidden="true">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                </button>
+              </div>
               <div className="grid grid-cols-3 gap-2">
                 <Boton variante="suave" onClick={() => setAccion("corral")} className={corral ? "" : "ring-2 ring-sky-600"}>
                   <span className="truncate">{corral ? corral.codigo : "Corral"}</span>
@@ -685,11 +733,18 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
             </div>
           )}
 
-          {(lote.pesajes.length > 0 || lote.mortalidad.length > 0 || lote.alimento.length > 0) && (
-            <SeccionDesplegable titulo="Registros" cantidad={lote.pesajes.length + lote.mortalidad.length + lote.alimento.length}>
+          {(lote.pesajes.length > 0 || lote.mortalidad.length > 0 || lote.alimento.length > 0 || (lote.gastos?.length ?? 0) > 0) && (
+            <SeccionDesplegable titulo="Registros" cantidad={lote.pesajes.length + lote.mortalidad.length + lote.alimento.length + (lote.gastos?.length ?? 0)}>
               <ul className="flex flex-col gap-1.5 text-sm">
                 {[
                   ...lote.pesajes.map((p) => ({ f: p.fecha, h: "", t: `Pesaje: ${p.pesoPromedio} kg promedio`, i: -1 })),
+                  ...(lote.gastos ?? []).map((g) => ({
+                    i: -1,
+                    g: g.id,
+                    f: g.fecha,
+                    h: g.hora ?? "",
+                    t: `Gasto: ${g.descripcion}${g.cantidad ? ` (${g.cantidad})` : ""} · ${formatoPesos(g.valor)}`,
+                  })),
                   ...lote.alimento.map((a, i) => ({
                     i,
                     f: a.fecha,
@@ -713,7 +768,19 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                     );
                     return (
                       <li key={k}>
-                        {x.i >= 0 ? (
+                        {"g" in x && x.g ? (
+                          <button
+                            type="button"
+                            onClick={() => void borrarGasto(x.g as string, x.t)}
+                            aria-label={`Eliminar: ${x.t}`}
+                            className="flex w-full items-center gap-3 rounded-xl bg-slate-50 px-3 py-2 text-left active:bg-slate-100"
+                          >
+                            {contenido}
+                            <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />
+                            </svg>
+                          </button>
+                        ) : x.i >= 0 ? (
                           <button
                             type="button"
                             onClick={() => abrirEdicion(x.i)}
@@ -764,7 +831,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
               </Campo>
 
             )
-          ) : esAlimento ? (
+          ) : esAlimento || accion === "gasto" ? (
             <div className="grid grid-cols-2 gap-3">
               <Campo etiqueta="Fecha">
                 <Entrada type="date" value={fecha} onChange={setFecha} required />
@@ -791,6 +858,25 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
               <Campo etiqueta="Causa">
                 <Entrada value={extra} onChange={setExtra} placeholder="Opcional" />
               </Campo>
+            </>
+          )}
+          {accion === "gasto" && (
+            <>
+              <Campo etiqueta="Producto o servicio">
+                <Entrada value={gastoDesc} onChange={(v) => setGastoDesc(v.slice(0, 80))} placeholder="Ej. Ivermectina, vacuna circovirus…" required />
+              </Campo>
+              <div className="grid grid-cols-2 gap-3">
+                <Campo etiqueta="Cantidad">
+                  <Entrada value={gastoCant} onChange={(v) => setGastoCant(v.slice(0, 40))} placeholder="Ej. 2 frascos" />
+                </Campo>
+                <Campo etiqueta="Valor total">
+                  <EntradaPesos value={valor} onChange={setValor} required />
+                </Campo>
+              </div>
+              <Campo etiqueta="Categoría en Contabilidad">
+                <Selector value={gastoCat} onChange={setGastoCat} opciones={CATEGORIAS_GASTO_LOTE.map((c) => ({ valor: c, texto: c }))} />
+              </Campo>
+              <p className="text-xs text-slate-500">Se suma como gasto en Contabilidad con el nombre del lote.</p>
             </>
           )}
           {legado && (
@@ -854,7 +940,8 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
               disabled={
                 (accion === "corral" && (!corralSel || corrales.length === 0)) ||
                 (esAlimento && !legado && (!elegido || cantidadNum <= 0 || excede)) ||
-                (legado && cantidadNum <= 0)
+                (legado && cantidadNum <= 0) ||
+                (accion === "gasto" && (!gastoDesc.trim() || !(Number(valor.replace(/\D/g, "")) > 0)))
               }
             >
               Guardar

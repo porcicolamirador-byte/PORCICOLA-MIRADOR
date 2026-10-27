@@ -83,6 +83,20 @@ export interface Alimento {
   /** Hora del consumo (HH:MM) */
   hora?: string;
 }
+/** Otro gasto de un lote (medicamento, vacuna, insumo…); se registra también en Contabilidad */
+export interface GastoLote {
+  id: string;
+  fecha: string;
+  hora?: string;
+  descripcion: string;
+  /** Cantidad escrita libremente, p. ej. "2 frascos" */
+  cantidad?: string;
+  valor: number;
+  categoria: string;
+  /** Gasto creado en Contabilidad */
+  movimientoId?: string;
+}
+
 export interface Lote {
   id: string;
   /** Código consecutivo del lote: LP-00, LP-01, … */
@@ -95,6 +109,8 @@ export interface Lote {
   pesajes: Pesaje[];
   mortalidad: Mortalidad[];
   alimento: Alimento[];
+  /** Otros gastos del lote (medicamentos, vacunas, insumos…) */
+  gastos?: GastoLote[];
   activo: boolean;
   fechaSalida?: string;
   /** Corral donde están los animales (id de los corrales de Ajustes) */
@@ -273,6 +289,7 @@ function leerLotesSinCodigo(): Lote[] {
     pesajes: Array.isArray(l.pesajes) ? l.pesajes : [],
     mortalidad: Array.isArray(l.mortalidad) ? l.mortalidad : [],
     alimento: Array.isArray(l.alimento) ? l.alimento : [],
+    gastos: Array.isArray(l.gastos) ? l.gastos : [],
     activo: l.activo !== false,
     fechaSalida: l.fechaSalida,
     corralId: typeof l.corralId === "string" && l.corralId ? l.corralId : undefined,
@@ -704,6 +721,53 @@ export function editarConsumoLote(
     },
   ]);
   return ok;
+}
+
+/** Categorías de Contabilidad para los gastos de un lote */
+export const CATEGORIAS_GASTO_LOTE = ["Medicamentos y vacunas", "Mantenimiento", "Transporte", "Mano de obra", "Otros gastos"];
+
+/** Registra otro gasto del lote y lo suma como gasto en Contabilidad */
+export function registrarGastoLote(
+  loteId: string,
+  datos: { descripcion: string; cantidad?: string; valor: number; categoria: string; fecha: string; hora?: string },
+): boolean {
+  const lote = leerLotes().find((l) => l.id === loteId);
+  if (!lote || !datos.descripcion.trim() || !(datos.valor > 0)) return false;
+  const movimientoId = nuevoId();
+  const descripcion = datos.descripcion.trim().slice(0, 80);
+  const cantidad = datos.cantidad?.trim().slice(0, 40) || undefined;
+  guardarMovimientos([
+    ...leerMovimientos(),
+    {
+      id: movimientoId,
+      fecha: datos.fecha,
+      tipo: "gasto",
+      categoria: datos.categoria,
+      descripcion: `${descripcion}${cantidad ? ` (${cantidad})` : ""} · ${nombreLote(lote)}`,
+      monto: Math.round(datos.valor),
+    },
+  ]);
+  const gasto: GastoLote = {
+    id: nuevoId(),
+    fecha: datos.fecha,
+    hora: datos.hora || horaActual(),
+    descripcion,
+    cantidad,
+    valor: Math.round(datos.valor),
+    categoria: datos.categoria,
+    movimientoId,
+  };
+  guardarLotes(leerLotes().map((l) => (l.id === loteId ? { ...l, gastos: [...(l.gastos ?? []), gasto] } : l)));
+  return true;
+}
+
+/** Borra un gasto del lote y su gasto en Contabilidad */
+export function eliminarGastoLote(loteId: string, gastoId: string) {
+  const lote = leerLotes().find((l) => l.id === loteId);
+  const gasto = lote?.gastos?.find((g) => g.id === gastoId);
+  if (!lote || !gasto) return;
+  if (gasto.movimientoId) guardarMovimientos(leerMovimientos().filter((m) => m.id !== gasto.movimientoId));
+  guardarLotes(leerLotes().map((l) => (l.id === loteId ? { ...l, gastos: (l.gastos ?? []).filter((g) => g.id !== gastoId) } : l)));
 }
 
 export function eliminarSalida(salidaId: string) {
