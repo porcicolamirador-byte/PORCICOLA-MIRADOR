@@ -37,7 +37,7 @@ import {
 } from "@/lib/datos";
 import { confirmar } from "@/components/Dialogo";
 import DialogoClave from "@/components/DialogoClave";
-import { exportarContabilidadLote } from "@/lib/exportarLote";
+import { exportarContabilidadLote, loteTieneMadre } from "@/lib/exportarLote";
 import { puede } from "@/lib/nube";
 import Modal from "@/components/Modal";
 import { ETAPAS_ALIMENTACION, leerConfig } from "@/lib/config";
@@ -628,11 +628,12 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   };
 
   const [exportandoPdf, setExportandoPdf] = useState(false);
+  const [incluirMadre, setIncluirMadre] = useState(false);
   const exportarPdfLote = async () => {
     if (exportandoPdf) return;
     setExportandoPdf(true);
     try {
-      await exportarContabilidadLote(lote);
+      await exportarContabilidadLote(lote, { incluirMadre });
     } finally {
       setExportandoPdf(false);
     }
@@ -872,6 +873,12 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
             </SeccionDesplegable>
           )}
 
+          {puede("contabilidad") && loteTieneMadre(lote) && (
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" checked={incluirMadre} onChange={(e) => setIncluirMadre(e.target.checked)} className="h-5 w-5 accent-sky-700" />
+              Agregar contabilidad de la madre (cerda {lote.origen?.cerdaId})
+            </label>
+          )}
           {puede("contabilidad") && (
             <Boton variante="secundario" onClick={() => void exportarPdfLote()} disabled={exportandoPdf} className="w-full">
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

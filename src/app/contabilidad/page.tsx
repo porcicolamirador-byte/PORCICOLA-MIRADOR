@@ -23,7 +23,7 @@ import { avisar, confirmar } from "@/components/Dialogo";
 import { puede } from "@/lib/nube";
 import { cargarLogoJpeg, entregarPdf } from "@/lib/pdfFicha";
 import { generarPdfContabilidad } from "@/lib/pdfContabilidad";
-import { exportarContabilidadLote } from "@/lib/exportarLote";
+import { exportarContabilidadLote, loteTieneMadre } from "@/lib/exportarLote";
 import { nombreGranjaActual } from "@/lib/sincronizar";
 
 const CATEGORIAS: Record<Movimiento["tipo"], string[]> = {
@@ -581,12 +581,13 @@ function ContabilidadLotes({ version }: { version: number }) {
 function DetalleCuentasLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   const c = cuentasLote(lote);
   const [exportando, setExportando] = useState(false);
+  const [incluirMadre, setIncluirMadre] = useState(false);
 
   const exportarPdf = async () => {
     if (exportando) return;
     setExportando(true);
     try {
-      await exportarContabilidadLote(lote);
+      await exportarContabilidadLote(lote, { incluirMadre });
     } finally {
       setExportando(false);
     }
@@ -661,6 +662,12 @@ function DetalleCuentasLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => vo
           {c.porAnimal > 0 ? ` · ${formatoPesos(Math.round(c.porAnimal))} por animal` : ""}
           {c.sinPrecio ? ` · ${c.sinPrecio} registro${c.sinPrecio === 1 ? "" : "s"} de alimento sin precio (la factura no tenía valor)` : ""}
         </p>
+        {loteTieneMadre(lote) && (
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" checked={incluirMadre} onChange={(e) => setIncluirMadre(e.target.checked)} className="h-5 w-5 accent-sky-700" />
+            Agregar contabilidad de la madre (cerda {lote.origen?.cerdaId})
+          </label>
+        )}
         <Boton onClick={() => void exportarPdf()} disabled={exportando} className="w-full">
           {exportando ? "Generando PDF…" : "Exportar contabilidad del lote"}
         </Boton>

@@ -3,7 +3,7 @@
  * financieros y detalle de movimientos. Solo información contable.
  */
 
-import { ANCHO, anchoAprox, ensamblarPdf, Lienzo, type LogoJpeg, type RGB } from "@/lib/pdfFicha";
+import { ANCHO, anchoAprox, ensamblarPdf, Lienzo, partir, type LogoJpeg, type RGB } from "@/lib/pdfFicha";
 
 const AZUL: RGB = [12, 74, 110];
 const AZUL_CLARO: RGB = [240, 249, 255];
@@ -41,6 +41,8 @@ export interface DatosPdfLote {
   animalesVivos: number;
   kgAlimento: number;
   registrosSinPrecio: number;
+  /** Texto con el periodo de la madre cuando se incluye su contabilidad */
+  notaMadre?: string;
   movimientos: MovimientoLotePdf[];
   fechaGeneracion: string; // ya formateada
   logo?: LogoJpeg | null;
@@ -212,6 +214,13 @@ export function generarPdfLote(d: DatosPdfLote): Blob {
     L.texto(xx + 9, yy + 16, recortar(x.v, wi - 18, 10.5, true), 10.5, P900, true);
   });
   y += 2 * 38 + 4;
+  if (d.notaMadre) {
+    for (const linea of partir(d.notaMadre, 110)) {
+      L.texto(M, y, linea, 8, P500);
+      y += 11;
+    }
+    y += 2;
+  }
   if (d.registrosSinPrecio > 0) {
     L.texto(M, y, `Nota: ${d.registrosSinPrecio} consumo(s) de alimento sin precio de compra no están incluidos en los costos.`, 8, P500);
     y += 13;
