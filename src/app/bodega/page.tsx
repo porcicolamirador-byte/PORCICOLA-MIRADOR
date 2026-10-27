@@ -92,7 +92,8 @@ export default function BodegaPage() {
   const datos = useMemo(() => {
     if (version < 0) return null;
     const inventario = calcularInventario();
-    const facturas = leerFacturas().sort((a, b) => b.fecha.localeCompare(a.fecha) || b.numero.localeCompare(a.numero));
+    // En orden de ingreso: la última factura ingresada primero (el id empieza con la hora de creación)
+    const facturas = leerFacturas().sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
     return { inventario, facturas, productos: leerProductos(), activos: leerProductosActivos() };
   }, [version]);
 

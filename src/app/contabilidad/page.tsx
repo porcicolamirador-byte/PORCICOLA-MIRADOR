@@ -297,7 +297,8 @@ function FacturasCredito({ version }: { version: number }) {
         <span className="normal-case tracking-normal font-semibold text-orange-600">{formatoPesos(deuda)}</span>
       </h2>
       {facturas.length > 0 && (
-        <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-orange-200">
+        <SeccionDesplegable titulo="Facturas a crédito" cantidad={facturas.length}>
+        <ul className="divide-y divide-slate-100 bg-white">
           {facturas.map((f) => {
             const total = totalFactura(f);
             const saldo = saldoFactura(f);
@@ -325,6 +326,7 @@ function FacturasCredito({ version }: { version: number }) {
             );
           })}
         </ul>
+        </SeccionDesplegable>
       )}
       {factura && (
         <Modal
