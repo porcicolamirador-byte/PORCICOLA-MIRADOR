@@ -872,7 +872,6 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
             abierto={pedirClave}
             titulo="Clave de lotes"
             mensaje={`Ingresa la clave para eliminar ${nombreLote(lote)}.`}
-            longitud={3}
             aceptar="Continuar"
             onValidar={(codigo) => {
               if (codigo !== leerConfig().claveLotes) return false;

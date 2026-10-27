@@ -2,13 +2,13 @@
 
 import { leerLog, registrarLog } from "@/lib/log";
 import { reemplazarClave } from "@/lib/sincronizar";
-import { perfilGuardado, puede } from "@/lib/nube";
+import { perfilGuardado } from "@/lib/nube";
 import { useEffect, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Boton, Interruptor } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
-import { ajustesDesbloqueados, bloquearAjustes } from "@/lib/acceso";
+import { ajustesDesbloqueados } from "@/lib/acceso";
 import {
   ALIMENTACION_POR_DEFECTO,
   CONFIG_POR_DEFECTO,
@@ -22,27 +22,18 @@ import {
 import { clavesDeLaApp, codigoDe, leerCorrales, leerProductos, notificarCambio, useVersionDatos } from "@/lib/datos";
 import CatalogoProductos from "@/components/CatalogoProductos";
 import CatalogoCorrales from "@/components/CatalogoCorrales";
-import { activarFaceId, desactivarFaceId, faceIdActivo, faceIdDisponible } from "@/lib/faceid";
 
 /**
- * Sección oculta de ajustes: solo se abre después de ingresar el código
- * en Ajustes. Sin código válido, regresa a Ajustes.
+ * Ajustes protegidos: entra el administrador o quien tenga el permiso
+ * "Ajustes protegidos". Sin permiso, regresa a Ajustes.
  */
 const sinSuscripcion = () => () => {};
-
-function leerFaceIdDisponible(): boolean {
-  try {
-    return localStorage.getItem("faceid-disponible") === "1";
-  } catch {
-    return false;
-  }
-}
 
 export default function AjustesAvanzadosPage() {
   const router = useRouter();
   // En el cliente el permiso y la configuración se leen al instante (sin pantalla intermedia)
   const cliente = useSyncExternalStore(sinSuscripcion, () => true, () => false);
-  const permitido = cliente && ajustesDesbloqueados() && puede("ajustes");
+  const permitido = cliente && ajustesDesbloqueados();
   const esAdmin = cliente && perfilGuardado()?.rol === "admin";
   const [config, setConfig] = useState<ConfigGranja>(() => (typeof window === "undefined" ? CONFIG_POR_DEFECTO : leerConfig()));
   const [abierto, setAbierto] = useState<string | null>(null);
@@ -51,47 +42,8 @@ export default function AjustesAvanzadosPage() {
   void version; // vuelve a leer al cambiar los datos
   const productos = cliente ? leerProductos().length : 0;
   const corrales = cliente ? leerCorrales().length : 0;
-  // Se parte de lo último que se supo de Face ID en este teléfono, para que nada salte al abrir
-  const [faceId, setFaceId] = useState<{ disponible: boolean; activo: boolean; ofrecer: boolean }>(() => {
-    if (typeof window === "undefined") return { disponible: false, activo: false, ofrecer: false };
-    const disponible = leerFaceIdDisponible();
-    return { disponible, activo: faceIdActivo(), ofrecer: disponible && !faceIdActivo() };
-  });
-
   useEffect(() => {
-    faceIdDisponible().then((disponible) => {
-      try {
-        localStorage.setItem("faceid-disponible", disponible ? "1" : "0");
-      } catch {}
-      setFaceId((f) => ({ disponible, activo: faceIdActivo(), ofrecer: disponible && !faceIdActivo() && (f.ofrecer || !f.disponible) }));
-    });
-  }, []);
-
-  const noOfrecerMas = () => {
-    setFaceId((f) => ({ ...f, ofrecer: false }));
-  };
-
-  // Se llama directamente desde el toque: el iPhone muestra Face ID
-  const encenderFaceId = () => {
-    activarFaceId().then(async (ok) => {
-      if (ok) {
-        noOfrecerMas();
-        setFaceId((f) => ({ ...f, activo: true }));
-        await avisar({ titulo: "Face ID activado", mensaje: "La próxima vez entrarás a los ajustes con tu rostro. El código sigue funcionando." });
-      } else {
-        await avisar({ titulo: "No se activó Face ID", mensaje: "Se canceló o el teléfono no lo permitió. Puedes seguir entrando con el código." });
-      }
-    });
-  };
-
-  const apagarFaceId = async () => {
-    if (!(await confirmar({ titulo: "Desactivar Face ID", mensaje: "Para entrar a los ajustes se pedirá solo el código.", aceptar: "Desactivar" }))) return;
-    desactivarFaceId();
-    setFaceId((f) => ({ ...f, activo: false }));
-  };
-
-  useEffect(() => {
-    if (!ajustesDesbloqueados() || !puede("ajustes")) router.replace("/ajustes");
+    if (!ajustesDesbloqueados()) router.replace("/ajustes");
   }, [router]);
 
   const borrarTodo = async () => {
@@ -105,11 +57,6 @@ export default function AjustesAvanzadosPage() {
     await avisar({ titulo: "Datos borrados", mensaje: "Se borró la información de la granja. Los demás teléfonos se actualizarán al conectarse." });
   };
 
-  const bloquear = () => {
-    bloquearAjustes();
-    router.replace("/ajustes");
-  };
-
   const guardar = (cambios: Partial<ConfigGranja>) => {
     setConfig(guardarConfig(cambios));
     notificarCambio(); // las tareas del dashboard se recalculan con el nuevo rango
@@ -117,7 +64,7 @@ export default function AjustesAvanzadosPage() {
 
   if (!permitido) {
     return (
-      <ModuloPage titulo="Ajustes avanzados" subtitulo="Sección protegida con código" icono={<IconoAjuste nombre="candado" className="h-5 w-5" />} tono="slate" volverA="/ajustes">
+      <ModuloPage titulo="Ajustes avanzados" subtitulo="Según los permisos de tu usuario" icono={<IconoAjuste nombre="candado" className="h-5 w-5" />} tono="slate" volverA="/ajustes">
         {null}
       </ModuloPage>
     );
@@ -126,31 +73,14 @@ export default function AjustesAvanzadosPage() {
   return (
     <ModuloPage
       titulo="Ajustes avanzados"
-      subtitulo="Sección protegida con código"
+      subtitulo="Según los permisos de tu usuario"
       icono={<IconoAjuste nombre="candado" className="h-5 w-5" />}
       tono="slate"
       volverA="/ajustes"
-      accion={
-        <Boton variante="secundario" onClick={bloquear} className="px-3.5">
-          Bloquear
-        </Boton>
-      }
     >
-      {faceId.ofrecer && (
-        <div className="rounded-2xl bg-sky-50 p-4 ring-1 ring-sky-100">
-          <p className="text-[15px] font-semibold text-sky-950">¿Entrar con Face ID la próxima vez?</p>
-          <p className="mt-0.5 text-xs text-sky-900/80">Así no tendrás que escribir el código cada vez. Si Face ID falla, se pedirá el código.</p>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <Boton variante="secundario" onClick={noOfrecerMas}>
-              Ahora no
-            </Boton>
-            <Boton onClick={encenderFaceId}>Activar Face ID</Boton>
-          </div>
-        </div>
-      )}
-
+      {esAdmin && (
       <Grupo titulo="Acceso">
-        {esAdmin && (
+        {(
           <li>
             <button type="button" onClick={() => router.push("/ajustes/usuarios")} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-50">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700" aria-hidden="true">
@@ -166,40 +96,10 @@ export default function AjustesAvanzadosPage() {
             </button>
           </li>
         )}
-        <li>
-          <label className={`flex w-full items-center gap-3 px-4 py-3 ${faceId.disponible ? "cursor-pointer" : "opacity-50"}`}>
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700" aria-hidden="true">
-              <IconoAjuste nombre="faceid" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-medium text-slate-900">Entrar con Face ID</span>
-              <span className="block text-xs text-slate-500">
-                {!faceId.disponible ? "No disponible en este teléfono" : faceId.activo ? "Activado en este teléfono" : "Desactivado: se pide el código"}
-              </span>
-            </span>
-            {faceId.disponible && (
-              <Interruptor activo={faceId.activo} onCambiar={(v) => (v ? encenderFaceId() : apagarFaceId())} />
-            )}
-          </label>
-        </li>
       </Grupo>
+      )}
 
       <Grupo titulo="Claves">
-        <Desplegable icono="llave" titulo="Clave de ajustes" resumen={config.claveAjustesActiva ? "Activa" : "Solo la primera vez"} abierto={abierto === "ajustes"} onAlternar={() => alternar("ajustes")}>
-          <ActivarClave
-            activa={config.claveAjustesActiva}
-            donde="al entrar a los ajustes protegidos"
-            textoDesactivada="Desactivada: solo se pide la primera vez en este teléfono"
-            onCambiar={(v) => guardar({ claveAjustesActiva: v })}
-          />
-          <CambiarClave
-            titulo="Clave de ajustes"
-            descripcion="Es el código que se pide para abrir esta sección."
-            icono="🔐"
-            actual={config.claveAjustes}
-            onGuardar={(clave) => guardar({ claveAjustes: clave })}
-          />
-        </Desplegable>
         <Desplegable icono="papelera" titulo="Clave de eliminación" resumen={config.claveEliminarActiva ? "Activa" : "Desactivada"} abierto={abierto === "eliminar"} onAlternar={() => alternar("eliminar")}>
           <ActivarClave
             activa={config.claveEliminarActiva}
@@ -236,9 +136,8 @@ export default function AjustesAvanzadosPage() {
           />
           <CambiarClave
             titulo="Clave de lotes"
-            descripcion="Se pide en Engorde para eliminar un lote. Tiene 3 números."
+            descripcion="Se pide en Engorde para eliminar un lote."
             icono="🐷"
-            longitud={3}
             actual={config.claveLotes}
             onGuardar={(clave) => guardar({ claveLotes: clave })}
           />

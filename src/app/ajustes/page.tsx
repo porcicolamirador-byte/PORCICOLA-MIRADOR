@@ -5,11 +5,9 @@ import { useRef, useState, type ChangeEvent, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Boton, Chevron, Tarjeta, Interruptor } from "@/components/ui";
-import DialogoClave from "@/components/DialogoClave";
-import { codigoValido, desbloquearAjustes, entradaLibre } from "@/lib/acceso";
 import { aplicarTema, temaGuardado } from "@/lib/tema";
 import DescargaSinConexion from "@/components/DescargaSinConexion";
-import { activarFaceId, CLAVE_FACEID_APP, faceIdActivo, motivoFalloFaceId, verificarFaceId } from "@/lib/faceid";
+import { activarFaceId, CLAVE_FACEID_APP, faceIdActivo } from "@/lib/faceid";
 import { bloqueoActivo, marcarDesbloqueada, ponerBloqueo } from "@/lib/bloqueo";
 import {
   clavesDeLaApp,
@@ -31,16 +29,10 @@ export default function AjustesPage() {
   const [mensaje, setMensaje] = useState("");
   const archivo = useRef<HTMLInputElement>(null);
   const router = useRouter();
-  const [pedirCodigo, setPedirCodigo] = useState(false);
 
   // La app abre en oscuro: se parte de ahí para que el interruptor no cambie al cargar
   const [oscuro, setOscuro] = useState(true);
   useEffect(() => setOscuro(temaGuardado() === "oscuro"), []);
-  const [conFaceId, setConFaceId] = useState(false);
-  const [avisoFaceId, setAvisoFaceId] = useState("");
-  useEffect(() => setConFaceId(faceIdActivo()), []);
-
-  // Con Face ID activo se pide el rostro; si falla o se cancela, se pide el código
   const [perfil, setPerfil] = useState<PerfilNube | null>(null);
   const [conBloqueo, setConBloqueo] = useState(false);
   useEffect(() => {
@@ -79,29 +71,11 @@ export default function AjustesPage() {
       void mostrarAviso({ titulo: "Sin permiso", mensaje: "Tu usuario no tiene acceso a los ajustes protegidos. Pídeselo al administrador." });
       return;
     }
-    if (entradaLibre()) {
-      desbloquearAjustes();
-      return router.push("/ajustes/avanzados");
-    }
-    if (!faceIdActivo()) return setPedirCodigo(true);
-    verificarFaceId().then((ok) => {
-      if (!ok) {
-        setAvisoFaceId(`Face ID no se abrió (${motivoFalloFaceId()}). Ingresa el código.`);
-        return setPedirCodigo(true);
-      }
-      desbloquearAjustes();
-      router.push("/ajustes/avanzados");
-    });
+    // Ya no se pide código: el acceso depende del permiso del usuario
+    router.push("/ajustes/avanzados");
   };
 
-  const validarCodigo = (codigo: string) => {
-    if (!codigoValido(codigo)) return false;
-    desbloquearAjustes();
-    setPedirCodigo(false);
-    setAvisoFaceId("");
-    router.push("/ajustes/avanzados");
-    return true;
-  };
+
 
   const resumen = cargado
     ? { cerdas: leerCerdas().length, lotes: leerLotes().length, movimientos: leerMovimientos().length }
@@ -246,23 +220,13 @@ export default function AjustesPage() {
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold text-slate-900">Ajustes</span>
-          <span className="block text-xs text-slate-500">{conFaceId ? "Entra con Face ID o con el código" : "Requiere código de confirmación"}</span>
+          <span className="block text-xs text-slate-500">{perfil?.rol === "admin" ? "Usuarios, claves y ajustes de la granja" : "Según los permisos de tu usuario"}</span>
         </span>
         <Chevron />
       </button>
 
       <p className="text-center text-xs text-slate-400">Porcícola El Mirador · versión 2.0.0</p>
 
-      <DialogoClave
-        abierto={pedirCodigo}
-        titulo="Código de confirmación"
-        mensaje={avisoFaceId || "Ingresa el código para abrir los ajustes."}
-        onValidar={validarCodigo}
-        onCerrar={() => {
-          setPedirCodigo(false);
-          setAvisoFaceId("");
-        }}
-      />
 
       {mensaje && (
         <div

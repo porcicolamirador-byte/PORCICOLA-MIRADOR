@@ -45,11 +45,13 @@ export interface ConfigGranja {
   claveEliminar: string;
   /** Clave para cargar una factura en Bodega */
   claveFacturas: string;
-  /** Clave para eliminar un lote en Engorde (3 números) */
+  /** Clave para eliminar un lote en Engorde */
   claveLotes: string;
   /** Si cada clave se pide o no (desactivada = la acción no pide clave) */
   /** Desactivada = la clave de ajustes solo se pide la primera vez en este teléfono */
   claveAjustesActiva: boolean;
+  /** Las claves ya usan los valores por defecto nuevos (0000) */
+  clavesV2?: boolean;
   claveEliminarActiva: boolean;
   claveFacturasActiva: boolean;
   claveLotesActiva: boolean;
@@ -70,9 +72,9 @@ export const CLAVE_CONFIG = "config-granja";
 
 export const CONFIG_POR_DEFECTO: ConfigGranja = {
   claveAjustes: "0030",
-  claveEliminar: "0030",
-  claveFacturas: "0030",
-  claveLotes: "000",
+  claveEliminar: "0000",
+  claveFacturas: "0000",
+  claveLotes: "0000",
   claveAjustesActiva: true,
   claveEliminarActiva: true,
   claveFacturasActiva: true,
@@ -120,13 +122,15 @@ export function leerConfig(): ConfigGranja {
     const max = esDia(c.desteteMax) && c.desteteMax > min ? c.desteteMax : Math.max(min + 1, CONFIG_POR_DEFECTO.desteteMax);
     return {
       claveAjustes: esClave(c.claveAjustes) ? c.claveAjustes : CONFIG_POR_DEFECTO.claveAjustes,
-      claveEliminar: esClave(c.claveEliminar) ? c.claveEliminar : CONFIG_POR_DEFECTO.claveEliminar,
-      claveFacturas: esClave(c.claveFacturas) ? c.claveFacturas : CONFIG_POR_DEFECTO.claveFacturas,
+      // Las claves que seguían en el valor por defecto anterior (0030) pasan a 0000
+      claveEliminar: esClave(c.claveEliminar) && !(!c.clavesV2 && c.claveEliminar === "0030") ? c.claveEliminar : CONFIG_POR_DEFECTO.claveEliminar,
+      claveFacturas: esClave(c.claveFacturas) && !(!c.clavesV2 && c.claveFacturas === "0030") ? c.claveFacturas : CONFIG_POR_DEFECTO.claveFacturas,
+      clavesV2: true,
       claveAjustesActiva: c.claveAjustesActiva !== false,
       claveEliminarActiva: c.claveEliminarActiva !== false,
       claveFacturasActiva: c.claveFacturasActiva !== false,
       claveLotesActiva: c.claveLotesActiva !== false,
-      claveLotes: typeof c.claveLotes === "string" && /^\d{3}$/.test(c.claveLotes) ? c.claveLotes : CONFIG_POR_DEFECTO.claveLotes,
+      claveLotes: esClave(c.claveLotes) ? c.claveLotes : CONFIG_POR_DEFECTO.claveLotes,
       desteteMin: min,
       desteteMax: max,
       parideras:
