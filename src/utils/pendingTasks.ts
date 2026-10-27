@@ -17,7 +17,15 @@ export interface PendingTask {
   descripcion: string;
   dias: number;
   fecha?: string;
+  /** Botón para resolver la tarea desde la lista (1.ª o 2.ª confirmación de gestación) */
+  confirmar?: 1 | 2;
 }
+
+/** Ventanas para confirmar la gestación (días después de la inseminación) */
+export const CONFIRMACIONES_GESTACION = [
+  { etapa: 1 as const, desde: 18, hasta: 24 },
+  { etapa: 2 as const, desde: 40, hasta: 44 },
+];
 
 export function calcularDiasEntre(fechaInicio: string, fechaFin: string) {
   const inicio = new Date(fechaInicio);
@@ -46,7 +54,8 @@ export function cargarHistorialDeCerda(cerdaId: string): Registro[] {
 
 export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
   const tareas: PendingTask[] = [];
-  const hoy = new Date().toISOString().split('T')[0];
+  const d = new Date();
+  const hoy = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const historial = cargarHistorialDeCerda(cerda.id);
 
   if (historial.length === 0) {
@@ -75,26 +84,23 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
   if (regInseminacion) {
     const diasDesdeInseminacion = calcularDiasEntre(regInseminacion.fecha || hoy, hoy);
 
-    if (diasDesdeInseminacion >= 25 && diasDesdeInseminacion <= 35) {
-      tareas.push({
-        id: cerda.id,
-        tipo: 'Confirmación de gestación',
-        prioridad: 'media',
-        descripcion: 'Realizar chequeo o ecografía para confirmar gestación',
-        dias: diasDesdeInseminacion,
-        fecha: regInseminacion.fecha,
-      });
-    }
-
-    if (diasDesdeInseminacion >= 18 && diasDesdeInseminacion <= 24 && !tieneParto && !tieneAborto && !tieneNuevaInseminacion) {
-      tareas.push({
-        id: cerda.id,
-        tipo: 'Posible repetición de celo',
-        prioridad: 'alta',
-        descripcion: 'Verificar retorno a celo',
-        dias: diasDesdeInseminacion,
-        fecha: regInseminacion.fecha,
-      });
+    // Confirmación de gestación en dos momentos; al confirmar, la alerta desaparece
+    const ia = regInseminacion as Registro & { confirmacion1?: string; confirmacion2?: string };
+    const cerrada = historial.some((r) => ['Parto', 'Aborto'].includes(r.tipo || '') && (r.fecha || '') >= (ia.fecha || ''));
+    const confirmacionAntigua = historial.some((r) => r.tipo === 'Confirmación de Gestación' && (r.fecha || '') >= (ia.fecha || ''));
+    for (const c of CONFIRMACIONES_GESTACION) {
+      const hecha = c.etapa === 1 ? ia.confirmacion1 : ia.confirmacion2;
+      if (!cerrada && !hecha && !confirmacionAntigua && diasDesdeInseminacion >= c.desde && diasDesdeInseminacion <= c.hasta) {
+        tareas.push({
+          id: cerda.id,
+          tipo: `${c.etapa}.ª confirmación de gestación`,
+          prioridad: 'alta',
+          descripcion: `Día ${c.desde}–${c.hasta}: confirmar que sigue gestante`,
+          dias: diasDesdeInseminacion,
+          fecha: regInseminacion.fecha,
+          confirmar: c.etapa,
+        });
+      }
     }
 
     if (diasDesdeInseminacion >= 70 && diasDesdeInseminacion <= 90) {
@@ -152,8 +158,8 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
       });
     }
 
-    const confirmacionGestacion = historial.find((r) => r.tipo === 'Confirmación de Gestación');
-    if (diasDesdeInseminacion > 35 && !confirmacionGestacion && !tieneParto) {
+    // Pasó la ventana de la 2.ª confirmación sin confirmar
+    if (diasDesdeInseminacion > 44 && !ia.confirmacion2 && !confirmacionAntigua && !cerrada) {
       tareas.push({
         id: cerda.id,
         tipo: 'Gestación sin confirmar',

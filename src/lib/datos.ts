@@ -47,6 +47,9 @@ export interface RegistroCerda extends Registro {
   id?: string;
   tipo: TipoEvento;
   fecha: string;
+  /** Inseminación: fechas de la 1.ª y 2.ª confirmación de gestación */
+  confirmacion1?: string;
+  confirmacion2?: string;
   vivos?: number;
   muertos?: number;
   momias?: number;
@@ -1064,6 +1067,17 @@ export function estadoDeCerda(historial: RegistroCerda[]): EstadoCerda {
     default:
       return "Sin registro";
   }
+}
+
+/** Marca la 1.ª o 2.ª confirmación de gestación en la última inseminación de la cerda */
+export function confirmarGestacion(cerdaId: string, etapa: 1 | 2): boolean {
+  const historial = leerHistorial(cerdaId);
+  const i = historial.findIndex((r) => r.tipo === "Inseminación");
+  if (i < 0) return false;
+  const campo = etapa === 1 ? "confirmacion1" : "confirmacion2";
+  const nuevo = historial.map((r, k) => (k === i ? { ...r, [campo]: hoy() } : r));
+  escribir(CLAVES.historial(cerdaId), nuevo);
+  return true;
 }
 
 export function nombreCerda(c: CerdaDatos): string {

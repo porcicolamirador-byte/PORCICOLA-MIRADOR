@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Chevron, Chips, Insignia, Vacio } from "@/components/ui";
-import { leerCerdas, useVersionDatos } from "@/lib/datos";
+import { confirmarGestacion, leerCerdas, useVersionDatos } from "@/lib/datos";
+import { confirmar } from "@/components/Dialogo";
 import { calcularTareasPendientes } from "@/utils/pendingTasks";
 
 type Prioridad = "todas" | "critica" | "alta" | "media" | "baja";
@@ -68,7 +69,26 @@ export default function TareasPage() {
                       Cerda {t.id} · {t.descripcion}
                     </span>
                   </span>
-                  <Chevron />
+                  {t.confirmar ? (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const ok = await confirmar({
+                          titulo: `${t.confirmar}.ª confirmación`,
+                          mensaje: `¿La cerda ${t.id} sigue gestante? Se registrará la ${t.confirmar}.ª confirmación de gestación con fecha de hoy.`,
+                          aceptar: "Confirmar",
+                        });
+                        if (ok) confirmarGestacion(t.id, t.confirmar!);
+                      }}
+                      className="shrink-0 rounded-full bg-sky-900 px-3 py-1.5 text-xs font-semibold text-white active:scale-95"
+                    >
+                      Confirmar
+                    </span>
+                  ) : (
+                    <Chevron />
+                  )}
                 </button>
               </li>
             );

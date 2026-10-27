@@ -6,7 +6,9 @@ import { useParams, useRouter } from "next/navigation";
 import usePageBackground from "@/hooks/usePageBackground";
 import { cargarLogoJpeg, entregarPdf, generarPdfFicha, type LogoJpeg } from "@/lib/pdfFicha";
 import { confirmar } from "@/components/Dialogo";
+import { CONFIRMACIONES_GESTACION } from "@/utils/pendingTasks";
 import {
+  confirmarGestacion,
   eliminarLotesDePartos,
   formatoPesos,
   guardarMovimientos,
@@ -839,7 +841,39 @@ export default function CerdaDetalle() {
             g.items.push(item);
           }
 
+          // Confirmación de gestación pendiente (1.ª día 18–24, 2.ª día 40–44)
+          const ia = registros.find((x) => x.tipo === "Inseminación");
+          const diasIa = ia?.fecha ? calcularDiasEntre(ia.fecha, fechaLocalISO(new Date())) : null;
+          const cerradaIa = ia ? registros.some((x) => ["Parto", "Aborto"].includes(x.tipo) && x.fecha >= ia.fecha) : true;
+          const porConfirmar =
+            ia && diasIa !== null && !cerradaIa
+              ? CONFIRMACIONES_GESTACION.find((c) => diasIa >= c.desde && diasIa <= c.hasta && !(c.etapa === 1 ? ia.confirmacion1 : ia.confirmacion2))
+              : undefined;
+
           return (
+            <>
+            {porConfirmar && (
+              <div className="mb-3 flex items-center gap-3 rounded-2xl bg-amber-50 px-4 py-3 ring-1 ring-amber-200">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-amber-900">{porConfirmar.etapa}.ª confirmación de gestación</p>
+                  <p className="text-xs text-amber-800">Día {diasIa} después de la inseminación (ventana {porConfirmar.desde}–{porConfirmar.hasta})</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const ok = await confirmar({
+                      titulo: `${porConfirmar.etapa}.ª confirmación`,
+                      mensaje: `¿La cerda ${id} sigue gestante? Se registrará la ${porConfirmar.etapa}.ª confirmación con fecha de hoy.`,
+                      aceptar: "Confirmar",
+                    });
+                    if (ok) confirmarGestacion(String(id), porConfirmar.etapa);
+                  }}
+                  className="shrink-0 rounded-full bg-sky-900 px-4 py-2 text-sm font-semibold text-white active:scale-95"
+                >
+                  Confirmar
+                </button>
+              </div>
+            )}
             <section className="mb-3 overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
               <div className="flex items-center justify-between gap-3 px-4 pt-4">
                 <div className="min-w-0">
@@ -978,6 +1012,11 @@ export default function CerdaDetalle() {
 
                                     {r.mensaje && <p className="mt-1.5 text-xs text-slate-600">{r.mensaje}</p>}
                                     {r.valorGenetica ? <p className="mt-0.5 text-xs text-slate-500">Genética: {formatoPesos(Number(r.valorGenetica))}</p> : null}
+                                    {r.confirmacion1 || r.confirmacion2 ? (
+                                      <p className="mt-0.5 text-xs font-medium text-sky-700">
+                                        {[r.confirmacion1 ? `✓ 1.ª confirmación ${formatearFechaCorta(r.confirmacion1)}` : "", r.confirmacion2 ? `✓ 2.ª confirmación ${formatearFechaCorta(r.confirmacion2)}` : ""].filter(Boolean).join(" · ")}
+                                      </p>
+                                    ) : null}
                                     {(r.descripcion || r.notas) && (
                                       <p className="mt-1 text-xs italic text-slate-500">{r.descripcion || r.notas}</p>
                                     )}
@@ -1007,6 +1046,7 @@ export default function CerdaDetalle() {
                 )}
               </div>
             </section>
+            </>
           );
         })()}
 
