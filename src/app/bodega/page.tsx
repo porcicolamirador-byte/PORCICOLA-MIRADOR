@@ -411,6 +411,7 @@ function NuevaFactura({
     const validas = lineas.filter((l) => l.productoId && num(l.cantidad) > 0);
     if (validas.length === 0) return setError("Agrega al menos un producto con su cantidad.");
     if (lineas.some((l) => l.productoId && num(l.cantidad) <= 0)) return setError("Hay productos sin cantidad.");
+    if (validas.some((l) => !(num(l.valor) > 0))) return setError("Cada producto debe tener su valor unitario (mayor que 0).");
     if (!pago) return setError("Selecciona el método de pago: contado o crédito.");
     const ids = validas.map((l) => l.productoId);
     if (new Set(ids).size !== ids.length) return setError("Un producto está repetido; súmalo en una sola línea.");
@@ -529,7 +530,7 @@ function NuevaFactura({
                       onChange={(v) => cambiarLinea(l.clave, { cantidad: v })}
                     />
                   </Campo>
-                  <Campo etiqueta="Valor unitario">
+                  <Campo etiqueta="Valor unitario *">
                     <EntradaPesos value={l.valor} onChange={(v) => cambiarLinea(l.clave, { valor: v })} />
                   </Campo>
                 </div>
