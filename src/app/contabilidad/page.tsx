@@ -2,7 +2,7 @@
 
 import Modal from "@/components/Modal";
 import PagoFactura, { PagoCredito } from "@/components/PagoFactura";
-import { codigoDe, guardarCuentasPorPagar, leerCuentasPorPagar, leerFacturas, leerProductos, leerSalidas, saldoCuenta, saldoFactura, totalFactura } from "@/lib/datos";
+import { calcularInventario, codigoDe, guardarCuentasPorPagar, guardarFacturas, leerCuentasPorPagar, leerFacturas, leerProductos, leerSalidas, saldoCuenta, saldoFactura, totalFactura } from "@/lib/datos";
 import { useMemo, useState, type FormEvent } from "react";
 import ModuloPage from "@/components/ModuloPage";
 import { Boton, Campo, Entrada, IconoMas, SeccionDesplegable, Selector, Vacio, EntradaPesos } from "@/components/ui";
@@ -95,6 +95,34 @@ export default function ContabilidadPage() {
         });
         return;
       }
+      // Sin la factura el gasto quedaría descuadrado: se eliminan juntos
+      const inventario = calcularInventario();
+      const negativos = factura.lineas
+        .map((l) => {
+          const item = inventario.find((i) => i.producto.id === l.productoId);
+          return item && item.disponible - l.cantidad < 0 ? item.producto.nombre : null;
+        })
+        .filter(Boolean);
+      if (negativos.length) {
+        await avisar({
+          titulo: "No se puede eliminar",
+          mensaje: `Este gasto es de la factura ${factura.numero} y al eliminarla quedarían existencias negativas de ${negativos.join(", ")}. Revisa primero las salidas en Bodega.`,
+        });
+        return;
+      }
+      if (
+        !(await confirmar({
+          titulo: `Eliminar factura ${factura.numero}`,
+          mensaje: `Este gasto es de la factura ${factura.numero}${factura.proveedor ? ` de ${factura.proveedor}` : ""}. Para que la contabilidad no quede descuadrada se eliminará también la factura ${factura.numero}${(factura.abonos ?? []).length ? " con sus abonos" : ""}, y sus productos saldrán del inventario de Bodega.`,
+          aceptar: "Eliminar todo",
+          destructivo: true,
+        }))
+      )
+        return;
+      const quitar = new Set([factura.movimientoId, ...(factura.abonos ?? []).map((ab) => ab.movimientoId), id].filter(Boolean));
+      guardarMovimientos(leerMovimientos().filter((m) => !quitar.has(m.id)));
+      guardarFacturas(leerFacturas().filter((f) => f.id !== factura.id));
+      return;
     }
     if (!(await confirmar({ titulo: "Eliminar movimiento", mensaje: "El ingreso o gasto se borrará y el balance del mes se recalculará.", aceptar: "Eliminar", destructivo: true }))) return;
     guardarMovimientos(leerMovimientos().filter((m) => m.id !== id));
