@@ -228,6 +228,8 @@ export const actualizarUsuario = (
 ) => llamarFuncion<{ usuario: PerfilNube }>("usuarios", { accion: "actualizar", id, ...cambios }).then((r) => r.usuario);
 
 /** Borra un usuario para siempre (solo administrador). Sus registros se conservan. */
+/** Borra todos los datos de la granja en la nube (solo administrador, con su PIN) */
+export const reiniciarBaseNube = (pin: string) => llamarFuncion<{ generacion: number }>("usuarios", { accion: "reiniciar", pin }).then((r) => r.generacion);
 export const eliminarUsuario = (id: string) => llamarFuncion<{ eliminado: string; usuario: string }>("usuarios", { accion: "eliminar", id });
 
 export interface ConsumoNube {
