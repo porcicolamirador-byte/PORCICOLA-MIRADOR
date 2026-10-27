@@ -37,6 +37,8 @@ import {
 } from "@/lib/datos";
 import { confirmar } from "@/components/Dialogo";
 import DialogoClave from "@/components/DialogoClave";
+import { exportarContabilidadLote } from "@/lib/exportarLote";
+import { puede } from "@/lib/nube";
 import Modal from "@/components/Modal";
 import { ETAPAS_ALIMENTACION, leerConfig } from "@/lib/config";
 
@@ -620,6 +622,17 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
     if (ok) eliminarGastoLote(lote.id, gastoId);
   };
 
+  const [exportandoPdf, setExportandoPdf] = useState(false);
+  const exportarPdfLote = async () => {
+    if (exportandoPdf) return;
+    setExportandoPdf(true);
+    try {
+      await exportarContabilidadLote(lote);
+    } finally {
+      setExportandoPdf(false);
+    }
+  };
+
   const cerrarLote = async () => {
     if (!(await confirmar({ titulo: `Cerrar ${nombreLote(lote)}`, mensaje: "El lote pasará a la lista de lotes cerrados. Puedes reabrirlo después.", aceptar: "Cerrar lote" }))) return;
     actualizarLote(lote.id, (l) => ({ ...l, activo: false, fechaSalida: hoy() }));
@@ -800,6 +813,15 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                   })}
               </ul>
             </SeccionDesplegable>
+          )}
+
+          {puede("contabilidad") && (
+            <Boton variante="secundario" onClick={() => void exportarPdfLote()} disabled={exportandoPdf} className="w-full">
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14" />
+              </svg>
+              {exportandoPdf ? "Generando PDF…" : "Exportar contabilidad del lote"}
+            </Boton>
           )}
 
           <div className="flex flex-wrap justify-center gap-2 pt-1">
