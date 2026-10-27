@@ -4,6 +4,8 @@ import { borrarConRegistro, guardarConRegistro } from "@/lib/log";
 import { useEffect, useMemo, useState, type TouchEvent } from "react";
 import { useRouter } from "next/navigation";
 import PageShell from "@/components/PageShell";
+import Modal from "@/components/Modal";
+import { Boton, Campo } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
 import { puede } from "@/lib/nube";
 import { leerConfig } from "@/lib/config";
@@ -1051,152 +1053,95 @@ export default function Gestacion() {
           </div>
         )}
 
-        {/* FORMULARIO: cuadro centrado con el mismo estilo de la ficha de la cerda */}
-        {mostrarFormulario && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={editIndex !== null ? "Editar cerda" : "Nueva cerda"}
-            className="fixed inset-0 z-[70] flex items-center justify-center p-4"
-            style={{
-              paddingTop: "calc(env(safe-area-inset-top) + 1rem)",
-              paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)",
+        {/* FORMULARIO: módulo centrado con el mismo estilo de los demás */}
+        <Modal
+          abierta={mostrarFormulario}
+          etiqueta="Gestación"
+          titulo={editIndex !== null ? "Editar cerda" : "Nueva cerda"}
+          subtitulo={editIndex !== null ? "Actualiza los datos de la cerda" : "Registro de una cerda nueva"}
+          icono="🐷"
+          onCerrar={() => setMostrarFormulario(false)}
+        >
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void agregarOCrear();
             }}
+            className="flex flex-col gap-3.5"
           >
-            <button
-              type="button"
-              aria-label="Cerrar formulario"
-              onClick={() => setMostrarFormulario(false)}
-              className="form-fondo absolute inset-0 bg-slate-950/45 backdrop-blur-[2px]"
-            />
-
-            <div className="form-hoja hoja-ios relative flex max-h-full w-full max-w-md flex-col overflow-hidden rounded-[22px] shadow-2xl">
-              {/* Barra superior estilo iOS: Cancelar · título · Guardar */}
-              <div className="barra-ios grid shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b px-2 py-2.5">
-                <button
-                  type="button"
-                  onClick={() => setMostrarFormulario(false)}
-                  className="justify-self-start rounded-lg px-2.5 py-1.5 text-[17px] text-sky-700 active:opacity-50"
-                >
-                  Cancelar
-                </button>
-                <h3 className="text-[17px] font-semibold text-slate-900">{editIndex !== null ? "Editar cerda" : "Nueva cerda"}</h3>
-                <button
-                  type="button"
-                  onClick={agregarOCrear}
-                  disabled={!id.trim()}
-                  className="justify-self-end rounded-lg px-2.5 py-1.5 text-[17px] font-semibold text-sky-700 active:opacity-50 disabled:text-slate-400"
-                >
-                  {editIndex !== null ? "Listo" : "Guardar"}
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 pb-6 pt-5">
-                {/* Identificación y raza */}
-                <ul className="celda-ios divide-y overflow-hidden rounded-xl">
-                  <li className="flex min-h-[46px] items-center gap-3 px-4">
-                    <label htmlFor="f-id" className="w-32 shrink-0 text-[15px] text-slate-900">Identificación</label>
-                    <input
-                      id="f-id"
-                      type="text"
-                      placeholder="A-102"
-                      autoComplete="off"
-                      autoCapitalize="characters"
-                      value={id}
-                      onChange={(e) => {
-                        setId(e.target.value.toUpperCase());
-                        if (idError) setIdError("");
-                      }}
-                      className="campo-ios min-w-0 flex-1 uppercase"
-                    />
-                  </li>
-                  <li className="flex min-h-[46px] items-center gap-3 px-4">
-                    <label htmlFor="f-raza" className="w-32 shrink-0 text-[15px] text-slate-900">Raza</label>
-                    <select id="f-raza" value={raza} onChange={(e) => setRaza(e.target.value)} className="campo-ios min-w-0 flex-1">
-                      {RAZAS.map((r) => (
-                        <option key={r} value={r}>{r}</option>
-                      ))}
-                      <option value="OTRA">Otra</option>
-                    </select>
-                  </li>
-                  {raza === "OTRA" && (
-                    <li className="flex min-h-[46px] items-center gap-3 px-4">
-                      <label htmlFor="f-otra" className="w-32 shrink-0 text-[15px] text-slate-900">Cuál</label>
-                      <input
-                        id="f-otra"
-                        type="text"
-                        placeholder="Nombre de la raza"
-                        value={otraRaza}
-                        onChange={(e) => setOtraRaza(e.target.value)}
-                        className="campo-ios min-w-0 flex-1"
-                      />
-                    </li>
-                  )}
-                </ul>
-                {(idError || razaError) && <p className="mt-1.5 px-4 text-[13px] text-red-600">{idError || razaError}</p>}
-
-                {/* Llegada */}
-                <p className="mb-1.5 mt-6 px-4 text-[13px] uppercase tracking-wide text-slate-500">Llegada</p>
-                <ul className="celda-ios divide-y overflow-hidden rounded-xl">
-                  <li className="flex min-h-[46px] items-center gap-3 px-4">
-                    <label htmlFor="f-fecha" className="w-32 shrink-0 text-[15px] text-slate-900">Fecha</label>
-                    <input
-                      id="f-fecha"
-                      type="date"
-                      value={fecha}
-                      max={fechaLocalISO(new Date())}
-                      onChange={(e) => {
-                        setFecha(e.target.value);
-                        if (fechaError) setFechaError("");
-                      }}
-                      className="campo-ios min-w-0 flex-1 appearance-none"
-                    />
-                  </li>
-                  <li className="flex min-h-[46px] items-center gap-3 px-4">
-                    <label htmlFor="f-peso" className="w-32 shrink-0 text-[15px] text-slate-900">Peso</label>
-                    <input
-                      id="f-peso"
-                      type="tel"
-                      inputMode="decimal"
-                      pattern="[0-9]*[.,]?[0-9]*"
-                      value={peso}
-                      onChange={(e) => {
-                        setPeso(e.target.value.replace(/[^0-9.,]/g, ""));
-                        if (pesoError) setPesoError("");
-                      }}
-                      placeholder="0"
-                      className="campo-ios min-w-0 flex-1"
-                    />
-                    <span className="-ml-1 text-[15px] text-slate-500">kg</span>
-                  </li>
-                </ul>
-                {(fechaError || pesoError) && <p className="mt-1.5 px-4 text-[13px] text-red-600">{fechaError || pesoError}</p>}
-
-                {/* Notas */}
-                <p className="mb-1.5 mt-6 px-4 text-[13px] uppercase tracking-wide text-slate-500">Notas</p>
-                <div className="celda-ios overflow-hidden rounded-xl">
-                  <label htmlFor="f-car" className="sr-only">Características</label>
-                  <textarea
-                    id="f-car"
-                    value={caracteristicas}
-                    onChange={(e) => setCaracteristicas(e.target.value)}
-                    placeholder="Marcas, temperamento, observaciones"
-                    rows={3}
-                    className="block w-full resize-none bg-transparent px-4 py-3 text-base text-slate-900 outline-none placeholder:text-slate-400"
-                  />
-                </div>
-              </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Campo etiqueta="Identificación *">
+                <input
+                  type="text"
+                  placeholder="Dato"
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  value={id}
+                  onChange={(e) => {
+                    setId(e.target.value.toUpperCase());
+                    if (idError) setIdError("");
+                  }}
+                  className="block w-full min-w-0 max-w-full appearance-none rounded-xl bg-slate-50 px-3.5 py-2.5 text-base text-slate-900 ring-1 ring-slate-200 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-600 uppercase"
+                />
+              </Campo>
+              <Campo etiqueta="Raza">
+                <select value={raza} onChange={(e) => setRaza(e.target.value)} className="block w-full min-w-0 max-w-full appearance-none rounded-xl bg-slate-50 px-3.5 py-2.5 text-base text-slate-900 ring-1 ring-slate-200 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-600">
+                  {RAZAS.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                  <option value="OTRA">Otra</option>
+                </select>
+              </Campo>
             </div>
-
-            <style>{`
-              .form-fondo { animation: form-fade 200ms ease-out both; }
-              .form-hoja { animation: form-entrar 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-              @keyframes form-fade { from { opacity: 0 } to { opacity: 1 } }
-              @keyframes form-entrar { from { transform: scale(0.96); opacity: 0 } to { transform: none; opacity: 1 } }
-              @media (prefers-reduced-motion: reduce) { .form-fondo, .form-hoja { animation: none; } }
-            `}</style>
-          </div>
-        )}
+            {raza === "OTRA" && (
+              <Campo etiqueta="¿Cuál raza?">
+                <input type="text" placeholder="Dato" value={otraRaza} onChange={(e) => setOtraRaza(e.target.value)} className="block w-full min-w-0 max-w-full appearance-none rounded-xl bg-slate-50 px-3.5 py-2.5 text-base text-slate-900 ring-1 ring-slate-200 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-600" />
+              </Campo>
+            )}
+            {(idError || razaError) && <p className="-mt-2 text-[13px] text-red-600">{idError || razaError}</p>}
+            <div className="grid grid-cols-2 gap-3">
+              <Campo etiqueta="Fecha de llegada">
+                <input
+                  type="date"
+                  value={fecha}
+                  max={fechaLocalISO(new Date())}
+                  onChange={(e) => {
+                    setFecha(e.target.value);
+                    if (fechaError) setFechaError("");
+                  }}
+                  className="block w-full min-w-0 max-w-full appearance-none rounded-xl bg-slate-50 px-3.5 py-2.5 text-base text-slate-900 ring-1 ring-slate-200 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-600"
+                />
+              </Campo>
+              <Campo etiqueta="Peso (kg)">
+                <input
+                  type="tel"
+                  inputMode="decimal"
+                  pattern="[0-9]*[.,]?[0-9]*"
+                  value={peso}
+                  onChange={(e) => {
+                    setPeso(e.target.value.replace(/[^0-9.,]/g, ""));
+                    if (pesoError) setPesoError("");
+                  }}
+                  placeholder="Dato"
+                  className="block w-full min-w-0 max-w-full appearance-none rounded-xl bg-slate-50 px-3.5 py-2.5 text-base text-slate-900 ring-1 ring-slate-200 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-600"
+                />
+              </Campo>
+            </div>
+            {(fechaError || pesoError) && <p className="-mt-2 text-[13px] text-red-600">{fechaError || pesoError}</p>}
+            <Campo etiqueta="Notas">
+              <textarea
+                value={caracteristicas}
+                onChange={(e) => setCaracteristicas(e.target.value)}
+                placeholder="Dato"
+                rows={3}
+                className="block w-full min-w-0 max-w-full appearance-none rounded-xl bg-slate-50 px-3.5 py-2.5 text-base text-slate-900 ring-1 ring-slate-200 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-600 resize-none"
+              />
+            </Campo>
+            <Boton type="submit" disabled={!id.trim()} className="mt-1 w-full py-3">
+              {editIndex !== null ? "Guardar cambios" : "Crear cerda"}
+            </Boton>
+          </form>
+        </Modal>
       </div>
     </PageShell>
   );
