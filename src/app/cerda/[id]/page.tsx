@@ -516,6 +516,8 @@ export default function CerdaDetalle() {
     ? calcularDiasEntre(ultimaInseminacion.fecha, fechaHoy)
     : 0;
   const porcentajeGestacion = Math.round((diasGestacion / DIAS_GESTACION) * 100);
+  // El progreso de gestación solo aplica mientras la cerda está en gestación (tras el parto se suspende)
+  const enGestacion = estado === "Gestación" && !!ultimaInseminacion;
   const diasFaltantes = Math.max(0, DIAS_GESTACION - diasGestacion);
 
   const totalPartos = registros.filter((r) => r.tipo === "Parto").length;
@@ -693,7 +695,7 @@ export default function CerdaDetalle() {
                 <span className="text-orange-400">🐷</span>
                 <div className="text-[11px] text-gray-600">Lechones</div>
               </div>
-              <div className="font-bold text-sm">{cerda.lechones || '-'}</div>
+              <div className="font-bold text-sm">{totalVivos || '-'}</div>
             </div>
 
             <div className="bg-gray-100 rounded-md p-1 flex items-center justify-between">
@@ -716,19 +718,19 @@ export default function CerdaDetalle() {
               </div>
               <div className="bg-gray-100 rounded-lg p-2 flex flex-col gap-1 min-h-[64px]">
                 <span className="text-gray-500">Parto estimado</span>
-                <span className="font-bold text-[12px] leading-4 truncate">{ultimaInseminacion ? formatearFechaCorta(calcularParto(ultimaInseminacion.fecha)) : '-'}</span>
+                <span className="font-bold text-[12px] leading-4 truncate">{enGestacion ? formatearFechaCorta(calcularParto(ultimaInseminacion.fecha)) : '-'}</span>
               </div>
               <div className="bg-gray-100 rounded-lg p-2 flex flex-col gap-1 min-h-[64px]">
                 <span className="text-gray-500">Días gest.</span>
-                <span className="font-bold text-[12px] leading-4">Día {diasGestacion}</span>
-                <span className="text-gray-500 text-[10px]">{diasGestacion} / {DIAS_GESTACION}</span>
+                <span className="font-bold text-[12px] leading-4">{enGestacion ? `Día ${diasGestacion}` : '-'}</span>
+                {enGestacion && <span className="text-gray-500 text-[10px]">{diasGestacion} / {DIAS_GESTACION}</span>}
               </div>
             </div>
           </div>
         </div>
 
-        {/* PROGRESO DE GESTACIÓN */}
-        {ultimaInseminacion && (
+        {/* PROGRESO DE GESTACIÓN: solo mientras está en gestación */}
+        {enGestacion && (
           <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 mb-3">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-bold text-black">Progreso de gestación</h3>
@@ -770,7 +772,7 @@ export default function CerdaDetalle() {
         )}
 
         {/* ALERTAS ACTIVAS */}
-        {ultimaInseminacion && diasGestacion > 110 && (
+        {enGestacion && diasGestacion > 110 && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-3xl p-4 mb-4">
             <p className="text-yellow-800 font-bold text-sm flex items-center gap-2">
               🔔 Alertas activas
