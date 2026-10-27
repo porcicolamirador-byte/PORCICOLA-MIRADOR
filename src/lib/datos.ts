@@ -94,8 +94,10 @@ export interface GastoLote {
   cantidad?: string;
   valor: number;
   categoria: string;
-  /** Gasto creado en Contabilidad */
+  /** Gasto creado en Contabilidad (de contado) */
   movimientoId?: string;
+  /** A crédito: cuenta por pagar en Contabilidad (cada abono es un gasto) */
+  cuentaId?: string;
 }
 
 export interface Lote {
@@ -801,24 +803,29 @@ export const CATEGORIAS_GASTO_LOTE = ["Medicamentos y vacunas", "Mantenimiento",
 /** Registra otro gasto del lote y lo suma como gasto en Contabilidad */
 export function registrarGastoLote(
   loteId: string,
-  datos: { descripcion: string; cantidad?: string; valor: number; categoria: string; fecha: string; hora?: string },
+  datos: { descripcion: string; cantidad?: string; valor: number; categoria: string; fecha: string; hora?: string; pago?: "contado" | "credito" },
 ): boolean {
   const lote = leerLotes().find((l) => l.id === loteId);
   if (!lote || !datos.descripcion.trim() || !(datos.valor > 0)) return false;
-  const movimientoId = nuevoId();
   const descripcion = datos.descripcion.trim().slice(0, 80);
   const cantidad = datos.cantidad?.trim().slice(0, 40) || undefined;
-  guardarMovimientos([
-    ...leerMovimientos(),
-    {
-      id: movimientoId,
-      fecha: datos.fecha,
-      tipo: "gasto",
-      categoria: datos.categoria,
-      descripcion: `${descripcion}${cantidad ? ` (${cantidad})` : ""} · ${nombreLote(lote)}`,
-      monto: Math.round(datos.valor),
-    },
-  ]);
+  const texto = `${descripcion}${cantidad ? ` (${cantidad})` : ""} · ${nombreLote(lote)}`;
+  let movimientoId: string | undefined;
+  let cuentaId: string | undefined;
+  if (datos.pago === "credito") {
+    // A crédito: queda por pagar en Contabilidad; el costo del lote se cuenta igual
+    cuentaId = nuevoId();
+    guardarCuentasPorPagar([
+      ...leerCuentasPorPagar(),
+      { id: cuentaId, fecha: datos.fecha, descripcion: texto, categoria: datos.categoria, total: Math.round(datos.valor), abonos: [] },
+    ]);
+  } else {
+    movimientoId = nuevoId();
+    guardarMovimientos([
+      ...leerMovimientos(),
+      { id: movimientoId, fecha: datos.fecha, tipo: "gasto", categoria: datos.categoria, descripcion: texto, monto: Math.round(datos.valor) },
+    ]);
+  }
   const gasto: GastoLote = {
     id: nuevoId(),
     fecha: datos.fecha,
@@ -828,6 +835,7 @@ export function registrarGastoLote(
     valor: Math.round(datos.valor),
     categoria: datos.categoria,
     movimientoId,
+    cuentaId,
   };
   guardarLotes(leerLotes().map((l) => (l.id === loteId ? { ...l, gastos: [...(l.gastos ?? []), gasto] } : l)));
   return true;
@@ -838,7 +846,13 @@ export function eliminarGastoLote(loteId: string, gastoId: string) {
   const lote = leerLotes().find((l) => l.id === loteId);
   const gasto = lote?.gastos?.find((g) => g.id === gastoId);
   if (!lote || !gasto) return;
-  if (gasto.movimientoId) guardarMovimientos(leerMovimientos().filter((m) => m.id !== gasto.movimientoId));
+  const quitar = new Set<string>(gasto.movimientoId ? [gasto.movimientoId] : []);
+  if (gasto.cuentaId) {
+    const cuenta = leerCuentasPorPagar().find((c) => c.id === gasto.cuentaId);
+    for (const a of cuenta?.abonos ?? []) if (a.movimientoId) quitar.add(a.movimientoId);
+    guardarCuentasPorPagar(leerCuentasPorPagar().filter((c) => c.id !== gasto.cuentaId));
+  }
+  if (quitar.size) guardarMovimientos(leerMovimientos().filter((m) => !quitar.has(m.id)));
   guardarLotes(leerLotes().map((l) => (l.id === loteId ? { ...l, gastos: (l.gastos ?? []).filter((g) => g.id !== gastoId) } : l)));
 }
 

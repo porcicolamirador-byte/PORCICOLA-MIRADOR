@@ -2,7 +2,7 @@
 
 import Modal from "@/components/Modal";
 import PagoFactura, { PagoCredito } from "@/components/PagoFactura";
-import { calcularInventario, codigoDe, guardarCuentasPorPagar, guardarFacturas, leerCuentasPorPagar, leerFacturas, leerProductos, leerSalidas, saldoCuenta, saldoFactura, totalFactura } from "@/lib/datos";
+import { calcularInventario, codigoDe, eliminarGastoLote, guardarCuentasPorPagar, guardarFacturas, leerCuentasPorPagar, leerFacturas, leerProductos, leerSalidas, saldoCuenta, saldoFactura, totalFactura } from "@/lib/datos";
 import { useMemo, useState, type FormEvent } from "react";
 import ModuloPage from "@/components/ModuloPage";
 import { Boton, Campo, Entrada, IconoMas, SeccionDesplegable, Selector, Vacio, EntradaPesos } from "@/components/ui";
@@ -415,15 +415,21 @@ function FacturasCredito({ version }: { version: number }) {
     if (
       !(await confirmar({
         titulo: "Eliminar gasto a crédito",
-        mensaje: `Se borrará "${cuenta.descripcion}"${cuenta.abonos.length ? " y los gastos de sus abonos" : ""}.`,
+        mensaje: `Se borrará "${cuenta.descripcion}"${cuenta.abonos.length ? " y los gastos de sus abonos" : ""}. Si es un gasto de un lote, también se quita del lote.`,
         aceptar: "Eliminar",
         destructivo: true,
       }))
     )
       return;
-    const quitar = new Set(cuenta.abonos.map((a) => a.movimientoId).filter(Boolean));
-    if (quitar.size) guardarMovimientos(leerMovimientos().filter((m) => !quitar.has(m.id)));
-    guardarCuentasPorPagar(leerCuentasPorPagar().filter((c) => c.id !== cuenta.id));
+    // Si viene de un gasto de lote, se quita también del lote (borra la cuenta y sus abonos)
+    const lote = leerLotes().find((l) => (l.gastos ?? []).some((g) => g.cuentaId === cuenta.id));
+    const gasto = lote?.gastos?.find((g) => g.cuentaId === cuenta.id);
+    if (lote && gasto) eliminarGastoLote(lote.id, gasto.id);
+    else {
+      const quitar = new Set(cuenta.abonos.map((a) => a.movimientoId).filter(Boolean));
+      if (quitar.size) guardarMovimientos(leerMovimientos().filter((m) => !quitar.has(m.id)));
+      guardarCuentasPorPagar(leerCuentasPorPagar().filter((c) => c.id !== cuenta.id));
+    }
     setAbierta(null);
   };
 

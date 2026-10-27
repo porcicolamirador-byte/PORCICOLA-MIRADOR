@@ -496,6 +496,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   const [gastoDesc, setGastoDesc] = useState("");
   const [gastoCant, setGastoCant] = useState("");
   const [gastoCat, setGastoCat] = useState(CATEGORIAS_GASTO_LOTE[0]);
+  const [gastoPago, setGastoPago] = useState<"" | "contado" | "credito">("");
   const [productoId, setProductoId] = useState("");
   const [corralSel, setCorralSel] = useState(lote.corralId ?? "");
   const [editIdx, setEditIdx] = useState<number | null>(null);
@@ -532,6 +533,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
     setGastoDesc("");
     setGastoCant("");
     setGastoCat(CATEGORIAS_GASTO_LOTE[0]);
+    setGastoPago("");
     setProductoId("");
     setFecha(hoy());
     setHora(horaActual());
@@ -577,8 +579,8 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
     }
     if (accion === "gasto") {
       const monto = Number(valor.replace(/\D/g, "")) || 0;
-      if (!gastoDesc.trim() || monto <= 0) return;
-      registrarGastoLote(lote.id, { descripcion: gastoDesc, cantidad: gastoCant, valor: monto, categoria: gastoCat, fecha, hora });
+      if (!gastoDesc.trim() || monto <= 0 || !gastoPago) return;
+      registrarGastoLote(lote.id, { descripcion: gastoDesc, cantidad: gastoCant, valor: monto, categoria: gastoCat, fecha, hora, pago: gastoPago });
       limpiar();
       return;
     }
@@ -950,7 +952,25 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
               <Campo etiqueta="Categoría en Contabilidad">
                 <Selector value={gastoCat} onChange={setGastoCat} opciones={CATEGORIAS_GASTO_LOTE.map((c) => ({ valor: c, texto: c }))} />
               </Campo>
-              <p className="text-xs text-slate-500">Se suma como gasto en Contabilidad con el nombre del lote.</p>
+              <Campo etiqueta="Método de pago *">
+                <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1">
+                  {(["contado", "credito"] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setGastoPago(m)}
+                      className={`rounded-xl py-2 text-sm font-semibold transition ${gastoPago === m ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+                    >
+                      {m === "contado" ? "Contado" : "Crédito"}
+                    </button>
+                  ))}
+                </div>
+              </Campo>
+              <p className="text-xs text-slate-500">
+                {gastoPago === "credito"
+                  ? "Se suma al costo del lote y queda en Contabilidad como «Por pagar a crédito»; cada abono se registra como gasto."
+                  : "Se suma como gasto en Contabilidad con el nombre del lote."}
+              </p>
             </>
           )}
           {legado && (
@@ -1015,7 +1035,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                 (accion === "corral" && (!corralSel || corrales.length === 0)) ||
                 (esAlimento && !legado && (!elegido || cantidadNum <= 0 || excede)) ||
                 (legado && cantidadNum <= 0) ||
-                (accion === "gasto" && (!gastoDesc.trim() || !(Number(valor.replace(/\D/g, "")) > 0)))
+                (accion === "gasto" && (!gastoDesc.trim() || !(Number(valor.replace(/\D/g, "")) > 0) || !gastoPago))
               }
             >
               Guardar
