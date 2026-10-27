@@ -27,6 +27,7 @@ const CATEGORIAS: Record<Movimiento["tipo"], string[]> = {
   ingreso: ["Venta de cerdos de engorde", "Venta de lechones", "Venta de cerdas de descarte", "Otros ingresos"],
   gasto: [
     "Alimento",
+    "Insumos",
     "Medicamentos y vacunas",
     "Mano de obra",
     "Genética / semen",

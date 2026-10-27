@@ -40,6 +40,9 @@ import {
   formatoHora,
   horaActual,
   nombreLote,
+  leerGastosProduccion,
+  registrarGastoProduccion,
+  CATEGORIAS_GASTO_PRODUCCION,
 } from "@/lib/datos";
 const avisarSinPermisoBodega = () =>
   avisar({ titulo: "Sin permiso", mensaje: "Tu usuario no tiene permiso para cargar facturas ni registrar salidas de bodega. Pídeselo al administrador." });
@@ -160,6 +163,8 @@ export default function BodegaPage() {
             valor={vista}
             onChange={setVista}
           />
+
+          {vista === "inventario" && !q && <TarjetaGastosProduccion />}
 
           {datos === null ? (
             <div className="h-40 animate-pulse rounded-3xl bg-slate-100" />
@@ -761,6 +766,157 @@ function DetalleFactura({ factura: f, productos, onCerrar }: { factura: Factura;
           Eliminar factura
         </button>
       </div>
+    </Hoja>
+  );
+}
+
+/* ───────────── Gastos de producción (módulo fijo de Bodega) ───────────── */
+
+function TarjetaGastosProduccion() {
+  const version = useVersionDatos();
+  const [abierta, setAbierta] = useState(false);
+  const mesActual = hoy().slice(0, 7);
+  const gastos = version < 0 ? [] : leerGastosProduccion();
+  const delMes = gastos.filter((g) => g.fecha.slice(0, 7) === mesActual);
+  const totalMes = delMes.reduce((s, g) => s + g.monto, 0);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setAbierta(true)}
+        className="flex w-full items-center gap-3 rounded-2xl bg-white p-3 text-left ring-1 ring-slate-200/80 transition active:scale-[0.99]"
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700" aria-hidden="true">
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" />
+            <path d="M9 8h6M9 12h6M9 16h3" />
+          </svg>
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5">
+            <span className="truncate text-[15px] font-semibold text-slate-900">Gastos de producción</span>
+            <span className="shrink-0 rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 ring-1 ring-sky-200">Fijo</span>
+          </span>
+          <span className="block truncate text-xs text-slate-500">
+            Insumos, medicamentos y más · {delMes.length} este mes
+          </span>
+        </span>
+        <span className="shrink-0 text-right">
+          <span className="block text-sm font-bold tabular-nums text-slate-900">{formatoPesos(totalMes)}</span>
+          <span className="block text-[10px] text-slate-400">este mes</span>
+        </span>
+        <Chevron />
+      </button>
+      {abierta && <HojaGastosProduccion onCerrar={() => setAbierta(false)} />}
+    </>
+  );
+}
+
+function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
+  const version = useVersionDatos();
+  const [nuevo, setNuevo] = useState(false);
+  const [descripcion, setDescripcion] = useState("");
+  const [cantidad, setCantidad] = useState("");
+  const [valor, setValor] = useState("");
+  const [categoria, setCategoria] = useState(CATEGORIAS_GASTO_PRODUCCION[0]);
+  const [fecha, setFecha] = useState(hoy());
+  const gastos = version < 0 ? [] : leerGastosProduccion();
+  const total = gastos.reduce((s, g) => s + g.monto, 0);
+  const monto = Number(valor.replace(/\D/g, "")) || 0;
+
+  const abrirNuevo = () => {
+    if (!puede("bodega")) return void avisarSinPermisoBodega();
+    setNuevo(true);
+  };
+
+  const guardar = (e: FormEvent) => {
+    e.preventDefault();
+    if (!registrarGastoProduccion({ descripcion, cantidad, valor: monto, categoria, fecha })) return;
+    setDescripcion("");
+    setCantidad("");
+    setValor("");
+    setCategoria(CATEGORIAS_GASTO_PRODUCCION[0]);
+    setFecha(hoy());
+    setNuevo(false);
+  };
+
+  const eliminar = async (id: string, texto: string) => {
+    if (!(await confirmar({ titulo: "Eliminar gasto", mensaje: `${texto}. También se quitará de Contabilidad.`, aceptar: "Eliminar", destructivo: true }))) return;
+    guardarMovimientos(leerMovimientos().filter((m) => m.id !== id));
+  };
+
+  return (
+    <Hoja abierta titulo={nuevo ? "Nuevo gasto de producción" : "Gastos de producción"} onCerrar={nuevo ? () => setNuevo(false) : onCerrar}>
+      {nuevo ? (
+        <form onSubmit={guardar} className="flex flex-col gap-3.5">
+          <Campo etiqueta="Producto o servicio">
+            <Entrada value={descripcion} onChange={(v) => setDescripcion(v.slice(0, 80))} placeholder="Ej. Desinfectante, jeringas, ivermectina…" required />
+          </Campo>
+          <div className="grid grid-cols-2 gap-3">
+            <Campo etiqueta="Cantidad">
+              <Entrada value={cantidad} onChange={(v) => setCantidad(v.slice(0, 40))} placeholder="Ej. 3 frascos" />
+            </Campo>
+            <Campo etiqueta="Valor total">
+              <EntradaPesos value={valor} onChange={setValor} required />
+            </Campo>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Campo etiqueta="Categoría">
+              <Selector value={categoria} onChange={setCategoria} opciones={CATEGORIAS_GASTO_PRODUCCION.map((c) => ({ valor: c, texto: c }))} />
+            </Campo>
+            <Campo etiqueta="Fecha">
+              <Entrada type="date" value={fecha} onChange={setFecha} required />
+            </Campo>
+          </div>
+          <p className="text-xs text-slate-500">Se suma como gasto en la contabilidad general de la granja.</p>
+          <div className="grid grid-cols-2 gap-2">
+            <Boton variante="secundario" onClick={() => setNuevo(false)}>
+              Cancelar
+            </Boton>
+            <Boton type="submit" disabled={!descripcion.trim() || monto <= 0}>
+              Guardar
+            </Boton>
+          </div>
+        </form>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between rounded-2xl bg-sky-50 px-4 py-3 ring-1 ring-sky-100">
+            <span className="text-sm text-sky-900">Total registrado</span>
+            <span className="text-lg font-bold tabular-nums text-sky-900">{formatoPesos(total)}</span>
+          </div>
+          <Boton onClick={abrirNuevo} className="w-full py-3">
+            <IconoMas /> Registrar gasto
+          </Boton>
+          {gastos.length === 0 ? (
+            <p className="rounded-xl bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">Aún no hay gastos de producción.</p>
+          ) : (
+            <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200">
+              {gastos.map((g) => (
+                <li key={g.id} className="flex items-center gap-2.5 px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] font-semibold text-slate-900">{g.descripcion}</p>
+                    <p className="truncate text-[11px] text-slate-500">
+                      {g.categoria} · {formatoFecha(g.fecha)}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-[13px] font-semibold tabular-nums text-slate-900">{formatoPesos(g.monto)}</span>
+                  <button
+                    type="button"
+                    onClick={() => void eliminar(g.id, g.descripcion)}
+                    aria-label={`Eliminar ${g.descripcion}`}
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-300 active:bg-rose-50 active:text-rose-600"
+                  >
+                    <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" aria-hidden="true">
+                      <path d="M5 5l10 10M15 5L5 15" />
+                    </svg>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </Hoja>
   );
 }

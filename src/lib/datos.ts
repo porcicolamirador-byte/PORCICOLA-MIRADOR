@@ -151,6 +151,10 @@ export interface Movimiento {
   monto: number;
   /** Lote de engorde al que corresponde (p. ej. el ingreso por su venta) */
   loteId?: string;
+  /** "produccion": registrado desde Bodega → Gastos de producción */
+  origen?: "produccion";
+  /** Cantidad escrita libremente (gastos de producción), p. ej. "3 frascos" */
+  cantidad?: string;
 }
 
 export type ZonaMonitoreo = "Maternidad" | "Gestación" | "Precebo" | "Engorde";
@@ -723,6 +727,36 @@ export function editarConsumoLote(
     },
   ]);
   return ok;
+}
+
+/** Categorías para Bodega → Gastos de producción */
+export const CATEGORIAS_GASTO_PRODUCCION = ["Insumos", "Medicamentos y vacunas", "Mantenimiento", "Transporte", "Mano de obra", "Servicios (agua, luz)", "Otros gastos"];
+
+/** Gastos registrados desde Bodega → Gastos de producción (más recientes primero) */
+export const leerGastosProduccion = () =>
+  leerMovimientos()
+    .filter((m) => m.origen === "produccion")
+    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+
+/** Registra un gasto de producción: queda como gasto en la contabilidad general */
+export function registrarGastoProduccion(datos: { descripcion: string; cantidad?: string; valor: number; categoria: string; fecha: string }) {
+  const descripcion = datos.descripcion.trim().slice(0, 80);
+  if (!descripcion || !(datos.valor > 0)) return false;
+  const cantidad = datos.cantidad?.trim().slice(0, 40) || undefined;
+  guardarMovimientos([
+    ...leerMovimientos(),
+    {
+      id: nuevoId(),
+      fecha: datos.fecha,
+      tipo: "gasto",
+      categoria: datos.categoria,
+      descripcion: cantidad ? `${descripcion} (${cantidad})` : descripcion,
+      monto: Math.round(datos.valor),
+      origen: "produccion",
+      ...(cantidad ? { cantidad } : {}),
+    },
+  ]);
+  return true;
 }
 
 /** Categorías de Contabilidad para los gastos de un lote */
