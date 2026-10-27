@@ -1097,7 +1097,7 @@ export default function CerdaDetalle() {
                 {/* Arete de oreja */}
                 <div className="relative flex h-16 min-w-[4.5rem] max-w-[8rem] shrink-0 items-center justify-center rounded-2xl bg-amber-300 px-3 pt-2 shadow-inner">
                   <span aria-hidden="true" className="absolute left-1/2 top-1.5 h-2 w-2 -translate-x-1/2 rounded-full bg-amber-50/90 ring-1 ring-amber-600/40" />
-                  <span className="truncate text-2xl font-black tabular-nums text-amber-950">{cerda.id}</span>
+                  <span className="truncate text-2xl font-black tabular-nums text-amber-950 arete-id">{cerda.id}</span>
                 </div>
                 <div className="min-w-0 pr-8">
                   <p className="text-xs font-medium uppercase tracking-[0.18em] text-sky-200/90">Ficha de la cerda</p>

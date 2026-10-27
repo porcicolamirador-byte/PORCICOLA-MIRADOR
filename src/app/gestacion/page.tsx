@@ -692,7 +692,7 @@ export default function Gestacion() {
                   <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${obtenerBarraColor(estadoLabel)}`} />
                   <div className="relative flex h-11 min-w-[3.25rem] max-w-full items-center justify-center rounded-xl bg-amber-300 px-2.5 pt-1.5 shadow-inner">
                     <span aria-hidden="true" className="absolute left-1/2 top-1 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-amber-50/90 ring-1 ring-amber-600/40" />
-                    <span className="truncate text-base font-black tabular-nums text-amber-950">{cerda.id}</span>
+                    <span className="truncate text-base font-black tabular-nums text-amber-950 arete-id">{cerda.id}</span>
                   </div>
                   <div className="w-full min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-950">{cerda.raza || "Sin raza"}</p>
@@ -804,7 +804,7 @@ export default function Gestacion() {
                             aria-hidden="true"
                             className="absolute left-1/2 top-[3px] h-1 w-1 -translate-x-1/2 rounded-full bg-white/90 ring-1 ring-amber-600/40"
                           />
-                          <span className="whitespace-nowrap text-[13px] font-black tabular-nums tracking-tight text-amber-950">{cerda.id}</span>
+                          <span className="whitespace-nowrap text-[13px] font-black tabular-nums tracking-tight text-amber-950 arete-id">{cerda.id}</span>
                         </div>
 
                         <div className="min-w-0 flex-1">

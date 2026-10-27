@@ -329,3 +329,7 @@ html.oscuro .bg-sky-50\/70 { background-color: color-mix(in srgb,#0ea5e9 14%,#1c
   60% { transform: translateX(-6px) } 80% { transform: translateX(4px) }
 }
 @media (prefers-reduced-motion: reduce) { .pin-sacudir { animation: none; } }
+
+/* ID de la cerda en el arete amarillo: siempre en negro (también en modo oscuro) */
+.arete-id,
+html.oscuro .arete-id { color: #111111; }
