@@ -1,8 +1,8 @@
 "use client";
 
 import Modal from "@/components/Modal";
-import PagoFactura from "@/components/PagoFactura";
-import { leerFacturas, leerProductos, saldoFactura, totalFactura } from "@/lib/datos";
+import PagoFactura, { PagoCredito } from "@/components/PagoFactura";
+import { guardarCuentasPorPagar, leerCuentasPorPagar, leerFacturas, leerProductos, saldoCuenta, saldoFactura, totalFactura } from "@/lib/datos";
 import { useMemo, useState, type FormEvent } from "react";
 import ModuloPage from "@/components/ModuloPage";
 import { Boton, Campo, Entrada, IconoMas, SeccionDesplegable, Selector, Vacio, EntradaPesos } from "@/components/ui";
@@ -175,20 +175,38 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
   const [monto, setMonto] = useState("");
   const [fecha, setFecha] = useState(hoy());
   const [loteId, setLoteId] = useState("");
+  const [pago, setPago] = useState<"" | "contado" | "credito">("");
+  const [error, setError] = useState("");
   const lotesActivos = abierta ? leerLotes().filter((l) => l.activo) : [];
 
   const cambiarTipo = (t: Movimiento["tipo"]) => {
     setTipo(t);
     setCategoria(CATEGORIAS[t][0]);
     if (t !== "ingreso") setLoteId("");
+    setPago("");
+    setError("");
   };
 
   const guardar = (e: FormEvent) => {
     e.preventDefault();
     const valor = Number(monto) || 0;
     if (valor <= 0) return;
+    if (tipo === "gasto" && !pago) return setError("Selecciona el método de pago: contado o crédito.");
     const lote = tipo === "ingreso" && loteId ? leerLotes().find((l) => l.id === loteId) : undefined;
     const texto = descripcion.trim();
+    if (tipo === "gasto" && pago === "credito") {
+      // A crédito: queda por pagar; cada abono se registra como gasto
+      guardarCuentasPorPagar([
+        ...leerCuentasPorPagar(),
+        { id: nuevoId(), fecha, descripcion: texto || categoria, categoria, total: valor, abonos: [] },
+      ]);
+      setDescripcion("");
+      setMonto("");
+      setPago("");
+      setError("");
+      onCerrar();
+      return;
+    }
     guardarMovimientos([
       ...leerMovimientos(),
       {
@@ -205,6 +223,8 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
     setDescripcion("");
     setMonto("");
     setLoteId("");
+    setPago("");
+    setError("");
     onCerrar();
   };
 
@@ -258,6 +278,31 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
             <Entrada type="date" value={fecha} onChange={setFecha} required />
           </Campo>
         </div>
+        {tipo === "gasto" && (
+          <Campo etiqueta="Método de pago *">
+            <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1">
+              {(["contado", "credito"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => {
+                    setPago(m);
+                    setError("");
+                  }}
+                  className={`rounded-xl py-2 text-sm font-semibold transition ${pago === m ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+                >
+                  {m === "contado" ? "Contado" : "Crédito"}
+                </button>
+              ))}
+            </div>
+          </Campo>
+        )}
+        {tipo === "gasto" && pago === "credito" && (
+          <p className="-mt-1.5 rounded-xl bg-orange-50 px-3 py-2 text-xs leading-snug text-orange-800 ring-1 ring-orange-100">
+            Queda en "Por pagar a crédito". Cada abono se registra como gasto en su fecha.
+          </p>
+        )}
+        {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
         <Boton type="submit" className="mt-1 w-full py-3">
           Guardar
         </Boton>
@@ -278,54 +323,78 @@ function cuentasLote(l: Lote, movimientos = leerMovimientos()) {
   return { alimento, otros, total, sinPrecio, porAnimal: l.vivos > 0 ? total / l.vivos : 0, ingresos, ingresosLote, utilidad: ingresos - total };
 }
 
-/* Facturas de Bodega a crédito con saldo pendiente: se abonan o pagan desde aquí */
+/* Por pagar a crédito: facturas de Bodega y gastos de Contabilidad con saldo; se abonan aquí */
+type ItemCredito =
+  | { clase: "factura"; id: string; fecha: string; titulo: string; detalle?: string; total: number; saldo: number }
+  | { clase: "gasto"; id: string; fecha: string; titulo: string; detalle?: string; total: number; saldo: number };
+
 function FacturasCredito({ version }: { version: number }) {
-  const facturas = useMemo(
-    () => (version < 0 ? [] : leerFacturas().filter((f) => f.pago === "credito" && saldoFactura(f) > 0).sort((a, b) => a.fecha.localeCompare(b.fecha))),
-    [version],
-  );
-  const [abierta, setAbierta] = useState<string | null>(null);
-  // Se busca entre todas: al pagarla deja la lista pero el módulo sigue abierto mostrando "pagada"
-  const factura = abierta ? (leerFacturas().find((f) => f.id === abierta) ?? null) : null;
-  if (facturas.length === 0 && !factura) return null;
-  const deuda = facturas.reduce((t, f) => t + saldoFactura(f), 0);
+  const items = useMemo<ItemCredito[]>(() => {
+    if (version < 0) return [];
+    const facturas: ItemCredito[] = leerFacturas()
+      .filter((f) => f.pago === "credito" && saldoFactura(f) > 0)
+      .map((f) => ({ clase: "factura", id: f.id, fecha: f.fecha, titulo: `Factura ${f.numero}`, detalle: f.proveedor, total: totalFactura(f), saldo: saldoFactura(f) }));
+    const gastos: ItemCredito[] = leerCuentasPorPagar()
+      .filter((c) => saldoCuenta(c) > 0)
+      .map((c) => ({ clase: "gasto", id: c.id, fecha: c.fecha, titulo: c.descripcion, detalle: c.categoria, total: c.total, saldo: saldoCuenta(c) }));
+    return [...facturas, ...gastos].sort((x, y) => x.fecha.localeCompare(y.fecha));
+  }, [version]);
+  const [abierta, setAbierta] = useState<{ clase: ItemCredito["clase"]; id: string } | null>(null);
+  // Se busca entre todos: al pagarse sale de la lista, pero el módulo sigue abierto mostrando "pagada"
+  const factura = abierta?.clase === "factura" ? (leerFacturas().find((f) => f.id === abierta.id) ?? null) : null;
+  const cuenta = abierta?.clase === "gasto" ? (leerCuentasPorPagar().find((c) => c.id === abierta.id) ?? null) : null;
+  if (items.length === 0 && !factura && !cuenta) return null;
+  const deuda = items.reduce((t, i) => t + i.saldo, 0);
+
+  const eliminarCuenta = async () => {
+    if (!cuenta) return;
+    if (
+      !(await confirmar({
+        titulo: "Eliminar gasto a crédito",
+        mensaje: `Se borrará "${cuenta.descripcion}"${cuenta.abonos.length ? " y los gastos de sus abonos" : ""}.`,
+        aceptar: "Eliminar",
+        destructivo: true,
+      }))
+    )
+      return;
+    const quitar = new Set(cuenta.abonos.map((a) => a.movimientoId).filter(Boolean));
+    if (quitar.size) guardarMovimientos(leerMovimientos().filter((m) => !quitar.has(m.id)));
+    guardarCuentasPorPagar(leerCuentasPorPagar().filter((c) => c.id !== cuenta.id));
+    setAbierta(null);
+  };
 
   return (
     <section>
       <h2 className="mb-1.5 flex items-baseline justify-between gap-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-        <span>Facturas a crédito · por pagar</span>
+        <span>Por pagar a crédito</span>
         <span className="normal-case tracking-normal font-semibold text-orange-600">{formatoPesos(deuda)}</span>
       </h2>
-      {facturas.length > 0 && (
-        <SeccionDesplegable titulo="Facturas a crédito" cantidad={facturas.length}>
-        <ul className="divide-y divide-slate-100 bg-white">
-          {facturas.map((f) => {
-            const total = totalFactura(f);
-            const saldo = saldoFactura(f);
-            return (
-              <li key={f.id}>
-                <button type="button" onClick={() => setAbierta(f.id)} className="flex w-full items-center gap-2.5 px-3 py-2 text-left active:bg-slate-50">
+      {items.length > 0 && (
+        <SeccionDesplegable titulo="Facturas y gastos a crédito" cantidad={items.length}>
+          <ul className="divide-y divide-slate-100 bg-white">
+            {items.map((i) => (
+              <li key={`${i.clase}-${i.id}`}>
+                <button type="button" onClick={() => setAbierta({ clase: i.clase, id: i.id })} className="flex w-full items-center gap-2.5 px-3 py-2 text-left active:bg-slate-50">
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold text-slate-900">
-                      Factura {f.numero}
-                      {f.proveedor ? <span className="font-normal text-slate-500"> · {f.proveedor}</span> : null}
+                      {i.titulo}
+                      {i.detalle ? <span className="font-normal text-slate-500"> · {i.detalle}</span> : null}
                     </span>
                     <span className="mt-1 block h-1 overflow-hidden rounded-full bg-slate-100">
-                      <span className="block h-full rounded-full bg-sky-500" style={{ width: `${total > 0 ? ((total - saldo) / total) * 100 : 0}%` }} />
+                      <span className="block h-full rounded-full bg-sky-500" style={{ width: `${i.total > 0 ? ((i.total - i.saldo) / i.total) * 100 : 0}%` }} />
                     </span>
                     <span className="mt-0.5 block truncate text-[11px] text-slate-500">
-                      {formatoFecha(f.fecha, true)} · total {formatoPesos(total)}
+                      {i.clase === "factura" ? "Bodega" : "Gasto"} · {formatoFecha(i.fecha, true)} · total {formatoPesos(i.total)}
                     </span>
                   </span>
                   <span className="shrink-0 text-right">
-                    <span className="block text-sm font-bold tabular-nums text-orange-600">{formatoPesos(saldo)}</span>
+                    <span className="block text-sm font-bold tabular-nums text-orange-600">{formatoPesos(i.saldo)}</span>
                     <span className="block text-[10px] text-slate-400">saldo</span>
                   </span>
                 </button>
               </li>
-            );
-          })}
-        </ul>
+            ))}
+          </ul>
         </SeccionDesplegable>
       )}
       {factura && (
@@ -343,6 +412,36 @@ function FacturasCredito({ version }: { version: number }) {
               <span className="text-lg font-bold tabular-nums text-sky-900">{formatoPesos(totalFactura(factura))}</span>
             </div>
             <PagoFactura factura={factura} productos={leerProductos()} />
+          </div>
+        </Modal>
+      )}
+      {cuenta && (
+        <Modal
+          abierta
+          etiqueta="Contabilidad · Gasto a crédito"
+          titulo={cuenta.descripcion}
+          subtitulo={`${formatoFecha(cuenta.fecha, true)} · ${cuenta.categoria}`}
+          icono="💸"
+          onCerrar={() => setAbierta(null)}
+        >
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between rounded-2xl bg-sky-50 px-4 py-3 ring-1 ring-sky-100">
+              <span className="text-sm font-medium text-sky-900">Total</span>
+              <span className="text-lg font-bold tabular-nums text-sky-900">{formatoPesos(cuenta.total)}</span>
+            </div>
+            <PagoCredito
+              credito
+              total={cuenta.total}
+              abonos={cuenta.abonos}
+              conGasto
+              categoria={cuenta.categoria}
+              descripcionAbono={`Abono · ${cuenta.descripcion}`}
+              onAbonos={(abonos) => guardarCuentasPorPagar(leerCuentasPorPagar().map((c) => (c.id === cuenta.id ? { ...c, abonos } : c)))}
+            />
+            <p className="text-center text-xs text-slate-500">Cada abono se registra como gasto en Contabilidad.</p>
+            <button type="button" onClick={() => void eliminarCuenta()} className="self-center rounded-full px-4 py-2 text-sm font-medium text-rose-600 active:bg-rose-50">
+              Eliminar gasto a crédito
+            </button>
           </div>
         </Modal>
       )}

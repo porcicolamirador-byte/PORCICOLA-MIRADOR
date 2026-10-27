@@ -26,6 +26,7 @@ const LISTAS = new Set([
   "engorde-lotes",
   "tratamientos",
   "contabilidad-movimientos",
+  "contabilidad-cuentas-pagar",
   "monitoreo-lecturas",
   "bioseguridad-visitas",
   "bodega-productos",

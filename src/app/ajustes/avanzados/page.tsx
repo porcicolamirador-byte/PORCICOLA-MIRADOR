@@ -1014,6 +1014,7 @@ const NOMBRES_COLECCION: Record<string, string> = {
   "engorde-lotes": "Lotes de engorde",
   tratamientos: "Tratamientos",
   "contabilidad-movimientos": "Movimientos contables",
+  "contabilidad-cuentas-pagar": "Gastos a crédito",
   "monitoreo-lecturas": "Lecturas de monitoreo",
   "bioseguridad-visitas": "Visitas",
   "bodega-productos": "Productos de bodega",

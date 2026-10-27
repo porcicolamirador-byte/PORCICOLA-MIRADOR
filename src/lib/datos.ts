@@ -15,6 +15,7 @@ export const CLAVES = {
   bioChecks: "bioseguridad-checks",
   bioVisitas: "bioseguridad-visitas",
   movimientos: "contabilidad-movimientos",
+  cuentasPagar: "contabilidad-cuentas-pagar",
   ajustes: "ajustes",
   lecturas: "monitoreo-lecturas",
   bodega: "bodega-articulos", // formato anterior (se migra al catálogo)
@@ -516,6 +517,20 @@ export const guardarSalidas = (s: SalidaBodega[]) => escribir(CLAVES.salidas, s)
 
 export const totalFactura = (f: Factura) =>
   f.lineas.reduce((s, l) => s + (Number(l.cantidad) || 0) * (Number(l.valorUnitario) || 0), 0);
+/** Gasto registrado a crédito en Contabilidad: se paga con abonos (cada abono es un gasto) */
+export interface CuentaPorPagar {
+  id: string;
+  fecha: string;
+  descripcion: string;
+  categoria: string;
+  total: number;
+  abonos: AbonoFactura[];
+}
+export const leerCuentasPorPagar = () =>
+  leer<CuentaPorPagar[]>(CLAVES.cuentasPagar, []).map((c) => ({ ...c, abonos: Array.isArray(c.abonos) ? c.abonos : [] }));
+export const guardarCuentasPorPagar = (c: CuentaPorPagar[]) => escribir(CLAVES.cuentasPagar, c);
+export const saldoCuenta = (c: CuentaPorPagar) => Math.max(0, (Number(c.total) || 0) - c.abonos.reduce((s, a) => s + (Number(a.monto) || 0), 0));
+
 /** Lo abonado a una factura a crédito */
 export const abonadoFactura = (f: Factura) => (f.abonos ?? []).reduce((s, a) => s + (Number(a.monto) || 0), 0);
 /** Lo que falta por pagar (0 en las de contado) */

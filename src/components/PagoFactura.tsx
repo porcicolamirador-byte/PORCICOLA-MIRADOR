@@ -11,7 +11,6 @@ import { Boton, Campo, Entrada, EntradaPesos, Insignia, SeccionDesplegable } fro
 import { avisar, confirmar } from "@/components/Dialogo";
 import { puede } from "@/lib/nube";
 import {
-  abonadoFactura,
   formatoFecha,
   formatoPesos,
   guardarFacturas,
@@ -20,8 +19,8 @@ import {
   leerFacturas,
   leerMovimientos,
   nuevoId,
-  saldoFactura,
   totalFactura,
+  type AbonoFactura,
   type CategoriaBodega,
   type Factura,
   type ProductoBodega,
@@ -41,24 +40,53 @@ export const CATEGORIA_GASTO: Record<CategoriaBodega, string> = {
   Otros: "Otros gastos",
 };
 
+/** Pago de una factura de Bodega */
 export default function PagoFactura({ factura: f, productos }: { factura: Factura; productos: ProductoBodega[] }) {
-  const credito = f.pago === "credito";
-  const total = totalFactura(f);
-  const abonado = abonadoFactura(f);
-  const saldo = saldoFactura(f);
-  const conGasto = f.registrarGasto ?? Boolean(f.movimientoId);
   const primero = productos.find((p) => p.id === f.lineas[0]?.productoId);
-  const categoria = primero ? CATEGORIA_GASTO[primero.categoria] : "Otros gastos";
-  const descripcion = (pre: string) => `${pre} ${f.numero}${f.proveedor ? ` · ${f.proveedor}` : ""}`;
+  return (
+    <PagoCredito
+      credito={f.pago === "credito"}
+      total={totalFactura(f)}
+      abonos={f.abonos ?? []}
+      conGasto={f.registrarGasto ?? Boolean(f.movimientoId)}
+      categoria={primero ? CATEGORIA_GASTO[primero.categoria] : "Otros gastos"}
+      descripcionAbono={`Abono factura ${f.numero}${f.proveedor ? ` · ${f.proveedor}` : ""}`}
+      onAbonos={(abonos) => guardarFacturas(leerFacturas().map((x) => (x.id === f.id ? { ...x, abonos } : x)))}
+    />
+  );
+}
+
+/**
+ * Pago a crédito (o de contado, solo informativo): saldo, abonos y pagar saldo.
+ * Cada abono se registra como gasto en Contabilidad si `conGasto`.
+ */
+export function PagoCredito({
+  credito,
+  total,
+  abonos,
+  conGasto,
+  categoria,
+  descripcionAbono,
+  onAbonos,
+}: {
+  credito: boolean;
+  total: number;
+  abonos: AbonoFactura[];
+  conGasto: boolean;
+  categoria: string;
+  descripcionAbono: string;
+  onAbonos: (abonos: AbonoFactura[]) => void;
+}) {
+  const abonado = abonos.reduce((s, a) => s + (Number(a.monto) || 0), 0);
+  const saldo = credito ? Math.max(0, total - abonado) : 0;
   const [abonando, setAbonando] = useState(false);
   const [montoAbono, setMontoAbono] = useState("");
   const [fechaAbono, setFechaAbono] = useState(hoy());
   const [errorAbono, setErrorAbono] = useState("");
 
-  const actualizar = (cambios: Partial<Factura>) => guardarFacturas(leerFacturas().map((x) => (x.id === f.id ? { ...x, ...cambios } : x)));
   const conPermiso = () => {
     if (puede("bodega") || puede("contabilidad")) return true;
-    void avisar({ titulo: "Sin permiso", mensaje: "Tu usuario no tiene permiso para registrar pagos de facturas. Pídeselo al administrador." });
+    void avisar({ titulo: "Sin permiso", mensaje: "Tu usuario no tiene permiso para registrar pagos a crédito. Pídeselo al administrador." });
     return false;
   };
 
@@ -69,9 +97,9 @@ export default function PagoFactura({ factura: f, productos }: { factura: Factur
     let movimientoId: string | undefined;
     if (conGasto) {
       movimientoId = nuevoId();
-      guardarMovimientos([...leerMovimientos(), { id: movimientoId, fecha, tipo: "gasto", categoria, descripcion: descripcion("Abono factura"), monto }]);
+      guardarMovimientos([...leerMovimientos(), { id: movimientoId, fecha, tipo: "gasto", categoria, descripcion: descripcionAbono, monto }]);
     }
-    actualizar({ abonos: [...(f.abonos ?? []), { id: nuevoId(), fecha, monto, movimientoId }] });
+    onAbonos([...abonos, { id: nuevoId(), fecha, monto, movimientoId }]);
     setAbonando(false);
     setMontoAbono("");
     setFechaAbono(hoy());
@@ -80,16 +108,16 @@ export default function PagoFactura({ factura: f, productos }: { factura: Factur
 
   const pagarSaldo = async () => {
     if (!conPermiso()) return;
-    if (!(await confirmar({ titulo: "Pagar saldo", mensaje: `Se registrará un pago de ${formatoPesos(saldo)} con fecha de hoy y la factura quedará pagada.`, aceptar: "Pagar" }))) return;
+    if (!(await confirmar({ titulo: "Pagar saldo", mensaje: `Se registrará un pago de ${formatoPesos(saldo)} con fecha de hoy y quedará pagada.`, aceptar: "Pagar" }))) return;
     abonar(saldo, hoy());
   };
 
   const eliminarAbono = async (id: string) => {
     if (!conPermiso()) return;
-    const a = (f.abonos ?? []).find((x) => x.id === id);
+    const a = abonos.find((x) => x.id === id);
     if (!a) return;
     if (!(await confirmar({ titulo: "Eliminar abono", mensaje: `Se quitará el abono de ${formatoPesos(a.monto)}${a.movimientoId ? " y su gasto en Contabilidad" : ""}.`, aceptar: "Eliminar", destructivo: true }))) return;
-    actualizar({ abonos: (f.abonos ?? []).filter((x) => x.id !== id) });
+    onAbonos(abonos.filter((x) => x.id !== id));
     if (a.movimientoId) guardarMovimientos(leerMovimientos().filter((m) => m.id !== a.movimientoId));
   };
 
@@ -153,11 +181,11 @@ export default function PagoFactura({ factura: f, productos }: { factura: Factur
         {!credito && <p className="w-full text-center text-[11px] text-slate-400">Pagada de contado · el método de pago no se puede cambiar</p>}
         {credito && saldo <= 0 && <p className="w-full text-center text-[11px] text-sky-700">Crédito pagado por completo</p>}
       </div>
-      {credito && (f.abonos?.length ?? 0) > 0 && (
+      {credito && abonos.length > 0 && (
         <div className="border-t border-slate-100 p-2">
-          <SeccionDesplegable titulo="Abonos" cantidad={f.abonos!.length}>
+          <SeccionDesplegable titulo="Abonos" cantidad={abonos.length}>
             <ul className="divide-y divide-slate-100 bg-white">
-              {[...f.abonos!].sort((a, b) => b.fecha.localeCompare(a.fecha)).map((a) => (
+              {[...abonos].sort((a, b) => b.fecha.localeCompare(a.fecha)).map((a) => (
                 <li key={a.id} className="flex items-center gap-3 px-3.5 py-2.5">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold tabular-nums text-slate-900">{formatoPesos(a.monto)}</p>
