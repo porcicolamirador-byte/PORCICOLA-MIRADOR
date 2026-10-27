@@ -220,7 +220,7 @@ export default function BodegaPage() {
                       {cat} · {items.length}
                     </h2>
                     <div className="grid grid-cols-2 gap-2">
-                      {items.map(({ producto: p, existencia, disponible, subproducto, bajoMinimo, sinCompras, ultimoPrecio }) => {
+                      {items.map(({ producto: p, existencia, disponible, subproducto, bajoMinimo, sinCompras }) => {
                         const nuevo = !subproducto && sinCompras;
                         const agotado = !subproducto && !nuevo && existencia <= 0;
                         const referencia = Math.max(p.minimo * 3, p.minimo + 1, 1);
@@ -266,7 +266,6 @@ export default function BodegaPage() {
                             <p className="text-[10px] leading-tight text-slate-500">
                               Mín. {fmt(p.minimo)} {p.unidad}
                               {p.unidad === "bultos" && existencia > 0 ? ` · ${fmt(existencia * factorKg(p))} kg` : ""}
-                              {ultimoPrecio > 0 && existencia > 0 ? ` · ${formatoPesos(existencia * ultimoPrecio)}` : ""}
                             </p>
                             </>
                             )}
@@ -799,6 +798,7 @@ function TarjetaConsumoCerdas() {
   if (!datos || datos.cerdas === 0) return null;
   const minimo = [datos.gestacion, datos.lactancia].filter((a) => a.dias !== null).sort((a, b) => a.dias! - b.dias!)[0];
   const revisar = [datos.gestacion, datos.lactancia].some(agotado);
+  const naranja = revisar || [datos.gestacion, datos.lactancia].some(porAgotarse);
   const kgDia = datos.gestacion.kgDia + datos.lactancia.kgDia;
 
   return (
@@ -821,7 +821,7 @@ function TarjetaConsumoCerdas() {
           </span>
         </span>
         <span className="shrink-0 text-right">
-          <span className={`block text-sm font-bold tabular-nums ${revisar ? "text-orange-600" : "text-slate-900"}`}>
+          <span className={`block text-sm font-bold tabular-nums ${naranja ? "text-orange-600" : "text-slate-900"}`}>
             {revisar ? "Revisar" : minimo ? `${minimo.dias} días` : "–"}
           </span>
           <span className="block text-[10px] text-slate-400">{revisar ? "alimento en 0" : "alcanza"}</span>
@@ -850,9 +850,11 @@ function TarjetaConsumoCerdas() {
 
 /** El alimento llegó a 0 en bodega: se revisa (depende de la condición corporal de cada cerda) */
 const agotado = (a: ConsumoAlimentoCerdas) => a.existenciaKg !== null && a.existenciaKg <= 0.01;
+/** Queda para unos 2 días o menos: se avisa en naranja */
+const porAgotarse = (a: ConsumoAlimentoCerdas) => a.dias !== null && a.dias <= 2;
 
 function BloqueConsumo({ titulo, a }: { titulo: string; a: ConsumoAlimentoCerdas }) {
-  const alerta = agotado(a);
+  const alerta = agotado(a) || porAgotarse(a);
   return (
     <section className="overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/80">
       <div className="flex items-center gap-2 px-3.5 pb-2 pt-3">
@@ -876,7 +878,7 @@ function BloqueConsumo({ titulo, a }: { titulo: string; a: ConsumoAlimentoCerdas
         <div className={`rounded-xl px-1.5 py-2 ${alerta ? "bg-orange-50" : "bg-sky-50"}`}>
           <p className={`text-[10px] font-medium uppercase tracking-wide ${alerta ? "text-orange-600" : "text-sky-700"}`}>Alcanza</p>
           <p className={`text-[13px] font-bold tabular-nums ${alerta ? "text-orange-600" : "text-sky-900"}`}>
-            {alerta ? "Revisar" : a.dias !== null ? `${a.dias} días` : "–"}
+            {agotado(a) ? "Revisar" : a.dias !== null ? `${a.dias} días` : "–"}
           </p>
           <p className="text-[10px] text-slate-500">{a.existenciaKg !== null ? `hay ${bultosTexto(a.existenciaKg, a.kgBulto)}` : "sin producto"}</p>
         </div>
