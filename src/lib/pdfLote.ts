@@ -21,6 +21,8 @@ const BLANCO: RGB = [255, 255, 255];
 
 export interface MovimientoLotePdf {
   fecha: string; // AAAA-MM-DD
+  /** Primer registro cuando la fila junta varios (se muestra como rango) */
+  fechaDesde?: string;
   concepto: string;
   categoria: string;
   tipo: "ingreso" | "costo";
@@ -239,7 +241,8 @@ export function generarPdfLote(d: DatosPdfLote): Blob {
       encabezadoDetalle();
     }
     const valor = m.tipo === "ingreso" ? pesos(m.valor) : `(${pesos(m.valor)})`;
-    L.texto(M + 8, y, fecha(m.fecha), 8.5, P500);
+    const f = m.fechaDesde && m.fechaDesde !== m.fecha ? `${fecha(m.fechaDesde).slice(0, 5)}–${fecha(m.fecha).slice(0, 5)}` : fecha(m.fecha);
+    L.texto(M + 8, y, f, 8.5, P500);
     L.texto(M + 78, y, recortar(m.concepto, 212, 8.5), 8.5, P900);
     L.texto(M + 300, y, recortar(m.categoria, DER - M - 300 - 100, 8.5), 8.5, P500);
     der(L, DER - 8, y, valor, 8.5, m.tipo === "ingreso" ? AZUL_TEXTO : P900, true);
