@@ -832,14 +832,7 @@ export default function Gestacion() {
                       </div>
 
                       {/* Datos clave */}
-                      <div className="space-y-2 text-sm text-slate-600">
-                        <p className="flex items-center gap-2">
-                          <span aria-hidden="true">📅</span>
-                          {ultimoRegistro?.tipo === "Inseminación"
-                            ? `IA: ${formatearFechaCorta(ultimoRegistro.fecha)}`
-                            : `Llegada: ${formatearFechaCorta(cerda.fecha)}`}
-                        </p>
-
+                      <div className="space-y-2 text-sm text-slate-600 empty:hidden">
                         {progresoGestacion !== null && estadoLabel === "Gestación" ? (
                           <div>
                             <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
@@ -860,11 +853,6 @@ export default function Gestacion() {
                               />
                             </div>
                           </div>
-                        ) : diasDesdeInseminacion !== null ? (
-                          <p className="flex items-center gap-2">
-                            <span aria-hidden="true">⏱</span>
-                            {diasDesdeInseminacion} días desde la IA
-                          </p>
                         ) : null}
 
                         {cerda.caracteristicas ? (
