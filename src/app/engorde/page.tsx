@@ -495,6 +495,10 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   // Otro gasto del lote (medicamento, vacuna, insumo…)
   const [gastoDesc, setGastoDesc] = useState("");
   const [gastoCant, setGastoCant] = useState("");
+  const [gastoUnidad, setGastoUnidad] = useState("");
+  // Otro gasto: valor unitario × cantidad = total
+  const gastoCantNum = Number(gastoCant.replace(",", ".")) || 0;
+  const gastoTotal = Math.round(gastoCantNum * (Number(valor.replace(/\D/g, "")) || 0));
   const [gastoCat, setGastoCat] = useState(CATEGORIAS_GASTO_LOTE[0]);
   const [gastoPago, setGastoPago] = useState<"" | "contado" | "credito">("");
   const [productoId, setProductoId] = useState("");
@@ -532,6 +536,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
     setExtra("");
     setGastoDesc("");
     setGastoCant("");
+    setGastoUnidad("");
     setGastoCat(CATEGORIAS_GASTO_LOTE[0]);
     setGastoPago("");
     setProductoId("");
@@ -578,9 +583,9 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
       return;
     }
     if (accion === "gasto") {
-      const monto = Number(valor.replace(/\D/g, "")) || 0;
-      if (!gastoDesc.trim() || monto <= 0 || !gastoPago) return;
-      registrarGastoLote(lote.id, { descripcion: gastoDesc, cantidad: gastoCant, valor: monto, categoria: gastoCat, fecha, hora, pago: gastoPago });
+      if (!gastoDesc.trim() || gastoTotal <= 0 || !gastoPago) return;
+      const cantidadTexto = `${String(gastoCantNum).replace(".", ",")} ${gastoUnidad.trim()}`.trim();
+      registrarGastoLote(lote.id, { descripcion: gastoDesc, cantidad: cantidadTexto, valor: gastoTotal, categoria: gastoCat, fecha, hora, pago: gastoPago });
       limpiar();
       return;
     }
@@ -942,12 +947,28 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                 <Entrada value={gastoDesc} onChange={(v) => setGastoDesc(v.slice(0, 80))} placeholder="Dato" required />
               </Campo>
               <div className="grid grid-cols-2 gap-3">
-                <Campo etiqueta="Cantidad">
-                  <Entrada value={gastoCant} onChange={(v) => setGastoCant(v.slice(0, 40))} placeholder="Dato" />
+                <Campo etiqueta="Cantidad *">
+                  <Entrada
+                    type="text"
+                    inputMode="decimal"
+                    value={gastoCant}
+                    onChange={(v) => setGastoCant(v.replace(/[^\d.,]/g, "").slice(0, 8))}
+                    placeholder="Dato"
+                    required
+                  />
                 </Campo>
-                <Campo etiqueta="Valor total">
-                  <EntradaPesos value={valor} onChange={setValor} placeholder="Dato" required />
+                <Campo etiqueta="Unidad">
+                  <Entrada value={gastoUnidad} onChange={(v) => setGastoUnidad(v.slice(0, 20))} placeholder="Dato" />
                 </Campo>
+              </div>
+              <Campo etiqueta="Valor unitario *">
+                <EntradaPesos value={valor} onChange={setValor} placeholder="Dato" required />
+              </Campo>
+              <div className="flex items-center justify-between rounded-xl bg-sky-50 px-3.5 py-2.5 ring-1 ring-sky-100">
+                <span className="text-sm text-sky-800">
+                  Total{gastoCantNum > 0 && gastoTotal > 0 ? <span className="text-xs text-sky-700/80"> · {String(gastoCantNum).replace(".", ",")} × {formatoPesos(gastoTotal / gastoCantNum)}</span> : null}
+                </span>
+                <span className="text-base font-bold tabular-nums text-sky-900">{formatoPesos(gastoTotal)}</span>
               </div>
               <Campo etiqueta="Categoría en Contabilidad">
                 <Selector value={gastoCat} onChange={setGastoCat} opciones={CATEGORIAS_GASTO_LOTE.map((c) => ({ valor: c, texto: c }))} />
@@ -1035,7 +1056,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                 (accion === "corral" && (!corralSel || corrales.length === 0)) ||
                 (esAlimento && !legado && (!elegido || cantidadNum <= 0 || excede)) ||
                 (legado && cantidadNum <= 0) ||
-                (accion === "gasto" && (!gastoDesc.trim() || !(Number(valor.replace(/\D/g, "")) > 0) || !gastoPago))
+                (accion === "gasto" && (!gastoDesc.trim() || !(gastoTotal > 0) || !gastoPago))
               }
             >
               Guardar
