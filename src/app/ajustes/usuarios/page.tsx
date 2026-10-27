@@ -7,8 +7,10 @@ import Modal from "@/components/Modal";
 import { Boton, Campo, Entrada, IconoMas, Interruptor } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
 import { ajustesDesbloqueados } from "@/lib/acceso";
-import { actualizarUsuario, crearUsuario, ErrorNube, listarUsuarios, perfilGuardado, type PerfilNube, type PermisoNube } from "@/lib/nube";
+import { actualizarUsuario, crearUsuario, eliminarUsuario, ErrorNube, listarUsuarios, perfilGuardado, type PerfilNube, type PermisoNube } from "@/lib/nube";
 import { registrarLog } from "@/lib/log";
+import { leerConfig } from "@/lib/config";
+import DialogoClave from "@/components/DialogoClave";
 
 const sinSuscripcion = () => () => {};
 
@@ -110,6 +112,10 @@ export default function UsuariosPage() {
             setUsuarios((lista) => (nuevo ? [...(lista ?? []), u] : (lista ?? []).map((x) => (x.id === u.id ? u : x))));
             setEditando(null);
           }}
+          onEliminado={(id) => {
+            setUsuarios((lista) => (lista ?? []).filter((x) => x.id !== id));
+            setEditando(null);
+          }}
         />
       )}
     </ModuloPage>
@@ -157,13 +163,45 @@ function EditorUsuario({
   esYo,
   onCerrar,
   onGuardado,
+  onEliminado,
 }: {
   usuario: PerfilNube | null;
   esYo: boolean;
   onCerrar: () => void;
   onGuardado: (u: PerfilNube, nuevo: boolean) => void;
+  onEliminado: (id: string) => void;
 }) {
   const nuevo = !usuario;
+  const [pedirClave, setPedirClave] = useState(false);
+
+  // Eliminar para siempre: confirmación y, si está activa, la clave de eliminación
+  const pedirEliminar = async () => {
+    if (!usuario) return;
+    const ok = await confirmar({
+      titulo: `Eliminar a ${usuario.nombre}`,
+      mensaje: `Se borrará el usuario @${usuario.usuario} para siempre y no podrá volver a entrar. Lo que registró en la granja se conserva. Si solo quieres quitarle el acceso por un tiempo, mejor desactívalo.`,
+      aceptar: "Eliminar",
+      destructivo: true,
+    });
+    if (!ok) return;
+    if (leerConfig().claveEliminarActiva) setPedirClave(true);
+    else void eliminar();
+  };
+
+  const eliminar = async () => {
+    if (!usuario) return;
+    setOcupado(true);
+    setError("");
+    try {
+      await eliminarUsuario(usuario.id);
+      registrarLog([{ accion: "Eliminación", modulo: "Usuarios", detalle: `Usuario @${usuario.usuario} (${usuario.nombre}) eliminado` }]);
+      onEliminado(usuario.id);
+    } catch (err) {
+      setError(mensajeDe(err));
+    } finally {
+      setOcupado(false);
+    }
+  };
   const [nombre, setNombre] = useState(usuario?.nombre ?? "");
   const [nombreUsuario, setNombreUsuario] = useState(usuario?.usuario ?? "");
   const [rol, setRol] = useState<PerfilNube["rol"]>(usuario?.rol ?? "trabajador");
@@ -223,6 +261,7 @@ function EditorUsuario({
   };
 
   return (
+    <>
     <Modal abierta etiqueta="Usuarios" titulo={nuevo ? "Nuevo usuario" : usuario!.nombre} subtitulo={nuevo ? undefined : `@${usuario!.usuario}`} icono={icono} onCerrar={onCerrar}>
       <form onSubmit={guardar} className="flex flex-col gap-3.5">
         <Campo etiqueta="Nombre">
@@ -298,7 +337,26 @@ function EditorUsuario({
             {ocupado ? "Guardando…" : nuevo ? "Crear" : "Guardar"}
           </Boton>
         </div>
+        {!nuevo && !esYo && (
+          <Boton variante="suave" onClick={() => void pedirEliminar()} disabled={ocupado} className="w-full text-rose-600">
+            Eliminar usuario
+          </Boton>
+        )}
       </form>
     </Modal>
+      <DialogoClave
+        abierto={pedirClave}
+        titulo="Clave de eliminación"
+        mensaje={`Ingresa la clave para eliminar a ${usuario?.nombre ?? ""}.`}
+        aceptar="Eliminar"
+        onValidar={(codigo) => {
+          if (codigo !== leerConfig().claveEliminar) return false;
+          setPedirClave(false);
+          void eliminar();
+          return true;
+        }}
+        onCerrar={() => setPedirClave(false)}
+      />
+    </>
   );
 }

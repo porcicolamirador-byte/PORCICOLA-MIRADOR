@@ -3,6 +3,7 @@
 //   { accion: "listar" }
 //   { accion: "crear", usuario, nombre, pin, rol?, permisos? }
 //   { accion: "actualizar", id, nombre?, rol?, permisos?, activo?, pin? }
+//   { accion: "eliminar", id }   → borra la cuenta para siempre (sus registros se conservan)
 //   { accion: "yo" }   → perfil del usuario que llama (cualquier usuario activo)
 import { admin, contrasenaDe, correoDe, CORS, json, PIN_VALIDO, usuarioDeLaPeticion, USUARIO_VALIDO } from "../_compartido/comun.ts";
 
@@ -106,6 +107,22 @@ Deno.serve(async (req) => {
         await admin.auth.admin.updateUserById(id, { ban_duration: cambios.activo ? "none" : "876000h" });
       }
       return json({ usuario: perfil });
+    }
+
+    if (accion === "eliminar") {
+      const id = String(cuerpo.id ?? "");
+      if (id === yo.id) return json({ error: "No puedes eliminar tu propio usuario" }, 400);
+      const { data: actual } = await admin.from("perfiles").select("id, usuario, rol, activo").eq("id", id).maybeSingle();
+      if (!actual) return json({ error: "Usuario no encontrado" }, 404);
+      if (actual.rol === "admin") {
+        const { count } = await admin.from("perfiles").select("id", { count: "exact", head: true }).eq("rol", "admin").eq("activo", true).neq("id", id);
+        if ((count ?? 0) === 0) return json({ error: "No se puede eliminar al último administrador" }, 400);
+      }
+      // Borra la cuenta: el perfil se borra con ella; en los datos y el registro queda sin usuario asignado
+      const { error } = await admin.auth.admin.deleteUser(id);
+      if (error) return json({ error: "No se pudo eliminar el usuario" }, 500);
+      await admin.rpc("registrar_intento_pin", { p_usuario: actual.usuario, p_exito: true });
+      return json({ eliminado: id, usuario: actual.usuario });
     }
 
     return json({ error: "Acción desconocida" }, 400);

@@ -226,3 +226,6 @@ export const actualizarUsuario = (
   id: string,
   cambios: Partial<Pick<PerfilNube, "nombre" | "rol" | "permisos" | "activo">> & { pin?: string },
 ) => llamarFuncion<{ usuario: PerfilNube }>("usuarios", { accion: "actualizar", id, ...cambios }).then((r) => r.usuario);
+
+/** Borra un usuario para siempre (solo administrador). Sus registros se conservan. */
+export const eliminarUsuario = (id: string) => llamarFuncion<{ eliminado: string; usuario: string }>("usuarios", { accion: "eliminar", id });
