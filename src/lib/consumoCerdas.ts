@@ -12,7 +12,6 @@ import {
   calcularInventario,
   codigoDe,
   diasEntre,
-  estadoDeCerda,
   factorKg,
   hoy,
   leerCerdas,
@@ -39,7 +38,14 @@ export interface ConsumoAlimentoCerdas {
   grupos: { texto: string; cerdas: number; kg: number }[];
 }
 
-/** Cerdas en cada regla hoy */
+/**
+ * Cerdas en cada regla hoy, según el último registro de la cerda (el mismo
+ * estado que muestra Gestación):
+ *  - Parto → lactancia;
+ *  - Inseminación con el día de cambio (100) cumplido → pre-parto (alimento de lactancia);
+ *  - cualquier otro estado (inseminación antes del día 100, celo, destete,
+ *    aborto, baja, tratamiento, evento o sin registros) → alimento de gestación.
+ */
 function contarCerdas(diaCambio: number) {
   const hoyIso = hoy();
   let gestantes = 0;
@@ -47,14 +53,10 @@ function contarCerdas(diaCambio: number) {
   let preparto = 0;
   let lactando = 0;
   for (const c of leerCerdas()) {
-    const historial = leerHistorial(c.id);
-    const estado = estadoDeCerda(historial);
-    if (estado === "Fuera del hato") continue;
-    if (estado === "Lactancia") lactando++;
-    else if (estado === "Gestación") {
-      const ia = historial.find((h) => h.tipo === "Inseminación");
-      const dias = ia ? diasEntre(ia.fecha, hoyIso) : 0;
-      if (dias >= diaCambio) preparto++;
+    const ultimo = leerHistorial(c.id)[0];
+    if (ultimo?.tipo === "Parto") lactando++;
+    else if (ultimo?.tipo === "Inseminación") {
+      if (diasEntre(ultimo.fecha, hoyIso) >= diaCambio) preparto++;
       else gestantes++;
     } else vacias++;
   }
@@ -179,8 +181,8 @@ export function calcularConsumoCerdas(): { gestacion: ConsumoAlimentoCerdas; lac
   return {
     cerdas: gestantes + vacias + preparto + lactando,
     gestacion: armar(reglas.codigoGestacion, [
-      { texto: `Gestación (hasta el día ${reglas.diaCambio})`, cerdas: gestantes, kgPorCerda: reglas.gestacion },
-      { texto: "Vacías, en celo u otro estado", cerdas: vacias, kgPorCerda: reglas.gestacion },
+      { texto: `Inseminadas (hasta el día ${reglas.diaCambio})`, cerdas: gestantes, kgPorCerda: reglas.gestacion },
+      { texto: "Otros estados (celo, destete, tratamiento…)", cerdas: vacias, kgPorCerda: reglas.gestacion },
     ]),
     lactancia: armar(reglas.codigoLactancia, [
       { texto: `Pre-parto (día ${reglas.diaCambio} al parto)`, cerdas: preparto, kgPorCerda: reglas.preparto },
