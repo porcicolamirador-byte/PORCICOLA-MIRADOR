@@ -172,6 +172,7 @@ export default function CerdaDetalle() {
   const [fecha, setFecha] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [valorGenetica, setValorGenetica] = useState("");
+  const [geneticaEnContabilidad, setGeneticaEnContabilidad] = useState(true);
   const [filtro, setFiltro] = useState("Todos");
   const [mensajeAviso, setMensajeAviso] = useState("");
   const [mostrarInfo, setMostrarInfo] = useState(false);
@@ -222,6 +223,7 @@ export default function CerdaDetalle() {
       setFecha("");
       setDescripcion("");
       setValorGenetica("");
+      setGeneticaEnContabilidad(true);
     }
   }, [mostrarForm]);
 
@@ -446,14 +448,16 @@ export default function CerdaDetalle() {
     let nuevo: any = { id: nuevoId(), tipo, fecha, descripcion };
 
     if (tipo === "Inseminación") {
-      // Gasto de la genética en Contabilidad, ligado a la cerda por su ID
-      const movimientoId = nuevoId();
-      guardarMovimientos([
-        ...leerMovimientos(),
-        { id: movimientoId, fecha, tipo: "gasto", categoria: "Genética", descripcion: `Genética · inseminación cerda ${id}`, monto: genetica, cerdaId: String(id) },
-      ]);
+      // El valor queda siempre en la cerda; en Contabilidad solo si se marcó
       nuevo.valorGenetica = genetica;
-      nuevo.movimientoId = movimientoId;
+      if (geneticaEnContabilidad) {
+        const movimientoId = nuevoId();
+        guardarMovimientos([
+          ...leerMovimientos(),
+          { id: movimientoId, fecha, tipo: "gasto", categoria: "Genética", descripcion: `Genética · inseminación cerda ${id}`, monto: genetica, cerdaId: String(id) },
+        ]);
+        nuevo.movimientoId = movimientoId;
+      }
       const partoEst = calcularParto(fecha);
       nuevo.partoEstimado = partoEst;
       nuevo.mensaje = `Parto estimado: ${formatearFechaCorta(partoEst)}`;
@@ -1070,7 +1074,16 @@ export default function CerdaDetalle() {
                         className="w-full pl-8 pr-4 py-2 rounded-2xl bg-gray-100 border border-gray-300 text-black outline-none box-border"
                       />
                     </div>
-                    <p className="mt-1 text-xs text-gray-500">Se registra como gasto en Contabilidad a nombre de esta cerda.</p>
+                    <label className="mt-2 flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={geneticaEnContabilidad}
+                        onChange={(e) => setGeneticaEnContabilidad(e.target.checked)}
+                        className="h-5 w-5 accent-sky-700"
+                      />
+                      Registrar como gasto en Contabilidad
+                    </label>
+                    <p className="mt-1 text-xs text-gray-500">El valor siempre queda guardado en esta cerda.</p>
                   </div>
                 )}
 
