@@ -376,7 +376,7 @@ function NuevaFactura({
   const [nota, setNota] = useState("");
   const [lineas, setLineas] = useState<LineaForm[]>([lineaVacia()]);
   const [comoGasto, setComoGasto] = useState(true);
-  const [pago, setPago] = useState<"contado" | "credito">("contado");
+  const [pago, setPago] = useState<"" | "contado" | "credito">("");
   const [error, setError] = useState("");
 
   const ordenados = [...productos].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
@@ -391,7 +391,7 @@ function NuevaFactura({
     setNota("");
     setLineas([lineaVacia()]);
     setComoGasto(true);
-    setPago("contado");
+    setPago("");
     setError("");
   };
   const cerrar = () => {
@@ -411,6 +411,7 @@ function NuevaFactura({
     const validas = lineas.filter((l) => l.productoId && num(l.cantidad) > 0);
     if (validas.length === 0) return setError("Agrega al menos un producto con su cantidad.");
     if (lineas.some((l) => l.productoId && num(l.cantidad) <= 0)) return setError("Hay productos sin cantidad.");
+    if (!pago) return setError("Selecciona el método de pago: contado o crédito.");
     const ids = validas.map((l) => l.productoId);
     if (new Set(ids).size !== ids.length) return setError("Un producto está repetido; súmalo en una sola línea.");
     const repetida = facturas.find(
@@ -557,13 +558,16 @@ function NuevaFactura({
           <span className="text-sm font-medium text-sky-900">Total de la factura</span>
           <span className="text-lg font-bold text-sky-900 tabular-nums">{formatoPesos(total)}</span>
         </div>
-        <Campo etiqueta="Método de pago">
+        <Campo etiqueta="Método de pago *">
           <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1">
             {(["contado", "credito"] as const).map((m) => (
               <button
                 key={m}
                 type="button"
-                onClick={() => setPago(m)}
+                onClick={() => {
+                  setPago(m);
+                  setError("");
+                }}
                 className={`rounded-xl py-2 text-sm font-semibold transition ${pago === m ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
               >
                 {m === "contado" ? "Contado" : "Crédito"}
@@ -578,7 +582,7 @@ function NuevaFactura({
         )}
         <label className="flex items-center gap-2 text-sm text-slate-700">
           <input type="checkbox" checked={comoGasto} onChange={(e) => setComoGasto(e.target.checked)} className="h-5 w-5 accent-sky-700" />
-          {pago === "contado" ? "Registrar el total como gasto en Contabilidad" : "Registrar cada abono como gasto en Contabilidad"}
+          {pago === "credito" ? "Registrar cada abono como gasto en Contabilidad" : "Registrar el total como gasto en Contabilidad"}
         </label>
 
         {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
@@ -841,6 +845,7 @@ function DetalleFactura({ factura: f, productos, onCerrar }: { factura: Factura;
     if (a.movimientoId) guardarMovimientos(leerMovimientos().filter((m) => m.id !== a.movimientoId));
   };
 
+  /** Solo una factura a crédito puede pasar a contado (las de contado no cambian) */
   const cambiarMetodo = async () => {
     if (!conPermiso()) return;
     if (credito) {
@@ -854,10 +859,6 @@ function DetalleFactura({ factura: f, productos, onCerrar }: { factura: Factura;
       }
       guardarMovimientos(movimientos);
       actualizar({ pago: "contado", abonos: undefined, movimientoId, registrarGasto: conGasto });
-    } else {
-      if (!(await confirmar({ titulo: "Cambiar a crédito", mensaje: "La factura quedará con todo el saldo pendiente. Después podrás registrar abonos.", aceptar: "Cambiar" }))) return;
-      if (f.movimientoId) guardarMovimientos(leerMovimientos().filter((m) => m.id !== f.movimientoId));
-      actualizar({ pago: "credito", abonos: [], movimientoId: undefined, registrarGasto: conGasto });
     }
   };
 
@@ -933,9 +934,13 @@ function DetalleFactura({ factura: f, productos, onCerrar }: { factura: Factura;
                 <Boton variante="secundario" onClick={() => abonar(saldo, hoy())} className="flex-1">Pagar saldo</Boton>
               </>
             )}
-            <button type="button" onClick={() => void cambiarMetodo()} className="w-full rounded-full py-1.5 text-xs font-semibold text-sky-700 active:bg-sky-50">
-              Cambiar a {credito ? "contado" : "crédito"}
-            </button>
+            {credito ? (
+              <button type="button" onClick={() => void cambiarMetodo()} className="w-full rounded-full py-1.5 text-xs font-semibold text-sky-700 active:bg-sky-50">
+                Cambiar a contado
+              </button>
+            ) : (
+              <p className="w-full text-center text-[11px] text-slate-400">Pagada de contado · el método de pago no se puede cambiar</p>
+            )}
           </div>
           {credito && (f.abonos?.length ?? 0) > 0 && (
             <div className="border-t border-slate-100 p-2">
