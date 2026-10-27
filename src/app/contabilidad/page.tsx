@@ -20,6 +20,7 @@ import { confirmar } from "@/components/Dialogo";
 import { puede } from "@/lib/nube";
 import { cargarLogoJpeg, entregarPdf } from "@/lib/pdfFicha";
 import { generarPdfContabilidad } from "@/lib/pdfContabilidad";
+import { generarPdfLote } from "@/lib/pdfLote";
 import { nombreGranjaActual } from "@/lib/sincronizar";
 
 const CATEGORIAS: Record<Movimiento["tipo"], string[]> = {
@@ -307,6 +308,59 @@ function ContabilidadLotes({ version }: { version: number }) {
 
 function DetalleCuentasLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   const c = cuentasLote(lote);
+  const [exportando, setExportando] = useState(false);
+
+  // PDF con solo la información contable del lote
+  const exportarPdf = async () => {
+    if (exportando) return;
+    setExportando(true);
+    try {
+      const logo = await cargarLogoJpeg("/images/logo.png");
+      const movimientos = [
+        ...lote.alimento
+          .filter((a) => Number(a.costo) > 0)
+          .map((a) => ({
+            fecha: a.fecha,
+            concepto: a.producto ? `${a.cantidad ?? ""} ${a.unidad ?? ""} ${a.producto}`.replace(/\s+/g, " ").trim() : `Alimento ${a.kg} kg`,
+            categoria: "Alimento",
+            tipo: "costo" as const,
+            valor: Number(a.costo) || 0,
+          })),
+        ...(lote.gastos ?? []).map((g) => ({
+          fecha: g.fecha,
+          concepto: `${g.descripcion}${g.cantidad ? ` (${g.cantidad})` : ""}`,
+          categoria: g.categoria,
+          tipo: "costo" as const,
+          valor: g.valor,
+        })),
+        ...c.ingresosLote.map((m) => ({
+          fecha: m.fecha,
+          concepto: m.descripcion.replace(` · ${nombreLote(lote)}`, "") || m.categoria,
+          categoria: m.categoria,
+          tipo: "ingreso" as const,
+          valor: m.monto,
+        })),
+      ];
+      const blob = generarPdfLote({
+        granja: nombreGranjaActual(),
+        codigo: lote.codigo ?? "Lote",
+        nombre: lote.nombre && lote.nombre !== lote.codigo ? lote.nombre : `${lote.cantidadInicial} animales`,
+        estado: lote.activo ? "Activo" : "Cerrado",
+        fechaIngreso: lote.fechaIngreso,
+        fechaCorte: lote.activo ? hoy() : lote.fechaSalida || hoy(),
+        animalesIniciales: lote.cantidadInicial,
+        animalesVivos: lote.vivos,
+        kgAlimento: lote.alimento.filter((a) => Number(a.costo) > 0).reduce((s, a) => s + (Number(a.kg) || 0), 0),
+        registrosSinPrecio: c.sinPrecio,
+        movimientos,
+        fechaGeneracion: formatoFecha(hoy()),
+        logo,
+      });
+      await entregarPdf(blob, `contabilidad-${(lote.codigo ?? "lote").toLowerCase()}-${hoy()}.pdf`);
+    } finally {
+      setExportando(false);
+    }
+  };
   const items = [
     ...lote.alimento.map((a, i) => ({
       k: `a${i}`,
@@ -369,6 +423,9 @@ function DetalleCuentasLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => vo
           {c.porAnimal > 0 ? ` · ${formatoPesos(Math.round(c.porAnimal))} por animal` : ""}
           {c.sinPrecio ? ` · ${c.sinPrecio} registro${c.sinPrecio === 1 ? "" : "s"} de alimento sin precio (la factura no tenía valor)` : ""}
         </p>
+        <Boton onClick={() => void exportarPdf()} disabled={exportando} className="w-full">
+          {exportando ? "Generando PDF…" : "Exportar contabilidad en PDF"}
+        </Boton>
         {items.length === 0 ? (
           <p className="rounded-xl bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">Este lote aún no tiene gastos ni ingresos.</p>
         ) : (
