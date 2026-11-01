@@ -925,11 +925,11 @@ export default function CerdaDetalle() {
                 ) : visibles.length === 0 ? (
                   <p className="py-6 text-center text-sm text-slate-500">No hay registros de este tipo.</p>
                 ) : (
-                  <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-3">
                     {grupos.map((g) => (
                       <div key={g.clave}>
-                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{g.titulo}</p>
-                        <ol className="relative flex flex-col gap-2.5 before:absolute before:bottom-3 before:left-[19px] before:top-3 before:w-0.5 before:rounded-full before:bg-slate-100">
+                        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{g.titulo}</p>
+                        <ol className="relative flex flex-col gap-1.5 before:absolute before:bottom-3 before:left-[13px] before:top-3 before:w-0.5 before:rounded-full before:bg-slate-100">
                           {g.items.map(({ r, idx }) => {
                             const info = infoTipo(r.tipo);
                             const isActiveMove = activeTouchIndex === idx && touchStartX !== null && touchCurrentX !== null;
@@ -940,18 +940,18 @@ export default function CerdaDetalle() {
                             const relativo =
                               dias === null ? "" : dias === 0 ? "Hoy" : dias === 1 ? "Ayer" : dias > 0 ? `Hace ${dias} días` : `En ${-dias} días`;
                             return (
-                              <li key={`${idx}-${r.fecha}-${r.tipo}`} className="relative flex gap-3">
+                              <li key={`${idx}-${r.fecha}-${r.tipo}`} className="relative flex gap-2">
                                 <span
                                   aria-hidden="true"
-                                  className={`relative z-10 mt-1.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-lg ring-4 ring-white ${info.fondo}`}
+                                  className={`relative z-10 mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-sm ring-[3px] ring-white ${info.fondo}`}
                                 >
                                   {info.icono}
                                 </span>
 
-                                <div className="relative min-w-0 flex-1 overflow-hidden rounded-2xl">
+                                <div className="relative min-w-0 flex-1 overflow-hidden rounded-xl">
                                   {/* Acción al deslizar */}
                                   <div
-                                    className={`absolute inset-y-0 right-0 flex w-[88px] items-center justify-center rounded-r-2xl bg-red-500 transition-opacity ${
+                                    className={`absolute inset-y-0 right-0 flex w-[88px] items-center justify-center rounded-r-xl bg-red-500 transition-opacity ${
                                       isSwiped ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
                                     }`}
                                   >
@@ -973,7 +973,7 @@ export default function CerdaDetalle() {
                                   </div>
 
                                   <div
-                                    className={`relative z-10 rounded-2xl border bg-white px-3.5 py-3 ${info.borde}`}
+                                    className={`relative z-10 rounded-xl border bg-white px-3 py-2 ${info.borde}`}
                                     onTouchStart={(e) => { handleTouchStart(e, idx); e.stopPropagation(); }}
                                     onTouchMove={(e) => { handleTouchMove(e, idx); e.stopPropagation(); }}
                                     onTouchEnd={(e) => { handleTouchEnd(e, idx); e.stopPropagation(); }}
@@ -982,16 +982,16 @@ export default function CerdaDetalle() {
                                       transition: isActiveMove ? "none" : "transform 200ms ease-out",
                                     }}
                                   >
-                                    <div className="flex items-start justify-between gap-2">
-                                      <p className={`min-w-0 text-sm font-bold leading-snug ${info.texto}`}>{r.tipo}</p>
-                                      <div className="shrink-0 text-right">
-                                        <p className="whitespace-nowrap text-xs font-semibold text-slate-700">{r.fecha ? formatearFechaCorta(r.fecha) : "–"}</p>
-                                        {relativo && <p className="whitespace-nowrap text-[11px] text-slate-400">{relativo}</p>}
-                                      </div>
+                                    <div className="flex items-baseline justify-between gap-2">
+                                      <p className={`min-w-0 truncate text-[13px] font-bold leading-snug ${info.texto}`}>{r.tipo}</p>
+                                      <p className="shrink-0 whitespace-nowrap text-[11px] text-slate-500">
+                                        <span className="font-semibold text-slate-700">{r.fecha ? formatearFechaCorta(r.fecha) : "–"}</span>
+                                        {relativo ? ` · ${relativo}` : ""}
+                                      </p>
                                     </div>
 
                                     {r.tipo === "Parto" && (
-                                      <div className="mt-2 flex flex-wrap gap-1.5">
+                                      <div className="mt-1 flex flex-wrap gap-1">
                                         <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-800">
                                           {r.vivos ?? 0} vivos
                                         </span>
@@ -1007,18 +1007,21 @@ export default function CerdaDetalle() {
                                       </div>
                                     )}
                                     {r.tipo === "Destete" && r.destetados != null && (
-                                      <p className="mt-1.5 text-xs font-semibold text-orange-800">{r.destetados} lechones destetados</p>
+                                      <p className="mt-0.5 text-xs font-semibold text-orange-800">{r.destetados} lechones destetados</p>
                                     )}
 
-                                    {r.mensaje && <p className="mt-1.5 text-xs text-slate-600">{r.mensaje}</p>}
-                                    {r.valorGenetica ? <p className="mt-0.5 text-xs text-slate-500">Genética: {formatoPesos(Number(r.valorGenetica))}</p> : null}
+                                    {(r.mensaje || r.valorGenetica) && (
+                                      <p className="mt-0.5 text-xs leading-snug text-slate-600">
+                                        {[r.mensaje, r.valorGenetica ? `Genética ${formatoPesos(Number(r.valorGenetica))}` : ""].filter(Boolean).join(" · ")}
+                                      </p>
+                                    )}
                                     {r.confirmacion1 || r.confirmacion2 ? (
                                       <p className="mt-0.5 text-xs font-medium text-sky-700">
                                         {[r.confirmacion1 ? `✓ 1.ª confirmación ${formatearFechaCorta(r.confirmacion1)}` : "", r.confirmacion2 ? `✓ 2.ª confirmación ${formatearFechaCorta(r.confirmacion2)}` : ""].filter(Boolean).join(" · ")}
                                       </p>
                                     ) : null}
                                     {(r.descripcion || r.notas) && (
-                                      <p className="mt-1 text-xs italic text-slate-500">{r.descripcion || r.notas}</p>
+                                      <p className="mt-0.5 line-clamp-2 text-xs italic text-slate-500">{r.descripcion || r.notas}</p>
                                     )}
 
                                     {r.tipo === "Parto" && (
@@ -1028,7 +1031,7 @@ export default function CerdaDetalle() {
                                           e.stopPropagation();
                                           setSelectedRegistro(r);
                                         }}
-                                        className="mt-2 text-xs font-semibold text-sky-700 hover:underline"
+                                        className="mt-1 text-xs font-semibold text-sky-700 hover:underline"
                                       >
                                         Ver detalle del parto ›
                                       </button>
