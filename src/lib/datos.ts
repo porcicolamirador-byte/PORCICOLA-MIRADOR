@@ -86,6 +86,10 @@ export interface Alimento {
   salidaId?: string;
   /** Hora del consumo (HH:MM) */
   hora?: string;
+  /** Cantidad que salió sin existencia (con "permitir sin inventario"); se valoró al último precio */
+  sinExistencia?: number;
+  /** Precio por unidad usado para lo que salió sin existencia (se corrige al llegar la factura) */
+  precioProvisional?: number;
 }
 /** Aplicación sanitaria registrada en el lote */
 export interface AplicacionLote {
@@ -779,6 +783,8 @@ export function registrarConsumoLote(datos: { loteId: string; productoId: string
     },
   ]);
   const costo = item.ultimoPrecio ? Math.round(item.ultimoPrecio * datos.cantidad) : 0;
+  // Lo que sale sin existencia se valora al último precio y queda pendiente de la próxima factura
+  const faltante = Math.max(0, datos.cantidad - Math.max(0, item.disponible));
   guardarLotes(
     leerLotes().map((l) =>
       l.id === lote.id
@@ -796,6 +802,7 @@ export function registrarConsumoLote(datos: { loteId: string; productoId: string
                 cantidad: datos.cantidad,
                 unidad: p.unidad,
                 salidaId,
+                ...(faltante > 1e-9 ? { sinExistencia: faltante, precioProvisional: item.ultimoPrecio || 0 } : {}),
               },
             ],
           }
@@ -803,6 +810,79 @@ export function registrarConsumoLote(datos: { loteId: string; productoId: string
     ),
   );
   return true;
+}
+
+/**
+ * Al ingresar una factura: lo que había salido sin existencia de esos productos
+ * se vuelve a valorar con el precio de la factura, solo si el precio cambió.
+ * Se reparte la cantidad de la factura en orden (primero lo más antiguo).
+ * Devuelve cuántos registros de alimento se corrigieron.
+ */
+export function recontabilizarSinExistencia(factura: Factura): number {
+  const productos = leerProductos();
+  const porId = new Map(productos.map((p) => [p.id, p]));
+  const grupoDe = (p: ProductoBodega) => codigoDe(p) || `#${p.id}`;
+  // Cantidad y precio (en la unidad base) que trae la factura, por grupo
+  const llega = new Map<string, { base: number; precioBase: number }>();
+  for (const l of factura.lineas) {
+    const p = porId.get(l.productoId);
+    if (!p) continue;
+    const fk = factorKg(p);
+    const k = grupoDe(p);
+    const previo = llega.get(k);
+    const base = (Number(l.cantidad) || 0) * fk;
+    if (base <= 0) continue;
+    llega.set(k, { base: (previo?.base ?? 0) + base, precioBase: (Number(l.valorUnitario) || 0) / fk });
+  }
+  if (llega.size === 0) return 0;
+
+  const lotes = leerLotes();
+  const pendientes: { loteId: string; i: number; fecha: string; hora: string }[] = [];
+  for (const l of lotes)
+    l.alimento.forEach((a, i) => {
+      const p = a.productoId ? porId.get(a.productoId) : undefined;
+      if (p && (a.sinExistencia ?? 0) > 1e-9 && llega.has(grupoDe(p))) pendientes.push({ loteId: l.id, i, fecha: a.fecha, hora: a.hora ?? "" });
+    });
+  if (pendientes.length === 0) return 0;
+  pendientes.sort((x, y) => `${x.fecha} ${x.hora}`.localeCompare(`${y.fecha} ${y.hora}`));
+
+  let corregidos = 0;
+  const cambios = new Map<string, Map<number, Alimento>>();
+  for (const pe of pendientes) {
+    const lote = lotes.find((l) => l.id === pe.loteId)!;
+    const a = lote.alimento[pe.i];
+    const p = porId.get(a.productoId!)!;
+    const fk = factorKg(p);
+    const g = llega.get(grupoDe(p))!;
+    if (g.base <= 1e-9) continue;
+    const faltaBase = (a.sinExistencia ?? 0) * fk;
+    const tomaBase = Math.min(faltaBase, g.base);
+    g.base -= tomaBase;
+    const toma = tomaBase / fk;
+    const precioNuevo = g.precioBase * fk;
+    const precioViejo = a.precioProvisional ?? 0;
+    const resto = Math.max(0, (a.sinExistencia ?? 0) - toma);
+    const nuevo: Alimento = { ...a, sinExistencia: resto > 1e-9 ? resto : undefined, precioProvisional: resto > 1e-9 ? precioViejo : undefined };
+    if (Math.abs(precioNuevo - precioViejo) >= 0.5) {
+      nuevo.costo = Math.max(0, Math.round((Number(a.costo) || 0) - toma * precioViejo + toma * precioNuevo)) || undefined;
+      corregidos++;
+    }
+    if (!cambios.has(lote.id)) cambios.set(lote.id, new Map());
+    cambios.get(lote.id)!.set(pe.i, nuevo);
+  }
+  if (cambios.size) {
+    guardarLotes(leerLotes().map((l) => (cambios.has(l.id) ? { ...l, alimento: l.alimento.map((a, i) => cambios.get(l.id)!.get(i) ?? a) } : l)));
+  }
+  if (corregidos) {
+    registrarLog([
+      {
+        accion: "Modificación",
+        modulo: "Engorde",
+        detalle: `Factura ${factura.numero}: ${corregidos} consumo(s) sin existencia revalorado(s) con el precio nuevo`,
+      },
+    ]);
+  }
+  return corregidos;
 }
 
 /** Elimina una salida de Bodega y, si era consumo de un lote, también su registro de alimento */

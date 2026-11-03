@@ -35,6 +35,7 @@ import {
   nuevoId,
   totalFactura,
   trazabilidadSalidas,
+  recontabilizarSinExistencia,
   saldoFactura,
   useVersionDatos,
   type CategoriaBodega,
@@ -463,7 +464,15 @@ function NuevaFactura({
       factura.movimientoId = movimientoId;
     }
     guardarFacturas([...leerFacturas(), factura]);
+    // Si había salidas sin existencia de estos productos y el precio cambió, se revaloran
+    const corregidos = recontabilizarSinExistencia(factura);
     cerrar();
+    if (corregidos > 0) {
+      await avisar({
+        titulo: "Costos actualizados",
+        mensaje: `${corregidos} consumo${corregidos === 1 ? "" : "s"} de lotes que salieron sin existencia se volvieron a valorar con el precio de esta factura.`,
+      });
+    }
   };
 
   return (
