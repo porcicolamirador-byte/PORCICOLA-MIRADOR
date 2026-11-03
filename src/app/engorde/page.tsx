@@ -9,7 +9,6 @@ import {
   formatoFecha,
   hierroAplicado,
   eliminarLoteCompleto,
-  resumenEliminarLote,
   editarAplicacion,
   eliminarAplicacion,
   formatoPesos,
@@ -790,20 +789,10 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   const reabrir = () => actualizarLote(lote.id, (l) => ({ ...l, activo: true, fechaSalida: undefined }));
   const [pedirClave, setPedirClave] = useState(false);
   const eliminar = async () => {
-    const r = resumenEliminarLote(lote.id);
-    const devuelve = [
-      r && r.productos.length
-        ? `Vuelven a Bodega: ${r.productos.map((p) => `${p.cantidad.toLocaleString("es-CO", { maximumFractionDigits: 2 })} ${p.unidad} de ${p.nombre}`).join(", ")}.`
-        : "",
-      r && r.gastos + r.provisional > 0 ? `Se quitan de Contabilidad ${formatoPesos(r.gastos + r.provisional)} en gastos e insumos del lote (también sus créditos y abonos).` : "",
-      r && r.ingresos ? `Los ${r.ingresos} ingreso(s) del lote se conservan en Contabilidad, sin lote.` : "",
-    ]
-      .filter(Boolean)
-      .join(" ");
     if (
       !(await confirmar({
         titulo: `⚠️ Eliminar ${nombreLote(lote)}`,
-        mensaje: `Atención: si el lote se elimina, sus productos e insumos registrados serán devueltos y quitados de la contabilidad. ${devuelve} También se borran sus pesajes y mortalidad. Esta acción no se puede deshacer.`,
+        mensaje: "Atención: si el lote se elimina, sus productos e insumos registrados serán devueltos y quitados de la contabilidad. Esta acción no se puede deshacer.",
         aceptar: "Eliminar lote",
         destructivo: true,
       }))
