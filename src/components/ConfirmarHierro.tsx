@@ -5,20 +5,15 @@
  * hierro a una camada. Al confirmar queda registrada en el lote y lo muestra.
  */
 
-import { useState } from "react";
 import Modal from "@/components/Modal";
 import { Boton } from "@/components/ui";
 import { formatoFecha, formatoHora, hierroAplicado, leerLotes, nombreLote, registrarHierro } from "@/lib/datos";
 
 export default function ConfirmarHierro({ loteId, onCerrar }: { loteId: string | null; onCerrar: () => void }) {
-  const [hecho, setHecho] = useState(false);
   const lote = loteId ? leerLotes().find((l) => l.id === loteId) : undefined;
   if (!loteId) return null;
   const aplicado = lote ? hierroAplicado(lote) : undefined;
-  const cerrar = () => {
-    setHecho(false);
-    onCerrar();
-  };
+  const cerrar = () => onCerrar();
 
   return (
     <Modal
@@ -35,7 +30,7 @@ export default function ConfirmarHierro({ loteId, onCerrar }: { loteId: string |
         <div className="flex flex-col gap-3">
           <div className="flex flex-col items-center gap-1 rounded-2xl bg-sky-50 px-4 py-5 text-center ring-1 ring-sky-100">
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-sky-600 text-2xl text-white" aria-hidden="true">✓</span>
-            <p className="mt-1 text-base font-bold text-sky-900">{hecho ? "Hierro registrado" : "Hierro ya aplicado"}</p>
+            <p className="mt-1 text-base font-bold text-sky-900">Hierro ya aplicado</p>
             <p className="text-sm text-sky-800">
               {formatoFecha(aplicado.fecha, true)}
               {aplicado.hora ? ` · ${formatoHora(aplicado.hora)}` : ""}
@@ -53,7 +48,9 @@ export default function ConfirmarHierro({ loteId, onCerrar }: { loteId: string |
           </p>
           <Boton
             onClick={() => {
-              if (registrarHierro(lote.id)) setHecho(true);
+              // Registra y cierra (sin mensaje adicional)
+              registrarHierro(lote.id);
+              cerrar();
             }}
             className="w-full py-3"
           >

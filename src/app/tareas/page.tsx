@@ -61,7 +61,10 @@ export default function TareasPage() {
               <li key={`${t.id}-${t.tipo}`}>
                 <button
                   type="button"
-                  onClick={() => router.push(`/cerda/${encodeURIComponent(t.id)}`)}
+                  onClick={() =>
+                    // La alerta de hierro lleva al lote de la camada; las demás, a la cerda
+                    router.push(t.hierroLote ? `/engorde?lote=${encodeURIComponent(t.hierroLote)}` : `/cerda/${encodeURIComponent(t.id)}`)
+                  }
                   className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-slate-50 active:bg-slate-100"
                 >
                   <Insignia clase={e.clase}>{e.texto}</Insignia>

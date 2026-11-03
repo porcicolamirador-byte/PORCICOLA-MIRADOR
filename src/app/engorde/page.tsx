@@ -65,6 +65,11 @@ export default function EngordePage() {
   const [vista, setVista] = useState<"activos" | "cerrados">("activos");
   const [nuevo, setNuevo] = useState(false);
   const [seleccionado, setSeleccionado] = useState<string | null>(null);
+  // Abrir un lote directo desde otra pantalla (p. ej. la alerta de hierro): /engorde?lote=ID
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("lote");
+    if (id) setSeleccionado(id);
+  }, []);
 
   const lotes = useMemo(() => (version < 0 ? null : leerLotes()), [version]);
   const activos = lotes?.filter((l) => l.activo) ?? [];
