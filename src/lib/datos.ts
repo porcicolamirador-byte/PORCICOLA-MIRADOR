@@ -1165,6 +1165,19 @@ export function registrarHierro(loteId: string): boolean {
   return true;
 }
 
+/** Cambia la fecha (y hora) de una aplicación del lote */
+export function editarAplicacion(loteId: string, aplicacionId: string, cambios: { fecha: string; hora?: string }) {
+  guardarLotes(
+    leerLotes().map((l) =>
+      l.id === loteId ? { ...l, aplicaciones: (l.aplicaciones ?? []).map((a) => (a.id === aplicacionId ? { ...a, ...cambios } : a)) } : l,
+    ),
+  );
+}
+/** Borra una aplicación del lote (si era el hierro, vuelve la alerta) */
+export function eliminarAplicacion(loteId: string, aplicacionId: string) {
+  guardarLotes(leerLotes().map((l) => (l.id === loteId ? { ...l, aplicaciones: (l.aplicaciones ?? []).filter((a) => a.id !== aplicacionId) } : l)));
+}
+
 /** Marca la 1.ª o 2.ª confirmación de gestación en la última inseminación de la cerda */
 export function confirmarGestacion(cerdaId: string, etapa: 1 | 2): boolean {
   const historial = leerHistorial(cerdaId);
