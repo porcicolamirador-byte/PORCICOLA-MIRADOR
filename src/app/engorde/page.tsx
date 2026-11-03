@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Boton, Campo, Chips, Dato, Entrada, EntradaPesos, IconoMas, SeccionDesplegable, Selector, Vacio } from "@/components/ui";
@@ -68,13 +68,12 @@ export default function EngordePage() {
   const activos = lotes?.filter((l) => l.activo) ?? [];
   const [busqueda, setBusqueda] = useState("");
   // Estilo de las tarjetas: el de siempre o el destacado (número de lote y edad grandes); se recuerda en este teléfono
-  const [estilo, setEstiloEstado] = useState<"clasico" | "destacado">(() => {
+  const [estilo, setEstiloEstado] = useState<"clasico" | "destacado">("clasico");
+  useEffect(() => {
     try {
-      return typeof window !== "undefined" && localStorage.getItem("engorde-estilo") === "destacado" ? "destacado" : "clasico";
-    } catch {
-      return "clasico";
-    }
-  });
+      if (localStorage.getItem("engorde-estilo") === "destacado") setEstiloEstado("destacado");
+    } catch {}
+  }, []);
   const setEstilo = (e: "clasico" | "destacado") => {
     setEstiloEstado(e);
     try {
