@@ -8,7 +8,6 @@ import {
   diasEntre,
   formatoFecha,
   hierroAplicado,
-  registrarHierro,
   formatoPesos,
   guardarLotes,
   hoy,
@@ -42,6 +41,7 @@ import DialogoClave from "@/components/DialogoClave";
 import { exportarContabilidadLote, loteTieneMadre } from "@/lib/exportarLote";
 import { puede } from "@/lib/nube";
 import Modal from "@/components/Modal";
+import ConfirmarHierro from "@/components/ConfirmarHierro";
 import { ETAPAS_ALIMENTACION, leerConfig } from "@/lib/config";
 
 /** Indicadores calculados de un lote */
@@ -716,6 +716,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
 
   const [exportandoPdf, setExportandoPdf] = useState(false);
   const [incluirMadre, setIncluirMadre] = useState(false);
+  const [hierroAbierto, setHierroAbierto] = useState(false);
   const exportarPdfLote = async () => {
     if (exportandoPdf) return;
     setExportandoPdf(true);
@@ -777,10 +778,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                 </div>
                 <button
                   type="button"
-                  onClick={async () => {
-                    const ok = await confirmar({ titulo: "Aplicación de hierro", mensaje: `Se registrará en ${nombreLote(lote)} que se aplicó hierro a los lechones hoy.`, aceptar: "Confirmar" });
-                    if (ok) registrarHierro(lote.id);
-                  }}
+                  onClick={() => setHierroAbierto(true)}
                   className="shrink-0 rounded-full bg-sky-900 px-3.5 py-1.5 text-xs font-semibold text-white active:scale-95"
                 >
                   Confirmar
@@ -1185,6 +1183,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
         </form>
       )}
     </Modal>
+          <ConfirmarHierro loteId={hierroAbierto ? lote.id : null} onCerrar={() => setHierroAbierto(false)} />
           <DialogoClave
             abierto={pedirClave}
             titulo="Confirma con tu PIN"

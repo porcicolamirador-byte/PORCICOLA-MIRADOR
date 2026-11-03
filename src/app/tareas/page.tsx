@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Chevron, Chips, Insignia, Vacio } from "@/components/ui";
-import { confirmarGestacion, leerCerdas, registrarHierro, useVersionDatos } from "@/lib/datos";
+import { confirmarGestacion, leerCerdas, useVersionDatos } from "@/lib/datos";
+import ConfirmarHierro from "@/components/ConfirmarHierro";
 import { confirmar } from "@/components/Dialogo";
 import { calcularTareasPendientes } from "@/utils/pendingTasks";
 
@@ -22,6 +23,7 @@ export default function TareasPage() {
   const router = useRouter();
   const version = useVersionDatos();
   const [filtro, setFiltro] = useState<Prioridad>("todas");
+  const [hierro, setHierro] = useState<string | null>(null);
 
   const tareas = useMemo(() => {
     if (version < 0) return null;
@@ -73,14 +75,9 @@ export default function TareasPage() {
                     <span
                       role="button"
                       tabIndex={0}
-                      onClick={async (e) => {
+                      onClick={(e) => {
                         e.stopPropagation();
-                        const ok = await confirmar({
-                          titulo: "Aplicación de hierro",
-                          mensaje: `¿Ya se aplicó el hierro a los lechones de la cerda ${t.id}? Quedará registrado en su lote con la fecha de hoy.`,
-                          aceptar: "Confirmar",
-                        });
-                        if (ok) registrarHierro(t.hierroLote!);
+                        setHierro(t.hierroLote!);
                       }}
                       className="shrink-0 rounded-full bg-sky-900 px-3 py-1.5 text-xs font-semibold text-white active:scale-95"
                     >
@@ -112,6 +109,7 @@ export default function TareasPage() {
           })}
         </ul>
       )}
+      <ConfirmarHierro loteId={hierro} onCerrar={() => setHierro(null)} />
     </ModuloPage>
   );
 }
