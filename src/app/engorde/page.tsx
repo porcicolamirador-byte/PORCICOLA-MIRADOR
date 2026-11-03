@@ -8,6 +8,8 @@ import {
   diasEntre,
   formatoFecha,
   hierroAplicado,
+  editarAplicacion,
+  eliminarAplicacion,
   formatoPesos,
   guardarLotes,
   hoy,
@@ -266,6 +268,51 @@ export default function EngordePage() {
       <NuevoLote abierta={nuevo} onCerrar={() => setNuevo(false)} />
       {lote && <DetalleLote lote={lote} onCerrar={() => setSeleccionado(null)} />}
     </ModuloPage>
+  );
+}
+
+/** Editar la fecha y hora de una aplicación (p. ej. hierro) o eliminarla */
+function EditarAplicacion({ lote, aplicacionId, onCerrar }: { lote: Lote; aplicacionId: string; onCerrar: () => void }) {
+  const a = (lote.aplicaciones ?? []).find((x) => x.id === aplicacionId);
+  const [fecha, setFecha] = useState(a?.fecha ?? hoy());
+  const [hora, setHora] = useState(a?.hora ?? "");
+  if (!a) return null;
+  const nombre = a.tipo === "Hierro" ? "Aplicación de hierro" : a.tipo;
+  return (
+    <Modal abierta etiqueta={nombreLote(lote)} titulo={nombre} subtitulo="Editar o eliminar el registro" icono="💉" onCerrar={onCerrar}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!fecha) return;
+          editarAplicacion(lote.id, a.id, { fecha, hora: hora || undefined });
+          onCerrar();
+        }}
+        className="flex flex-col gap-3.5"
+      >
+        <div className="grid grid-cols-2 gap-3">
+          <Campo etiqueta="Fecha">
+            <Entrada type="date" value={fecha} onChange={setFecha} required />
+          </Campo>
+          <Campo etiqueta="Hora">
+            <Entrada type="time" value={hora} onChange={setHora} />
+          </Campo>
+        </div>
+        <Boton type="submit" className="w-full py-3">
+          Guardar
+        </Boton>
+        <Boton
+          variante="suave"
+          onClick={async () => {
+            if (!(await confirmar({ titulo: `Eliminar ${nombre.toLowerCase()}`, mensaje: `Se quitará este registro de ${nombreLote(lote)}.`, aceptar: "Eliminar", destructivo: true }))) return;
+            eliminarAplicacion(lote.id, a.id);
+            onCerrar();
+          }}
+          className="w-full text-rose-600"
+        >
+          Eliminar registro
+        </Boton>
+      </form>
+    </Modal>
   );
 }
 
@@ -722,6 +769,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   const [exportandoPdf, setExportandoPdf] = useState(false);
   const [incluirMadre, setIncluirMadre] = useState(false);
   const [hierroAbierto, setHierroAbierto] = useState(false);
+  const [aplicacionSel, setAplicacionSel] = useState<string | null>(null);
   const exportarPdfLote = async () => {
     if (exportandoPdf) return;
     setExportandoPdf(true);
@@ -770,12 +818,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
           <TarjetaCorral corral={corral} onCambiar={lote.activo ? () => setAccion("corral") : undefined} />
           {lote.origen && (() => {
             const hierro = hierroAplicado(lote);
-            return hierro ? (
-              <div className="flex items-center gap-2 rounded-xl bg-sky-50 px-3 py-2 ring-1 ring-sky-100">
-                <span className="text-sm font-semibold text-sky-800">✓ Hierro aplicado</span>
-                <span className="text-xs text-sky-700">{formatoFecha(hierro.fecha, true)}{hierro.hora ? ` · ${formatoHora(hierro.hora)}` : ""}</span>
-              </div>
-            ) : lote.activo ? (
+            return !hierro && lote.activo ? (
               <div className="flex items-center gap-3 rounded-xl bg-amber-50 px-3 py-2 ring-1 ring-amber-200">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-amber-900">Aplicación de hierro</p>
@@ -889,6 +932,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                   })),
                   ...(lote.aplicaciones ?? []).map((a) => ({
                     i: -1,
+                    ap: a.id,
                     f: a.fecha,
                     h: a.hora ?? "",
                     t: `Insumo: 💉 ${a.tipo === "Hierro" ? "Aplicación de hierro" : a.tipo}${a.nota ? ` · ${a.nota}` : ""}`,
@@ -907,7 +951,19 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                     );
                     return (
                       <li key={k}>
-                        {"g" in x && x.g ? (
+                        {"ap" in x && x.ap ? (
+                          <button
+                            type="button"
+                            onClick={() => setAplicacionSel(x.ap as string)}
+                            aria-label={`Editar o eliminar: ${x.t}`}
+                            className="flex w-full items-center gap-3 rounded-xl bg-slate-50 px-3 py-2 text-left active:bg-slate-100"
+                          >
+                            {contenido}
+                            <svg viewBox="0 0 20 20" className="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+                              <path d="M13.5 3.5l3 3L7 16H4v-3l9.5-9.5z" strokeLinejoin="round" />
+                            </svg>
+                          </button>
+                        ) : "g" in x && x.g ? (
                           <button
                             type="button"
                             onClick={() => void borrarGasto(x.g as string, x.t)}
@@ -1195,6 +1251,9 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
       )}
     </Modal>
           <ConfirmarHierro loteId={hierroAbierto ? lote.id : null} onCerrar={() => setHierroAbierto(false)} />
+          {aplicacionSel && (
+            <EditarAplicacion lote={lote} aplicacionId={aplicacionSel} onCerrar={() => setAplicacionSel(null)} />
+          )}
           <DialogoClave
             abierto={pedirClave}
             titulo="Confirma con tu PIN"
