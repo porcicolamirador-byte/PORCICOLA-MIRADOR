@@ -9,6 +9,9 @@ import { puede } from "@/lib/nube";
 import DialogoClave from "@/components/DialogoClave";
 import { leerConfig } from "@/lib/config";
 import Modal from "@/components/Modal";
+import { generarPdfSalidas } from "@/lib/pdfSalidas";
+import { cargarLogoJpeg, entregarPdf } from "@/lib/pdfFicha";
+import { nombreGranjaActual } from "@/lib/sincronizar";
 import PagoFactura from "@/components/PagoFactura";
 import { calcularConsumoCerdas, type ConsumoAlimentoCerdas } from "@/lib/consumoCerdas";
 import { CATEGORIAS_BODEGA, IconoCategoria, RecuadroCategoria } from "@/components/CatalogoProductos";
@@ -864,13 +867,102 @@ function DetalleFactura({ factura: f, productos, onCerrar }: { factura: Factura;
 function SalidasALotes() {
   const version = useVersionDatos();
   const [limite, setLimite] = useState(30);
+  const [filtroProducto, setFiltroProducto] = useState("");
+  const [filtroLote, setFiltroLote] = useState("");
+  const [exportando, setExportando] = useState(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const trazas = useMemo(() => (version < 0 ? [] : trazabilidadSalidas().filter((t) => t.salida.loteId)), [version]);
-  if (trazas.length === 0) return null;
+  const todas = useMemo(() => (version < 0 ? [] : trazabilidadSalidas().filter((t) => t.salida.loteId)), [version]);
+  if (todas.length === 0) return null;
   const cant = (n: number) => n.toLocaleString("es-CO", { maximumFractionDigits: 2 });
+  const productosLista = [...new Map(todas.map((t) => [t.producto.id, t.producto.nombre])).entries()].sort((a, b) => a[1].localeCompare(b[1], "es"));
+  const lotesLista = [...new Map(todas.map((t) => [t.salida.loteId!, t.lote ? `${t.lote.codigo ?? ""} · ${nombreLote(t.lote)}` : "Lote eliminado"])).entries()].sort((a, b) =>
+    a[1].localeCompare(b[1], "es", { numeric: true }),
+  );
+  const trazas = todas.filter((t) => (!filtroProducto || t.producto.id === filtroProducto) && (!filtroLote || t.salida.loteId === filtroLote));
+  const totalFiltro = trazas.reduce((s, t) => s + t.valor, 0);
+
+  const exportar = async () => {
+    if (exportando) return;
+    setExportando(true);
+    try {
+      const logo = await cargarLogoJpeg("/images/logo.png");
+      const filtro = [
+        filtroProducto ? productosLista.find(([id]) => id === filtroProducto)?.[1] ?? "" : "Todos los productos",
+        filtroLote ? lotesLista.find(([id]) => id === filtroLote)?.[1] ?? "" : "Todos los lotes",
+      ].join(" · ");
+      const blob = generarPdfSalidas({
+        granja: nombreGranjaActual(),
+        filtro,
+        fechaGeneracion: formatoFecha(hoy(), true),
+        logo,
+        filas: trazas.map((t) => ({
+          fecha: `${formatoFecha(t.salida.fecha)}${t.salida.hora ? ` ${t.salida.hora}` : ""}`,
+          lote: t.lote?.codigo ?? "Lote",
+          producto: t.producto.nombre,
+          cantidad: `${cant(t.salida.cantidad)} ${t.producto.unidad}`,
+          valor: t.valor,
+          facturas: t.partes.map((p) => ({
+            texto: `Factura ${p.factura.numero}${p.factura.proveedor ? ` · ${p.factura.proveedor}` : ""} · ${formatoFecha(p.factura.fecha)}`,
+            cantidad: `${cant(p.cantidad)} ${t.producto.unidad}`,
+            valor: p.valor,
+          })),
+          sinFactura: t.sinFactura > 0.0001 ? `${cant(t.sinFactura)} ${t.producto.unidad}` : undefined,
+        })),
+      });
+      await entregarPdf(blob, `salidas-a-lotes-${hoy()}.pdf`);
+    } finally {
+      setExportando(false);
+    }
+  };
 
   return (
-    <SeccionDesplegable titulo="Salidas a lotes" cantidad={trazas.length}>
+    <SeccionDesplegable titulo="Salidas a lotes" cantidad={todas.length}>
+      <div className="flex flex-col gap-2 border-b border-slate-100 bg-white px-3.5 py-3">
+        <div className="grid grid-cols-2 gap-2">
+          <select
+            value={filtroProducto}
+            onChange={(e) => {
+              setFiltroProducto(e.target.value);
+              setLimite(30);
+            }}
+            aria-label="Filtrar por producto"
+            className="h-10 min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-sky-200"
+          >
+            <option value="">Todos los productos</option>
+            {productosLista.map(([id, n]) => (
+              <option key={id} value={id}>{n}</option>
+            ))}
+          </select>
+          <select
+            value={filtroLote}
+            onChange={(e) => {
+              setFiltroLote(e.target.value);
+              setLimite(30);
+            }}
+            aria-label="Filtrar por lote"
+            className="h-10 min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-sky-200"
+          >
+            <option value="">Todos los lotes</option>
+            {lotesLista.map(([id, n]) => (
+              <option key={id} value={id}>{n}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs text-slate-500">
+            {trazas.length} {trazas.length === 1 ? "salida" : "salidas"} · <b className="font-semibold text-slate-800">{formatoPesos(Math.round(totalFiltro))}</b>
+          </span>
+          <button
+            type="button"
+            onClick={() => void exportar()}
+            disabled={exportando || trazas.length === 0}
+            className="rounded-full bg-sky-900 px-3.5 py-1.5 text-xs font-semibold text-white active:scale-95 disabled:opacity-50"
+          >
+            {exportando ? "Generando…" : "Exportar PDF"}
+          </button>
+        </div>
+      </div>
+      {trazas.length === 0 && <p className="bg-white px-3.5 py-4 text-center text-sm text-slate-500">No hay salidas con este filtro.</p>}
       <ul className="divide-y divide-slate-100 bg-white">
         {trazas.slice(0, limite).map((t) => (
           <li key={t.salida.id} className="px-3.5 py-2.5">
