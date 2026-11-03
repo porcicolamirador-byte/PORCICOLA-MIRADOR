@@ -24,12 +24,13 @@ import { leerConfig } from "@/lib/config";
 import type { MovimientoLotePdf } from "@/lib/pdfLote";
 import { cargarLogoJpeg, entregarPdf } from "@/lib/pdfFicha";
 import { generarPdfLote } from "@/lib/pdfLote";
+import { generarPdfLoteFormato, type FormatoReporteLote } from "@/lib/pdfLoteFormatos";
 import { nombreGranjaActual } from "@/lib/sincronizar";
 
 /** El lote viene de un parto: se puede agregar la contabilidad de su madre */
 export const loteTieneMadre = (lote: Lote) => Boolean(lote.origen?.cerdaId && leerCerdas().some((c) => c.id === lote.origen!.cerdaId));
 
-export async function exportarContabilidadLote(lote: Lote, opciones: { incluirMadre?: boolean } = {}) {
+export async function exportarContabilidadLote(lote: Lote, opciones: { incluirMadre?: boolean; formato?: FormatoReporteLote } = {}) {
   const logo = await cargarLogoJpeg("/images/logo.png");
   const ingresos = leerMovimientos().filter((m) => m.tipo === "ingreso" && m.loteId === lote.id);
   const conPrecio = lote.alimento.filter((a) => Number(a.costo) > 0);
@@ -46,7 +47,9 @@ export async function exportarContabilidadLote(lote: Lote, opciones: { incluirMa
   ];
   const madre = opciones.incluirMadre ? contabilidadMadre(lote) : null;
   if (madre) movimientos.push(...madre.movimientos);
-  const blob = generarPdfLote({
+  const generar = (d: Parameters<typeof generarPdfLote>[0]) =>
+    !opciones.formato || opciones.formato === "estandar" ? generarPdfLote(d) : generarPdfLoteFormato(d, opciones.formato);
+  const blob = generar({
     granja: nombreGranjaActual(),
     codigo: lote.codigo ?? "Lote",
     nombre: lote.nombre && lote.nombre !== lote.codigo ? lote.nombre : `${lote.cantidadInicial} animales`,
