@@ -378,8 +378,66 @@ export function eliminarLotesDePartos(filtro: { codigos?: string[]; cerdaId?: st
   const borrar = lotes.filter(
     (l) => l.origen && ((filtro.codigos && filtro.codigos.includes(l.origen.codigoParto)) || (filtro.cerdaId && l.origen.cerdaId === filtro.cerdaId)),
   );
-  if (borrar.length) guardarLotes(lotes.filter((l) => !borrar.includes(l)));
+  for (const l of borrar) eliminarLoteCompleto(l.id);
   return borrar;
+}
+
+/** Lo que se devuelve al eliminar un lote (para avisar antes) */
+export function resumenEliminarLote(loteId: string) {
+  const lote = leerLotes().find((l) => l.id === loteId);
+  if (!lote) return null;
+  const salidas = new Set([...lote.alimento.map((a) => a.salidaId).filter(Boolean), ...leerSalidas().filter((s) => s.loteId === loteId).map((s) => s.id)]);
+  const productos = new Map<string, { nombre: string; unidad: string; cantidad: number }>();
+  const porId = new Map(leerProductos().map((p) => [p.id, p]));
+  for (const sd of leerSalidas()) {
+    if (!salidas.has(sd.id)) continue;
+    const p = porId.get(sd.productoId);
+    const k = sd.productoId;
+    const x = productos.get(k) ?? { nombre: p?.nombre ?? "Producto", unidad: p?.unidad ?? "", cantidad: 0 };
+    x.cantidad += Number(sd.cantidad) || 0;
+    productos.set(k, x);
+  }
+  const gastos = (lote.gastos ?? []).reduce((t, g) => t + (Number(g.valor) || 0), 0);
+  const provisional = lote.alimento.reduce((t, a) => {
+    const m = a.movProvisionalId ? leerMovimientos().find((x) => x.id === a.movProvisionalId) : undefined;
+    return t + (m?.monto ?? 0);
+  }, 0);
+  const ingresos = leerMovimientos().filter((m) => m.loteId === loteId && m.tipo === "ingreso").length;
+  return { lote, productos: [...productos.values()], gastos, provisional, ingresos };
+}
+
+/**
+ * Elimina un lote y deshace lo que registró en Bodega y Contabilidad:
+ * el alimento vuelve al inventario (se borran sus salidas), se quitan los
+ * gastos del lote (de contado o a crédito, con sus abonos) y los gastos
+ * provisionales de lo que salió sin existencia. Los ingresos del lote se
+ * conservan en Contabilidad pero quedan sin lote.
+ */
+export function eliminarLoteCompleto(loteId: string) {
+  const lote = leerLotes().find((l) => l.id === loteId);
+  if (!lote) return;
+  // 1) Bodega: el alimento vuelve a la existencia
+  const salidas = new Set([...lote.alimento.map((a) => a.salidaId).filter(Boolean), ...leerSalidas().filter((s) => s.loteId === loteId).map((s) => s.id)]);
+  if (salidas.size) guardarSalidas(leerSalidas().filter((s) => !salidas.has(s.id)));
+  // 2) Contabilidad: gastos del lote, créditos con sus abonos y gastos provisionales
+  const quitar = new Set<string>();
+  const cuentas = new Set<string>();
+  for (const g of lote.gastos ?? []) {
+    if (g.movimientoId) quitar.add(g.movimientoId);
+    if (g.cuentaId) cuentas.add(g.cuentaId);
+  }
+  for (const a of lote.alimento) if (a.movProvisionalId) quitar.add(a.movProvisionalId);
+  if (cuentas.size) {
+    for (const c of leerCuentasPorPagar()) if (cuentas.has(c.id)) for (const ab of c.abonos) if (ab.movimientoId) quitar.add(ab.movimientoId);
+    guardarCuentasPorPagar(leerCuentasPorPagar().filter((c) => !cuentas.has(c.id)));
+  }
+  const movs = leerMovimientos();
+  const nuevos = movs
+    .filter((m) => !quitar.has(m.id))
+    .map((m) => (m.loteId === loteId ? { ...m, loteId: undefined, descripcion: m.descripcion } : m));
+  if (nuevos.length !== movs.length || movs.some((m) => m.loteId === loteId)) guardarMovimientos(nuevos);
+  // 3) El lote
+  guardarLotes(leerLotes().filter((l) => l.id !== loteId));
 }
 
 /** Tratamientos */
