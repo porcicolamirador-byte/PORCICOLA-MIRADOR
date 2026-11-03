@@ -9,6 +9,7 @@ import { puede } from "@/lib/nube";
 import DialogoClave from "@/components/DialogoClave";
 import { leerConfig } from "@/lib/config";
 import Modal from "@/components/Modal";
+import SelectorApp from "@/components/SelectorApp";
 import { generarPdfSalidas } from "@/lib/pdfSalidas";
 import { cargarLogoJpeg, entregarPdf } from "@/lib/pdfFicha";
 import { nombreGranjaActual } from "@/lib/sincronizar";
@@ -919,34 +920,26 @@ function SalidasALotes() {
     <SeccionDesplegable titulo="Salidas a lotes" cantidad={todas.length}>
       <div className="flex flex-col gap-2 border-b border-slate-100 bg-white px-3.5 py-3">
         <div className="grid grid-cols-2 gap-2">
-          <select
-            value={filtroProducto}
-            onChange={(e) => {
-              setFiltroProducto(e.target.value);
+          <SelectorApp
+            titulo="Producto"
+            etiqueta="Salidas a lotes"
+            valor={filtroProducto}
+            onCambiar={(v) => {
+              setFiltroProducto(v);
               setLimite(30);
             }}
-            aria-label="Filtrar por producto"
-            className="h-10 min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-sky-200"
-          >
-            <option value="">Todos los productos</option>
-            {productosLista.map(([id, n]) => (
-              <option key={id} value={id}>{n}</option>
-            ))}
-          </select>
-          <select
-            value={filtroLote}
-            onChange={(e) => {
-              setFiltroLote(e.target.value);
+            opciones={[{ valor: "", texto: "Todos los productos" }, ...productosLista.map(([id, n]) => ({ valor: id, texto: n }))]}
+          />
+          <SelectorApp
+            titulo="Lote"
+            etiqueta="Salidas a lotes"
+            valor={filtroLote}
+            onCambiar={(v) => {
+              setFiltroLote(v);
               setLimite(30);
             }}
-            aria-label="Filtrar por lote"
-            className="h-10 min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-sky-200"
-          >
-            <option value="">Todos los lotes</option>
-            {lotesLista.map(([id, n]) => (
-              <option key={id} value={id}>{n}</option>
-            ))}
-          </select>
+            opciones={[{ valor: "", texto: "Todos los lotes" }, ...lotesLista.map(([id, n]) => ({ valor: id, texto: n }))]}
+          />
         </div>
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs text-slate-500">
