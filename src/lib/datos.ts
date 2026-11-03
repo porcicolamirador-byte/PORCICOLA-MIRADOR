@@ -314,6 +314,7 @@ function leerLotesSinCodigo(): Lote[] {
     mortalidad: Array.isArray(l.mortalidad) ? l.mortalidad : [],
     alimento: Array.isArray(l.alimento) ? l.alimento : [],
     gastos: Array.isArray(l.gastos) ? l.gastos : [],
+    aplicaciones: Array.isArray(l.aplicaciones) ? l.aplicaciones : undefined,
     activo: l.activo !== false,
     fechaSalida: l.fechaSalida,
     corralId: typeof l.corralId === "string" && l.corralId ? l.corralId : undefined,
