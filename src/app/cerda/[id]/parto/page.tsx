@@ -140,6 +140,8 @@ export default function RegistrarParto() {
       momias: nMomias,
       pesoPromedio: aNumero(pesoPromedio) ?? undefined,
       raza: raza.trim() || undefined,
+      // Genética de la inseminación de esta camada (no se cambia aquí)
+      genetica: (ultimaInseminacion as { genetica?: string } | undefined)?.genetica || undefined,
       pesoCerda: aNumero(pesoCerda) ?? undefined,
       estadoSalud,
       observaciones: observaciones.trim() || undefined,
@@ -249,6 +251,13 @@ export default function RegistrarParto() {
                 <input type="tel" inputMode="decimal" value={pesoPromedio} placeholder="Ej: 1.4"
                   onChange={(e) => setPesoPromedio(e.target.value.replace(/[^0-9.,]/g, ""))} className={inputBase} />
               </Campo>
+              <div className="col-span-2">
+                <Campo etiqueta="Genética (de la inseminación)">
+                  <div className="flex h-11 items-center rounded-xl border border-slate-200 bg-slate-100 px-3 text-base text-slate-700" aria-readonly="true">
+                    {(ultimaInseminacion as { genetica?: string } | undefined)?.genetica || "Sin genética registrada"}
+                  </div>
+                </Campo>
+              </div>
               <Campo etiqueta="Raza / cruce">
                 <input value={raza} onChange={(e) => setRaza(e.target.value)} placeholder="Ej: Pietrain x Camborough" className={inputBase} />
               </Campo>

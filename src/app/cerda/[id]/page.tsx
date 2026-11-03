@@ -150,6 +150,9 @@ function tituloMes(clave: string): string {
   return `${MESES_LARGOS[m - 1]} ${a}`;
 }
 
+/** Genéticas para la inseminación (con "Otro…" se escribe a mano) */
+const GENETICAS = ["PIC 410 SUP", "PIC 410 TOP", "PIC 337 SUP", "PIC 337 TOP", "DUROC", "PIC L02", "PIC L03"];
+
 export default function CerdaDetalle() {
   const params = useParams<{ id: string }>();
   // Sin conexión la pantalla puede venir de una copia guardada de otra cerda:
@@ -175,6 +178,8 @@ export default function CerdaDetalle() {
   const [descripcion, setDescripcion] = useState("");
   const [valorGenetica, setValorGenetica] = useState("");
   const [geneticaEnContabilidad, setGeneticaEnContabilidad] = useState(true);
+  const [tipoGenetica, setTipoGenetica] = useState("");
+  const [otraGenetica, setOtraGenetica] = useState("");
   const [filtro, setFiltro] = useState("Todos");
   const [mensajeAviso, setMensajeAviso] = useState("");
   const [mostrarInfo, setMostrarInfo] = useState(false);
@@ -226,6 +231,8 @@ export default function CerdaDetalle() {
       setDescripcion("");
       setValorGenetica("");
       setGeneticaEnContabilidad(true);
+      setTipoGenetica("");
+      setOtraGenetica("");
     }
   }, [mostrarForm]);
 
@@ -442,6 +449,11 @@ export default function CerdaDetalle() {
     }
 
     const genetica = Number(valorGenetica.replace(/\D/g, "")) || 0;
+    const nombreGenetica = tipoGenetica === "OTRA" ? otraGenetica.trim() : tipoGenetica;
+    if (tipo === "Inseminación" && !nombreGenetica) {
+      mostrarAviso(tipoGenetica === "OTRA" ? "Escribe cuál es la genética" : "Selecciona la genética");
+      return;
+    }
     if (tipo === "Inseminación" && genetica <= 0) {
       mostrarAviso("Ingresa el valor de la genética");
       return;
@@ -452,11 +464,12 @@ export default function CerdaDetalle() {
     if (tipo === "Inseminación") {
       // El valor queda siempre en la cerda; en Contabilidad solo si se marcó
       nuevo.valorGenetica = genetica;
+      nuevo.genetica = nombreGenetica;
       if (geneticaEnContabilidad) {
         const movimientoId = nuevoId();
         guardarMovimientos([
           ...leerMovimientos(),
-          { id: movimientoId, fecha, tipo: "gasto", categoria: "Genética", descripcion: `Genética · inseminación cerda ${id}`, monto: genetica, cerdaId: String(id) },
+          { id: movimientoId, fecha, tipo: "gasto", categoria: "Genética", descripcion: `Genética ${nombreGenetica} · inseminación cerda ${id}`, monto: genetica, cerdaId: String(id) },
         ]);
         nuevo.movimientoId = movimientoId;
       }
@@ -637,6 +650,7 @@ export default function CerdaDetalle() {
               <div className="rounded-lg bg-slate-100 p-2"><b>Vivos</b><p>{selectedRegistro.vivos ?? "-"}</p></div>
               <div className="rounded-lg bg-slate-100 p-2"><b>Muertos</b><p>{selectedRegistro.muertos ?? "-"}</p></div>
               <div className="rounded-lg bg-slate-100 p-2"><b>Peso promedio</b><p>{selectedRegistro.pesoPromedio != null ? `${selectedRegistro.pesoPromedio} kg` : "-"}</p></div>
+              <div className="rounded-lg bg-slate-100 p-2"><b>Genética</b><p>{selectedRegistro.genetica || "-"}</p></div>
               <div className="rounded-lg bg-slate-100 p-2"><b>Raza</b><p>{selectedRegistro.raza || "-"}</p></div>
               <div className="rounded-lg bg-slate-100 p-2"><b>Peso de cerda</b><p>{selectedRegistro.pesoCerda != null ? `${selectedRegistro.pesoCerda} kg` : "-"}</p></div>
               <div className="rounded-lg bg-slate-100 p-2"><b>Estado de salud</b><p>{selectedRegistro.estadoSalud || "-"}</p></div>
@@ -1010,9 +1024,16 @@ export default function CerdaDetalle() {
                                       <p className="mt-0.5 text-xs font-semibold text-orange-800">{r.destetados} lechones destetados</p>
                                     )}
 
-                                    {(r.mensaje || r.valorGenetica) && (
+                                    {(r.mensaje || r.valorGenetica || r.genetica) && (
                                       <p className="mt-0.5 text-xs leading-snug text-slate-600">
-                                        {[r.mensaje, r.valorGenetica ? `Genética ${formatoPesos(Number(r.valorGenetica))}` : ""].filter(Boolean).join(" · ")}
+                                        {[
+                                          r.mensaje,
+                                          r.genetica || r.valorGenetica
+                                            ? `Genética ${[r.genetica, r.valorGenetica ? formatoPesos(Number(r.valorGenetica)) : ""].filter(Boolean).join(" ")}`
+                                            : "",
+                                        ]
+                                          .filter(Boolean)
+                                          .join(" · ")}
                                       </p>
                                     )}
                                     {r.confirmacion1 || r.confirmacion2 ? (
@@ -1105,6 +1126,31 @@ export default function CerdaDetalle() {
                 {/* VALOR DE LA GENÉTICA (solo inseminación) */}
                 {tipo === "Inseminación" && (
                   <div>
+                    <label className="block text-sm text-gray-600 font-medium">Genética *</label>
+                    <select
+                      value={tipoGenetica}
+                      onChange={(e) => setTipoGenetica(e.target.value)}
+                      className="w-full max-w-[320px] mt-1 px-4 py-2 rounded-2xl bg-gray-100 border border-gray-300 text-black outline-none box-border"
+                    >
+                      <option value="">Selecciona la genética</option>
+                      {GENETICAS.map((g) => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                      <option value="OTRA">Otro…</option>
+                    </select>
+                    {tipoGenetica === "OTRA" && (
+                      <input
+                        type="text"
+                        value={otraGenetica}
+                        onChange={(e) => setOtraGenetica(e.target.value.slice(0, 40))}
+                        placeholder="Escribe la genética"
+                        className="w-full max-w-[320px] mt-2 px-4 py-2 rounded-2xl bg-gray-100 border border-gray-300 text-black outline-none box-border"
+                      />
+                    )}
+                  </div>
+                )}
+                {tipo === "Inseminación" && (
+                  <div>
                     <label className="block text-sm text-gray-600 font-medium">Valor de la genética *</label>
                     <div className="relative mt-1 w-full max-w-[220px]">
                       <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-black/50">$</span>
@@ -1113,7 +1159,7 @@ export default function CerdaDetalle() {
                         inputMode="numeric"
                         value={valorGenetica ? Number(valorGenetica).toLocaleString("es-CO") : ""}
                         onChange={(e) => setValorGenetica(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                        placeholder="Dato"
+                        placeholder="Ingresar valor"
                         className="w-full pl-8 pr-4 py-2 rounded-2xl bg-gray-100 border border-gray-300 text-black outline-none box-border"
                       />
                     </div>
