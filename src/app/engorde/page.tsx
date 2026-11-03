@@ -169,7 +169,7 @@ export default function EngordePage() {
           accion={!q && vista === "activos" ? <Boton onClick={() => setNuevo(true)}>Crear lote</Boton> : undefined}
         />
       ) : (
-        <ul className="flex flex-col gap-2.5">
+        <ul className={estilo === "destacado" ? "grid grid-cols-2 gap-2" : "flex flex-col gap-2.5"}>
           {visibles.map((l) => {
             const r = resumenLote(l);
             if (estilo === "destacado") {
@@ -177,49 +177,34 @@ export default function EngordePage() {
               const numero = /^LP-(\d+)$/.exec(l.codigo ?? "")?.[1];
               return (
                 <li key={l.id}>
+                  {/* Solo número de lote y edad, para ver muchos lotes a la vez */}
                   <button
                     type="button"
                     onClick={() => setSeleccionado(l.id)}
-                    className="w-full rounded-3xl bg-white p-3 text-left ring-1 ring-slate-200/80 transition hover:shadow-md active:scale-[0.99]"
+                    className="flex w-full items-center gap-2.5 rounded-2xl bg-white p-2 text-left ring-1 ring-slate-200/80 transition active:scale-[0.98]"
                   >
-                    <div className="flex items-stretch gap-3">
-                      {/* Número de lote grande */}
-                      <div className="flex w-[68px] shrink-0 flex-col items-center justify-center rounded-2xl bg-sky-900 py-2 text-white">
-                        <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-sky-200">Lote</span>
-                        <span className="text-[26px] font-black leading-none tabular-nums">{numero ?? (l.codigo || "–")}</span>
-                      </div>
-                      <div className="flex min-w-0 flex-1 flex-col justify-center">
-                        <p className="truncate text-[15px] font-semibold text-slate-900">
-                          {l.nombre && l.nombre !== l.codigo ? l.nombre : l.codigo || "Lote"}
-                        </p>
-                        {l.origen && <p className="truncate text-[11px] text-slate-500">Madre: cerda {l.origen.cerdaId}</p>}
-                        <p className="mt-0.5 truncate text-[11px] tabular-nums text-slate-600">
-                          {l.vivos}/{l.cantidadInicial} animales
-                          {r.pesoActual ? ` · ${r.pesoActual.toFixed(1)} kg` : ""}
-                          {r.gdp !== null ? ` · ${Math.round(r.gdp)} g/d` : ""}
-                        </p>
-                      </div>
-                      {/* Edad grande */}
-                      <div className="flex shrink-0 flex-col items-end justify-center pr-1">
-                        <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-400">{l.origen ? "Edad" : "En el lote"}</span>
-                        <span className="text-[22px] font-black leading-none tabular-nums text-slate-900">
-                          {edad.meses > 0 ? (
-                            <>
-                              {edad.meses}
-                              <span className="text-xs font-bold text-slate-500">m </span>
-                              {edad.dias}
-                              <span className="text-xs font-bold text-slate-500">d</span>
-                            </>
-                          ) : (
-                            <>
-                              {edad.dias}
-                              <span className="text-xs font-bold text-slate-500"> días</span>
-                            </>
-                          )}
-                        </span>
-                      </div>
+                    <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-sky-900 text-white">
+                      <span className="text-[8px] font-semibold uppercase tracking-[0.14em] text-sky-200">Lote</span>
+                      <span className={`font-black leading-none tabular-nums ${numero ? "text-xl" : "text-[11px]"}`}>{numero ?? (l.codigo || "–")}</span>
                     </div>
-                    <BarraConsumo lote={l} />
+                    <div className="min-w-0 flex-1">
+                      <span className="block text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-400">{l.origen ? "Edad" : "En el lote"}</span>
+                      <span className="block truncate text-lg font-black leading-tight tabular-nums text-slate-900">
+                        {edad.meses > 0 ? (
+                          <>
+                            {edad.meses}
+                            <span className="text-[11px] font-bold text-slate-500">m </span>
+                            {edad.dias}
+                            <span className="text-[11px] font-bold text-slate-500">d</span>
+                          </>
+                        ) : (
+                          <>
+                            {edad.dias}
+                            <span className="text-[11px] font-bold text-slate-500"> días</span>
+                          </>
+                        )}
+                      </span>
+                    </div>
                   </button>
                 </li>
               );
