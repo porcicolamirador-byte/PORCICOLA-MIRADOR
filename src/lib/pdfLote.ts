@@ -43,6 +43,8 @@ export interface DatosPdfLote {
   registrosSinPrecio: number;
   /** Texto con el periodo de la madre cuando se incluye su contabilidad */
   notaMadre?: string;
+  /** Gastos del lote comprados a crédito: total y lo ya abonado */
+  credito?: { total: number; abonado: number };
   movimientos: MovimientoLotePdf[];
   fechaGeneracion: string; // ya formateada
   logo?: LogoJpeg | null;
@@ -180,9 +182,28 @@ export function generarPdfLote(d: DatosPdfLote): Blob {
       der(L, M + (i + 1) * wp - 10, y + 14.5, p.v, 8.5, P900, true);
       if (i > 0) L.rect(M + i * wp, y + 5, 0.6, 12, P200);
     });
-    y += 34;
+    y += 30;
   } else {
-    y += 12;
+    y += 6;
+  }
+
+  // Pagado y crédito (gastos del lote a crédito con sus abonos)
+  {
+    const creditoTotal = d.credito?.total ?? 0;
+    const porPagar = Math.max(0, creditoTotal - (d.credito?.abonado ?? 0));
+    L.rect(M, y, ANCHO_UTIL, 22, porPagar > 0 ? [255, 247, 237] : P50, 6);
+    const partes = [
+      { t: "Pagado", v: pesos(totalCostos - porPagar), c: P900 },
+      { t: "Comprado a crédito", v: pesos(creditoTotal), c: P900 },
+      { t: "Crédito por pagar", v: pesos(porPagar), c: porPagar > 0 ? ([194, 65, 12] as RGB) : P900 },
+    ];
+    const wp = ANCHO_UTIL / 3;
+    partes.forEach((p, i) => {
+      L.texto(M + i * wp + 10, y + 14.5, p.t, 7.5, P500);
+      der(L, M + (i + 1) * wp - 10, y + 14.5, p.v, 8.5, p.c, true);
+      if (i > 0) L.rect(M + i * wp, y + 5, 0.6, 12, P200);
+    });
+    y += 34;
   }
 
   /* ── Estado de resultados ── */

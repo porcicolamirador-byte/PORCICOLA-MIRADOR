@@ -11,6 +11,7 @@ import {
   formatoFecha,
   hoy,
   leerCerdas,
+  leerCuentasPorPagar,
   leerHistorial,
   leerMovimientos,
   leerProductos,
@@ -58,6 +59,7 @@ export async function exportarContabilidadLote(lote: Lote, opciones: { incluirMa
     kgAlimento: conPrecio.reduce((s, a) => s + (Number(a.kg) || 0), 0),
     registrosSinPrecio: lote.alimento.length - conPrecio.length,
     notaMadre: madre?.nota,
+    credito: creditoDelLote(lote),
     movimientos,
     fechaGeneracion: formatoFecha(hoy()),
     logo,
@@ -210,4 +212,18 @@ function contabilidadMadre(lote: Lote): { movimientos: MovimientoLotePdf[]; nota
     `Madre: cerda ${cerdaId} · ${dma(desde)} – ${dma(hasta)} · alimento estimado según consumo` +
     (sinPrecio.length ? ` · ${sinPrecio.join(" y ")} sin precio de compra ($0)` : "");
   return { movimientos, nota };
+}
+
+/** Gastos del lote a crédito: total comprado y lo abonado (de sus cuentas por pagar) */
+function creditoDelLote(lote: Lote) {
+  const cuentas = new Map(leerCuentasPorPagar().map((c) => [c.id, c]));
+  let total = 0;
+  let abonado = 0;
+  for (const g of lote.gastos ?? []) {
+    if (!g.cuentaId) continue;
+    total += Number(g.valor) || 0;
+    const c = cuentas.get(g.cuentaId);
+    abonado += Math.min(Number(g.valor) || 0, (c?.abonos ?? []).reduce((t, a) => t + (Number(a.monto) || 0), 0));
+  }
+  return { total, abonado };
 }
