@@ -90,6 +90,8 @@ export interface Alimento {
   sinExistencia?: number;
   /** Precio por unidad usado para lo que salió sin existencia (se corrige al llegar la factura) */
   precioProvisional?: number;
+  /** Gasto provisional en Contabilidad (como pagado en efectivo) por lo que salió sin existencia */
+  movProvisionalId?: string;
 }
 /** Aplicación sanitaria registrada en el lote */
 export interface AplicacionLote {
@@ -785,6 +787,23 @@ export function registrarConsumoLote(datos: { loteId: string; productoId: string
   const costo = item.ultimoPrecio ? Math.round(item.ultimoPrecio * datos.cantidad) : 0;
   // Lo que sale sin existencia se valora al último precio y queda pendiente de la próxima factura
   const faltante = Math.max(0, datos.cantidad - Math.max(0, item.disponible));
+  // Mientras llega la factura, lo que salió sin existencia se registra como gasto pagado en efectivo
+  let movProvisionalId: string | undefined;
+  const montoProvisional = Math.round(faltante * (item.ultimoPrecio || 0));
+  if (faltante > 1e-9 && montoProvisional > 0) {
+    movProvisionalId = nuevoId();
+    guardarMovimientos([
+      ...leerMovimientos(),
+      {
+        id: movProvisionalId,
+        fecha: datos.fecha,
+        tipo: "gasto",
+        categoria: categoriaContable(p.categoria),
+        descripcion: `Sin existencia · ${fmtNum(faltante)} ${p.unidad} ${p.nombre} · ${nombreLote(lote)}`,
+        monto: montoProvisional,
+      },
+    ]);
+  }
   guardarLotes(
     leerLotes().map((l) =>
       l.id === lote.id
@@ -802,7 +821,7 @@ export function registrarConsumoLote(datos: { loteId: string; productoId: string
                 cantidad: datos.cantidad,
                 unidad: p.unidad,
                 salidaId,
-                ...(faltante > 1e-9 ? { sinExistencia: faltante, precioProvisional: item.ultimoPrecio || 0 } : {}),
+                ...(faltante > 1e-9 ? { sinExistencia: faltante, precioProvisional: item.ultimoPrecio || 0, movProvisionalId } : {}),
               },
             ],
           }
@@ -818,6 +837,10 @@ export function registrarConsumoLote(datos: { loteId: string; productoId: string
  * Se reparte la cantidad de la factura en orden (primero lo más antiguo).
  * Devuelve cuántos registros de alimento se corrigieron.
  */
+/** Categoría de Contabilidad según el tipo de producto de bodega */
+const categoriaContable = (c: CategoriaBodega) =>
+  c === "Alimento" ? "Alimento" : c === "Medicamentos" || c === "Vacunas" ? "Medicamentos y vacunas" : "Otros gastos";
+
 export function recontabilizarSinExistencia(factura: Factura): number {
   const productos = leerProductos();
   const porId = new Map(productos.map((p) => [p.id, p]));
@@ -848,6 +871,7 @@ export function recontabilizarSinExistencia(factura: Factura): number {
 
   let corregidos = 0;
   const cambios = new Map<string, Map<number, Alimento>>();
+  const ajustesProvisionales = new Map<string, { quitar: number; borrar: boolean }>();
   for (const pe of pendientes) {
     const lote = lotes.find((l) => l.id === pe.loteId)!;
     const a = lote.alimento[pe.i];
@@ -862,7 +886,15 @@ export function recontabilizarSinExistencia(factura: Factura): number {
     const precioNuevo = g.precioBase * fk;
     const precioViejo = a.precioProvisional ?? 0;
     const resto = Math.max(0, (a.sinExistencia ?? 0) - toma);
-    const nuevo: Alimento = { ...a, sinExistencia: resto > 1e-9 ? resto : undefined, precioProvisional: resto > 1e-9 ? precioViejo : undefined };
+    const nuevo: Alimento = {
+      ...a,
+      sinExistencia: resto > 1e-9 ? resto : undefined,
+      precioProvisional: resto > 1e-9 ? precioViejo : undefined,
+      movProvisionalId: resto > 1e-9 ? a.movProvisionalId : undefined,
+    };
+    // El gasto provisional (efectivo) de lo que ya cubre la factura se quita: la factura lo
+    // contabiliza como corresponde (de contado o a crédito, con sus abonos)
+    if (a.movProvisionalId) ajustesProvisionales.set(a.movProvisionalId, { quitar: Math.round(toma * precioViejo), borrar: resto <= 1e-9 });
     if (Math.abs(precioNuevo - precioViejo) >= 0.5) {
       nuevo.costo = Math.max(0, Math.round((Number(a.costo) || 0) - toma * precioViejo + toma * precioNuevo)) || undefined;
       corregidos++;
@@ -872,6 +904,18 @@ export function recontabilizarSinExistencia(factura: Factura): number {
   }
   if (cambios.size) {
     guardarLotes(leerLotes().map((l) => (cambios.has(l.id) ? { ...l, alimento: l.alimento.map((a, i) => cambios.get(l.id)!.get(i) ?? a) } : l)));
+  }
+  if (ajustesProvisionales.size) {
+    guardarMovimientos(
+      leerMovimientos()
+        .map((m) => {
+          const aj = ajustesProvisionales.get(m.id);
+          if (!aj) return m;
+          if (aj.borrar) return null;
+          return { ...m, monto: Math.max(0, m.monto - aj.quitar) };
+        })
+        .filter((m): m is Movimiento => !!m && m.monto > 0),
+    );
   }
   if (corregidos) {
     registrarLog([
@@ -892,6 +936,7 @@ export function eliminarConsumoLote(loteId: string, indice: number) {
   const registro = lote?.alimento[indice];
   if (!lote || !registro) return;
   if (registro.salidaId) guardarSalidas(leerSalidas().filter((s) => s.id !== registro.salidaId));
+  if (registro.movProvisionalId) guardarMovimientos(leerMovimientos().filter((m) => m.id !== registro.movProvisionalId));
   guardarLotes(leerLotes().map((l) => (l.id === loteId ? { ...l, alimento: l.alimento.filter((_, i) => i !== indice) } : l)));
 }
 

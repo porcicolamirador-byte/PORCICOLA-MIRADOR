@@ -92,6 +92,15 @@ export default function ContabilidadPage() {
       });
       return;
     }
+    // Gasto provisional de alimento que salió sin existencia: se maneja desde el lote
+    const loteProvisional = leerLotes().find((l) => l.alimento.some((al) => al.movProvisionalId === id));
+    if (loteProvisional) {
+      await avisar({
+        titulo: "Gasto provisional de un lote",
+        mensaje: `Este gasto es alimento que salió sin existencia para ${nombreLote(loteProvisional)}. Se ajusta solo al ingresar la factura, o elimina el consumo desde el lote en Engorde.`,
+      });
+      return;
+    }
     // Gasto registrado desde un lote: se elimina primero desde el lote
     const loteDelGasto = leerLotes().find((l) => (l.gastos ?? []).some((g) => g.movimientoId === id));
     if (loteDelGasto) {
