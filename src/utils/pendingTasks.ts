@@ -1,4 +1,5 @@
 import { leerConfig } from "@/lib/config";
+import { hierroAplicado, loteDelParto } from "@/lib/datos";
 
 export interface Registro {
   tipo?: string;
@@ -19,6 +20,8 @@ export interface PendingTask {
   fecha?: string;
   /** Botón para resolver la tarea desde la lista (1.ª o 2.ª confirmación de gestación) */
   confirmar?: 1 | 2;
+  /** Botón para confirmar la aplicación de hierro (id del lote de la camada) */
+  hierroLote?: string;
 }
 
 /** Ventanas para confirmar la gestación (días después de la inseminación) */
@@ -205,6 +208,24 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
         descripcion: 'Programar destete de la camada',
         dias: diasDesdeParto,
         fecha: regParto.fecha,
+      });
+    }
+  }
+
+  // Hierro a los lechones entre el día 2 y 3 después del parto (se quita al confirmarlo en el lote)
+  if (regParto) {
+    const diasParto = calcularDiasEntre(regParto.fecha || hoy, hoy);
+    const codigo = String((regParto as Registro & { codigoParto?: string }).codigoParto ?? '');
+    const lote = codigo ? loteDelParto(codigo) : undefined;
+    if (diasParto >= 2 && diasParto <= 3 && lote && lote.activo && !hierroAplicado(lote)) {
+      tareas.push({
+        id: cerda.id,
+        tipo: 'Aplicación de hierro',
+        prioridad: 'alta',
+        descripcion: `Aplicar hierro a los lechones del ${lote.codigo ?? 'lote'} (día ${diasParto})`,
+        dias: diasParto,
+        fecha: regParto.fecha,
+        hierroLote: lote.id,
       });
     }
   }

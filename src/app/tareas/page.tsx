@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Chevron, Chips, Insignia, Vacio } from "@/components/ui";
-import { confirmarGestacion, leerCerdas, useVersionDatos } from "@/lib/datos";
+import { confirmarGestacion, leerCerdas, registrarHierro, useVersionDatos } from "@/lib/datos";
 import { confirmar } from "@/components/Dialogo";
 import { calcularTareasPendientes } from "@/utils/pendingTasks";
 
@@ -69,7 +69,24 @@ export default function TareasPage() {
                       Cerda {t.id} · {t.descripcion}
                     </span>
                   </span>
-                  {t.confirmar ? (
+                  {t.hierroLote ? (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const ok = await confirmar({
+                          titulo: "Aplicación de hierro",
+                          mensaje: `¿Ya se aplicó el hierro a los lechones de la cerda ${t.id}? Quedará registrado en su lote con la fecha de hoy.`,
+                          aceptar: "Confirmar",
+                        });
+                        if (ok) registrarHierro(t.hierroLote!);
+                      }}
+                      className="shrink-0 rounded-full bg-sky-900 px-3 py-1.5 text-xs font-semibold text-white active:scale-95"
+                    >
+                      Confirmar
+                    </span>
+                  ) : t.confirmar ? (
                     <span
                       role="button"
                       tabIndex={0}

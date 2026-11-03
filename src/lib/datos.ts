@@ -87,6 +87,14 @@ export interface Alimento {
   /** Hora del consumo (HH:MM) */
   hora?: string;
 }
+/** Aplicación sanitaria registrada en el lote */
+export interface AplicacionLote {
+  id: string;
+  fecha: string;
+  hora?: string;
+  tipo: "Hierro" | string;
+  nota?: string;
+}
 /** Otro gasto de un lote (medicamento, vacuna, insumo…); se registra también en Contabilidad */
 export interface GastoLote {
   id: string;
@@ -117,6 +125,8 @@ export interface Lote {
   alimento: Alimento[];
   /** Otros gastos del lote (medicamentos, vacunas, insumos…) */
   gastos?: GastoLote[];
+  /** Aplicaciones sanitarias del lote (p. ej. hierro a los lechones) */
+  aplicaciones?: AplicacionLote[];
   activo: boolean;
   fechaSalida?: string;
   /** Corral donde están los animales (id de los corrales de Ajustes) */
@@ -1067,6 +1077,19 @@ export function estadoDeCerda(historial: RegistroCerda[]): EstadoCerda {
     default:
       return "Sin registro";
   }
+}
+
+/** Lote creado con un parto (por su código) */
+export const loteDelParto = (codigoParto: string) => leerLotes().find((l) => l.origen?.codigoParto === codigoParto);
+/** ¿Ya se aplicó el hierro a la camada de ese lote? */
+export const hierroAplicado = (l: Lote) => (l.aplicaciones ?? []).find((a) => a.tipo === "Hierro");
+/** Registra en el lote la aplicación de hierro (una sola vez) */
+export function registrarHierro(loteId: string): boolean {
+  const lote = leerLotes().find((l) => l.id === loteId);
+  if (!lote || hierroAplicado(lote)) return false;
+  const aplicacion: AplicacionLote = { id: nuevoId(), fecha: hoy(), hora: horaActual(), tipo: "Hierro" };
+  guardarLotes(leerLotes().map((l) => (l.id === loteId ? { ...l, aplicaciones: [...(l.aplicaciones ?? []), aplicacion] } : l)));
+  return true;
 }
 
 /** Marca la 1.ª o 2.ª confirmación de gestación en la última inseminación de la cerda */

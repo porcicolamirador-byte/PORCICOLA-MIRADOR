@@ -7,6 +7,8 @@ import { Boton, Campo, Chips, Dato, Entrada, EntradaPesos, IconoMas, SeccionDesp
 import {
   diasEntre,
   formatoFecha,
+  hierroAplicado,
+  registrarHierro,
   formatoPesos,
   guardarLotes,
   hoy,
@@ -760,6 +762,32 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
       {accion === "resumen" ? (
         <div className="flex flex-col gap-4">
           <TarjetaCorral corral={corral} onCambiar={lote.activo ? () => setAccion("corral") : undefined} />
+          {lote.origen && (() => {
+            const hierro = hierroAplicado(lote);
+            return hierro ? (
+              <div className="flex items-center gap-2 rounded-xl bg-sky-50 px-3 py-2 ring-1 ring-sky-100">
+                <span className="text-sm font-semibold text-sky-800">✓ Hierro aplicado</span>
+                <span className="text-xs text-sky-700">{formatoFecha(hierro.fecha, true)}{hierro.hora ? ` · ${formatoHora(hierro.hora)}` : ""}</span>
+              </div>
+            ) : lote.activo ? (
+              <div className="flex items-center gap-3 rounded-xl bg-amber-50 px-3 py-2 ring-1 ring-amber-200">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-amber-900">Aplicación de hierro</p>
+                  <p className="text-[11px] text-amber-800">Entre el día 2 y 3 después del parto</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const ok = await confirmar({ titulo: "Aplicación de hierro", mensaje: `Se registrará en ${nombreLote(lote)} que se aplicó hierro a los lechones hoy.`, aceptar: "Confirmar" });
+                    if (ok) registrarHierro(lote.id);
+                  }}
+                  className="shrink-0 rounded-full bg-sky-900 px-3.5 py-1.5 text-xs font-semibold text-white active:scale-95"
+                >
+                  Confirmar
+                </button>
+              </div>
+            ) : null;
+          })()}
           <div className={`grid gap-1.5 ${lote.origen ? "grid-cols-2" : "grid-cols-1"}`}>
             {lote.origen && (
               <button
