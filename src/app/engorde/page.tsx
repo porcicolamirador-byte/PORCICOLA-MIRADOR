@@ -920,7 +920,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                     f: a.fecha,
                     h: a.hora ?? "",
                     t: a.producto
-                      ? `Alimento: ${fmtCantidad(a.cantidad ?? 0)} ${a.unidad ?? ""} ${a.producto}${a.kg ? ` (${fmtCantidad(a.kg)} kg)` : ""}${(a.sinExistencia ?? 0) > 0 ? " · sin existencia, precio provisional" : ""}`
+                      ? `Alimento: ${fmtCantidad(a.cantidad ?? 0)} ${a.unidad ?? ""} ${a.producto}${a.kg ? ` (${fmtCantidad(a.kg)} kg)` : ""}${(a.sinExistencia ?? 0) > 0 ? " · sin existencia, recalcular" : ""}`
                       : `Alimento: ${a.kg} kg${a.costo ? ` · ${formatoPesos(a.costo)}` : ""}`,
                   })),
                   ...(lote.gastos ?? []).map((g) => ({
