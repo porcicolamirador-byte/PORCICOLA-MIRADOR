@@ -24,7 +24,6 @@ import { puede } from "@/lib/nube";
 import { cargarLogoJpeg, entregarPdf } from "@/lib/pdfFicha";
 import { generarPdfContabilidad } from "@/lib/pdfContabilidad";
 import { exportarContabilidadLote, loteTieneMadre } from "@/lib/exportarLote";
-import { FORMATOS_REPORTE_LOTE, type FormatoReporteLote } from "@/lib/pdfLoteFormatos";
 import { nombreGranjaActual } from "@/lib/sincronizar";
 
 const CATEGORIAS: Record<Movimiento["tipo"], string[]> = {
@@ -583,20 +582,12 @@ function DetalleCuentasLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => vo
   const c = cuentasLote(lote);
   const [exportando, setExportando] = useState(false);
   const [incluirMadre, setIncluirMadre] = useState(false);
-  const [formatoPdf, setFormatoPdf] = useState<FormatoReporteLote>(() => {
-    try {
-      const f = typeof window !== "undefined" ? localStorage.getItem("formato-reporte-lote") : null;
-      return FORMATOS_REPORTE_LOTE.some((x) => x.valor === f) ? (f as FormatoReporteLote) : "estandar";
-    } catch {
-      return "estandar";
-    }
-  });
 
   const exportarPdf = async () => {
     if (exportando) return;
     setExportando(true);
     try {
-      await exportarContabilidadLote(lote, { incluirMadre, formato: formatoPdf });
+      await exportarContabilidadLote(lote, { incluirMadre });
     } finally {
       setExportando(false);
     }
@@ -677,26 +668,6 @@ function DetalleCuentasLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => vo
             Agregar contabilidad de la madre (cerda {lote.origen?.cerdaId})
           </label>
         )}
-        <label className="flex items-center gap-2 text-sm text-slate-700">
-          <span className="shrink-0">Formato</span>
-          <select
-            value={formatoPdf}
-            onChange={(e) => {
-              const f = e.target.value as FormatoReporteLote;
-              setFormatoPdf(f);
-              try {
-                localStorage.setItem("formato-reporte-lote", f);
-              } catch {}
-            }}
-            className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-sky-200"
-          >
-            {FORMATOS_REPORTE_LOTE.map((f) => (
-              <option key={f.valor} value={f.valor}>
-                {f.nombre} · {f.detalle}
-              </option>
-            ))}
-          </select>
-        </label>
         <Boton onClick={() => void exportarPdf()} disabled={exportando} className="w-full">
           {exportando ? "Generando PDF…" : "Exportar contabilidad del lote"}
         </Boton>

@@ -38,7 +38,6 @@ import {
 import { confirmar } from "@/components/Dialogo";
 import DialogoClave from "@/components/DialogoClave";
 import { exportarContabilidadLote, loteTieneMadre } from "@/lib/exportarLote";
-import { FORMATOS_REPORTE_LOTE, type FormatoReporteLote } from "@/lib/pdfLoteFormatos";
 import { puede } from "@/lib/nube";
 import Modal from "@/components/Modal";
 import { ETAPAS_ALIMENTACION, leerConfig } from "@/lib/config";
@@ -715,19 +714,11 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
 
   const [exportandoPdf, setExportandoPdf] = useState(false);
   const [incluirMadre, setIncluirMadre] = useState(false);
-  const [formatoPdf, setFormatoPdf] = useState<FormatoReporteLote>(() => {
-    try {
-      const f = typeof window !== "undefined" ? localStorage.getItem("formato-reporte-lote") : null;
-      return FORMATOS_REPORTE_LOTE.some((x) => x.valor === f) ? (f as FormatoReporteLote) : "estandar";
-    } catch {
-      return "estandar";
-    }
-  });
   const exportarPdfLote = async () => {
     if (exportandoPdf) return;
     setExportandoPdf(true);
     try {
-      await exportarContabilidadLote(lote, { incluirMadre, formato: formatoPdf });
+      await exportarContabilidadLote(lote, { incluirMadre });
     } finally {
       setExportandoPdf(false);
     }
@@ -972,28 +963,6 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
               <input type="checkbox" checked={incluirMadre} onChange={(e) => setIncluirMadre(e.target.checked)} className="h-5 w-5 accent-sky-700" />
               Agregar contabilidad de la madre (cerda {lote.origen?.cerdaId})
             </label>
-          )}
-          {puede("contabilidad") && (
-          <label className="flex items-center gap-2 text-sm text-slate-700">
-            <span className="shrink-0">Formato</span>
-            <select
-              value={formatoPdf}
-              onChange={(e) => {
-                const f = e.target.value as FormatoReporteLote;
-                setFormatoPdf(f);
-                try {
-                  localStorage.setItem("formato-reporte-lote", f);
-                } catch {}
-              }}
-              className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-sky-200"
-            >
-              {FORMATOS_REPORTE_LOTE.map((f) => (
-                <option key={f.valor} value={f.valor}>
-                  {f.nombre} · {f.detalle}
-                </option>
-              ))}
-            </select>
-          </label>
           )}
           {puede("contabilidad") && (
             <Boton variante="secundario" onClick={() => void exportarPdfLote()} disabled={exportandoPdf} className="w-full">
