@@ -1056,7 +1056,7 @@ export default function Gestacion() {
               <Campo etiqueta="Identificación *">
                 <input
                   type="text"
-                  placeholder="Dato"
+                  placeholder="Ejemplo: P014"
                   autoComplete="off"
                   autoCapitalize="characters"
                   value={id}
@@ -1105,7 +1105,7 @@ export default function Gestacion() {
                     setPeso(e.target.value.replace(/[^0-9.,]/g, ""));
                     if (pesoError) setPesoError("");
                   }}
-                  placeholder="Dato"
+                  placeholder="Ingresar peso"
                   className="block w-full min-w-0 max-w-full appearance-none rounded-xl bg-slate-50 px-3.5 py-2.5 text-base text-slate-900 ring-1 ring-slate-200 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-600"
                 />
               </Campo>
@@ -1115,7 +1115,7 @@ export default function Gestacion() {
               <textarea
                 value={caracteristicas}
                 onChange={(e) => setCaracteristicas(e.target.value)}
-                placeholder="Dato"
+                placeholder=""
                 rows={3}
                 className="block w-full min-w-0 max-w-full appearance-none rounded-xl bg-slate-50 px-3.5 py-2.5 text-base text-slate-900 ring-1 ring-slate-200 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-600 resize-none"
               />
