@@ -579,6 +579,78 @@ export interface ExistenciaProducto {
   ultimoPrecio: number;
 }
 
+/** De qué factura salió cada salida de bodega (primero lo que entró primero) */
+export interface TrazaSalida {
+  salida: SalidaBodega;
+  producto: ProductoBodega;
+  lote?: Lote;
+  /** Partes de la salida por factura, en la unidad del producto */
+  partes: { factura: Factura; cantidad: number; valor: number }[];
+  /** Lo que salió sin compra registrada (sin factura) */
+  sinFactura: number;
+  valor: number;
+}
+
+/**
+ * Reparte cada salida entre las facturas con el método "primero en entrar,
+ * primero en salir": si una salida se lleva lo último de una factura y sigue
+ * con la siguiente, aparecen las dos. Los productos con el mismo código
+ * comparten las facturas (todo se cuenta en kilos o en la unidad común).
+ */
+export function trazabilidadSalidas(): TrazaSalida[] {
+  const productos = leerProductos();
+  const porId = new Map(productos.map((p) => [p.id, p]));
+  const grupoDe = (p: ProductoBodega) => codigoDe(p) || `#${p.id}`;
+  const lotes = new Map(leerLotes().map((l) => [l.id, l]));
+  // Entradas por grupo, en orden de llegada
+  const entradas = new Map<string, { factura: Factura; base: number; precioBase: number }[]>();
+  const facturas = [...leerFacturas()].sort((a, b) => a.fecha.localeCompare(b.fecha) || (a.id < b.id ? -1 : 1));
+  for (const f of facturas) {
+    for (const l of f.lineas) {
+      const p = porId.get(l.productoId);
+      if (!p) continue;
+      const k = grupoDe(p);
+      const fk = factorKg(p);
+      const base = (Number(l.cantidad) || 0) * fk;
+      if (base <= 0) continue;
+      entradas.set(k, [...(entradas.get(k) ?? []), { factura: f, base, precioBase: (Number(l.valorUnitario) || 0) / fk }]);
+    }
+  }
+  const restante = new Map<string, { factura: Factura; base: number; precioBase: number }[]>();
+  for (const [k, v] of entradas) restante.set(k, v.map((e) => ({ ...e })));
+  const salidas = [...leerSalidas()].sort((a, b) => `${a.fecha} ${a.hora ?? "00:00"}`.localeCompare(`${b.fecha} ${b.hora ?? "00:00"}`) || (a.id < b.id ? -1 : 1));
+  const resultado: TrazaSalida[] = [];
+  for (const sd of salidas) {
+    const p = porId.get(sd.productoId);
+    if (!p) continue;
+    const fk = factorKg(p);
+    let falta = (Number(sd.cantidad) || 0) * fk;
+    const cola = restante.get(grupoDe(p)) ?? [];
+    const partes: TrazaSalida["partes"] = [];
+    for (const e of cola) {
+      if (falta <= 1e-9) break;
+      if (e.base <= 1e-9) continue;
+      const toma = Math.min(e.base, falta);
+      e.base -= toma;
+      falta -= toma;
+      const previa = partes.find((x) => x.factura.id === e.factura.id);
+      if (previa) {
+        previa.cantidad += toma / fk;
+        previa.valor += toma * e.precioBase;
+      } else partes.push({ factura: e.factura, cantidad: toma / fk, valor: toma * e.precioBase });
+    }
+    resultado.push({
+      salida: sd,
+      producto: p,
+      lote: sd.loteId ? lotes.get(sd.loteId) : undefined,
+      partes,
+      sinFactura: Math.max(0, falta / fk),
+      valor: partes.reduce((t, x) => t + x.valor, 0),
+    });
+  }
+  return resultado.reverse();
+}
+
 /**
  * Existencias calculadas: entradas por facturas menos salidas registradas.
  * Los productos con el mismo código comparten inventario: todo se suma en

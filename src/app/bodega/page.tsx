@@ -30,6 +30,7 @@ import {
   migrarBodegaAnterior,
   nuevoId,
   totalFactura,
+  trazabilidadSalidas,
   saldoFactura,
   useVersionDatos,
   type CategoriaBodega,
@@ -176,6 +177,7 @@ export default function BodegaPage() {
 
           {vista === "inventario" && !q && <TarjetaGastosProduccion />}
           {vista === "inventario" && !q && <TarjetaConsumoCerdas />}
+          {vista === "inventario" && !q && <SalidasALotes />}
 
           {datos === null ? (
             <div className="h-40 animate-pulse rounded-3xl bg-slate-100" />
@@ -857,6 +859,68 @@ function DetalleFactura({ factura: f, productos, onCerrar }: { factura: Factura;
 }
 
 /* ───────────── Gastos de producción (módulo fijo de Bodega) ───────────── */
+
+/* Salidas a lotes: para qué lote salió cada producto, de qué factura(s), valor, fecha y hora */
+function SalidasALotes() {
+  const version = useVersionDatos();
+  const [limite, setLimite] = useState(30);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const trazas = useMemo(() => (version < 0 ? [] : trazabilidadSalidas().filter((t) => t.salida.loteId)), [version]);
+  if (trazas.length === 0) return null;
+  const cant = (n: number) => n.toLocaleString("es-CO", { maximumFractionDigits: 2 });
+
+  return (
+    <SeccionDesplegable titulo="Salidas a lotes" cantidad={trazas.length}>
+      <ul className="divide-y divide-slate-100 bg-white">
+        {trazas.slice(0, limite).map((t) => (
+          <li key={t.salida.id} className="px-3.5 py-2.5">
+            <div className="flex items-start gap-2">
+              <span className="shrink-0 rounded-md bg-sky-100 px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-sky-800">
+                {t.lote?.codigo ?? "Lote"}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-slate-900">
+                  {cant(t.salida.cantidad)} {t.producto.unidad} · {t.producto.nombre}
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  {t.lote ? nombreLote(t.lote) : "Lote eliminado"} · {formatoFecha(t.salida.fecha, true)}
+                  {t.salida.hora ? ` · ${formatoHora(t.salida.hora)}` : ""}
+                </p>
+              </div>
+              <span className="shrink-0 text-sm font-bold tabular-nums text-slate-900">{formatoPesos(Math.round(t.valor))}</span>
+            </div>
+            <ul className="mt-1.5 flex flex-col gap-1 pl-1">
+              {t.partes.map((p) => (
+                <li key={p.factura.id} className="flex items-center gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs">
+                  <span aria-hidden="true">🧾</span>
+                  <span className="min-w-0 flex-1 truncate text-slate-700">
+                    Factura <b className="font-semibold">{p.factura.numero}</b>
+                    {p.factura.proveedor ? ` · ${p.factura.proveedor}` : ""}
+                    <span className="text-slate-400"> · {formatoFecha(p.factura.fecha)}</span>
+                  </span>
+                  <span className="shrink-0 tabular-nums text-slate-500">
+                    {cant(p.cantidad)} {t.producto.unidad}
+                  </span>
+                  <span className="w-20 shrink-0 text-right font-semibold tabular-nums text-slate-800">{formatoPesos(Math.round(p.valor))}</span>
+                </li>
+              ))}
+              {t.sinFactura > 0.0001 && (
+                <li className="rounded-lg bg-orange-50 px-2.5 py-1.5 text-xs text-orange-800">
+                  {cant(t.sinFactura)} {t.producto.unidad} sin factura de compra (sin valor)
+                </li>
+              )}
+            </ul>
+          </li>
+        ))}
+      </ul>
+      {trazas.length > limite && (
+        <button type="button" onClick={() => setLimite((n) => n + 30)} className="w-full border-t border-slate-100 py-2.5 text-sm font-semibold text-sky-700 active:bg-slate-50">
+          Ver más ({trazas.length - limite})
+        </button>
+      )}
+    </SeccionDesplegable>
+  );
+}
 
 /* Consumo aproximado de alimento de las cerdas (reglas en Ajustes ocultos) */
 const bultosTexto = (kg: number, kgBulto: number) => {
