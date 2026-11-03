@@ -204,8 +204,12 @@ export default function EngordePage() {
                           </>
                         )}
                       </span>
+                      {l.origen && (
+                        <span className="block truncate text-[10px] text-slate-500">
+                          Cerda <b className="font-semibold text-slate-700">{l.origen.cerdaId}</b>
+                        </span>
+                      )}
                       <span className="block truncate text-[10px] tabular-nums text-slate-500">
-                        {l.origen ? <>Cerda <b className="font-semibold text-slate-700">{l.origen.cerdaId}</b> · </> : null}
                         <b className="font-semibold text-slate-700">{l.vivos}</b> {l.vivos === 1 ? "animal" : "animales"}
                       </span>
                     </div>
