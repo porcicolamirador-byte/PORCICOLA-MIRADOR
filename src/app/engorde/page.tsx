@@ -930,12 +930,22 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
             </SeccionDesplegable>
           )}
 
-          {(lote.pesajes.length > 0 || lote.mortalidad.length > 0) && (
-            <SeccionDesplegable titulo="Pesajes y mortalidad" cantidad={lote.pesajes.length + lote.mortalidad.length}>
+          {(lote.pesajes.length > 0 || lote.mortalidad.length > 0 || (lote.aplicaciones?.length ?? 0) > 0) && (
+            <SeccionDesplegable
+              titulo="Pesajes, mortalidad y sanidad"
+              cantidad={lote.pesajes.length + lote.mortalidad.length + (lote.aplicaciones?.length ?? 0)}
+              inicialAbierta={(lote.aplicaciones?.length ?? 0) > 0 && lote.pesajes.length + lote.mortalidad.length === 0}
+            >
               <ul className="flex flex-col gap-1.5 text-sm">
                 {[
                   ...lote.pesajes.map((p) => ({ f: p.fecha, h: "", t: `Pesaje: ${p.pesoPromedio} kg promedio`, i: -1 })),
                   ...lote.mortalidad.map((m) => ({ f: m.fecha, h: "", t: `Muerte: ${m.cantidad}${m.causa ? ` · ${m.causa}` : ""}`, i: -1 })),
+                  ...(lote.aplicaciones ?? []).map((a) => ({
+                    f: a.fecha,
+                    h: a.hora ?? "",
+                    t: `💉 ${a.tipo === "Hierro" ? "Aplicación de hierro" : a.tipo}${a.nota ? ` · ${a.nota}` : ""}`,
+                    i: -1,
+                  })),
                 ]
                   .sort((a, b) => b.f.localeCompare(a.f) || b.h.localeCompare(a.h))
                   .map((x, k) => {
