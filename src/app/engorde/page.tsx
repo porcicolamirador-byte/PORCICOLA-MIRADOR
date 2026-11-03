@@ -67,6 +67,20 @@ export default function EngordePage() {
   const lotes = useMemo(() => (version < 0 ? null : leerLotes()), [version]);
   const activos = lotes?.filter((l) => l.activo) ?? [];
   const [busqueda, setBusqueda] = useState("");
+  // Estilo de las tarjetas: el de siempre o el destacado (número de lote y edad grandes); se recuerda en este teléfono
+  const [estilo, setEstiloEstado] = useState<"clasico" | "destacado">(() => {
+    try {
+      return typeof window !== "undefined" && localStorage.getItem("engorde-estilo") === "destacado" ? "destacado" : "clasico";
+    } catch {
+      return "clasico";
+    }
+  });
+  const setEstilo = (e: "clasico" | "destacado") => {
+    setEstiloEstado(e);
+    try {
+      localStorage.setItem("engorde-estilo", e);
+    } catch {}
+  };
   // Busca por código o nombre del lote, por la madre (número o nombre) y por el código del parto
   const q = busqueda.trim().toLowerCase();
   const nombresMadres = useMemo(() => (version < 0 ? new Map<string, string>() : new Map(leerCerdas().map((c) => [c.id, c.nombre ?? ""]))), [version]);
@@ -111,14 +125,41 @@ export default function EngordePage() {
         />
       </div>
 
-      <Chips
-        opciones={[
-          { valor: "activos", texto: "Activos" },
-          { valor: "cerrados", texto: "Cerrados" },
-        ]}
-        valor={vista}
-        onChange={setVista}
-      />
+      <div className="flex items-center justify-between gap-2">
+        <Chips
+          opciones={[
+            { valor: "activos", texto: "Activos" },
+            { valor: "cerrados", texto: "Cerrados" },
+          ]}
+          valor={vista}
+          onChange={setVista}
+        />
+        {/* Cambiar el estilo de las tarjetas */}
+        <div className="flex shrink-0 gap-0.5 rounded-xl bg-slate-100 p-0.5" role="group" aria-label="Estilo de las tarjetas">
+          {(["clasico", "destacado"] as const).map((e) => (
+            <button
+              key={e}
+              type="button"
+              onClick={() => setEstilo(e)}
+              aria-pressed={estilo === e}
+              aria-label={e === "clasico" ? "Estilo clásico" : "Estilo destacado"}
+              className={`flex h-8 w-9 items-center justify-center rounded-lg transition ${estilo === e ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+            >
+              {e === "clasico" ? (
+                <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" aria-hidden="true">
+                  <rect x="4" y="5" width="16" height="14" rx="3" />
+                  <path d="M7.5 9.5h5M7.5 14.5h9" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" aria-hidden="true">
+                  <rect x="3.5" y="5" width="7" height="14" rx="2.5" />
+                  <path d="M13.5 9h7M13.5 15h5" />
+                </svg>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {lotes === null ? (
         <div className="h-40 animate-pulse rounded-3xl bg-slate-100" />
@@ -132,6 +173,58 @@ export default function EngordePage() {
         <ul className="flex flex-col gap-2.5">
           {visibles.map((l) => {
             const r = resumenLote(l);
+            if (estilo === "destacado") {
+              const edad = edadMesesDias(l.fechaIngreso, l.activo ? hoy() : l.fechaSalida || hoy());
+              const numero = /^LP-(\d+)$/.exec(l.codigo ?? "")?.[1];
+              return (
+                <li key={l.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSeleccionado(l.id)}
+                    className="w-full rounded-3xl bg-white p-3 text-left ring-1 ring-slate-200/80 transition hover:shadow-md active:scale-[0.99]"
+                  >
+                    <div className="flex items-stretch gap-3">
+                      {/* Número de lote grande */}
+                      <div className="flex w-[68px] shrink-0 flex-col items-center justify-center rounded-2xl bg-sky-900 py-2 text-white">
+                        <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-sky-200">Lote</span>
+                        <span className="text-[26px] font-black leading-none tabular-nums">{numero ?? (l.codigo || "–")}</span>
+                      </div>
+                      <div className="flex min-w-0 flex-1 flex-col justify-center">
+                        <p className="truncate text-[15px] font-semibold text-slate-900">
+                          {l.nombre && l.nombre !== l.codigo ? l.nombre : l.codigo || "Lote"}
+                        </p>
+                        {l.origen && <p className="truncate text-[11px] text-slate-500">Madre: cerda {l.origen.cerdaId}</p>}
+                        <p className="mt-0.5 truncate text-[11px] tabular-nums text-slate-600">
+                          {l.vivos}/{l.cantidadInicial} animales
+                          {r.pesoActual ? ` · ${r.pesoActual.toFixed(1)} kg` : ""}
+                          {r.gdp !== null ? ` · ${Math.round(r.gdp)} g/d` : ""}
+                        </p>
+                      </div>
+                      {/* Edad grande */}
+                      <div className="flex shrink-0 flex-col items-end justify-center pr-1">
+                        <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-400">{l.origen ? "Edad" : "En el lote"}</span>
+                        <span className="text-[22px] font-black leading-none tabular-nums text-slate-900">
+                          {edad.meses > 0 ? (
+                            <>
+                              {edad.meses}
+                              <span className="text-xs font-bold text-slate-500">m </span>
+                              {edad.dias}
+                              <span className="text-xs font-bold text-slate-500">d</span>
+                            </>
+                          ) : (
+                            <>
+                              {edad.dias}
+                              <span className="text-xs font-bold text-slate-500"> días</span>
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                    <BarraConsumo lote={l} />
+                  </button>
+                </li>
+              );
+            }
             return (
               <li key={l.id}>
                 <button
