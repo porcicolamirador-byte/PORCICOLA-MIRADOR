@@ -55,8 +55,13 @@ function resumenLote(l: Lote) {
   const dias = Math.max(0, diasEntre(l.fechaIngreso, fin));
   const pesajes = [...l.pesajes].sort((a, b) => b.fecha.localeCompare(a.fecha));
   const pesoActual = pesajes[0]?.pesoPromedio ?? l.pesoInicial;
-  const diasAlUltimoPeso = pesajes[0] ? Math.max(1, diasEntre(l.fechaIngreso, pesajes[0].fecha)) : 0;
-  const gdp = pesajes[0] && l.pesoInicial ? ((pesoActual - l.pesoInicial) / diasAlUltimoPeso) * 1000 : null;
+  // Ganancia diaria: del peso de partida al último pesaje. El punto de partida es el
+  // peso inicial del lote (al nacer o al ingresar); si no tiene, el primer pesaje.
+  const primero = pesajes[pesajes.length - 1];
+  const base =
+    l.pesoInicial > 0 ? { fecha: l.fechaIngreso, peso: l.pesoInicial } : pesajes.length >= 2 ? { fecha: primero.fecha, peso: primero.pesoPromedio } : null;
+  const diasBase = base && pesajes[0] ? diasEntre(base.fecha, pesajes[0].fecha) : 0;
+  const gdp = base && pesajes[0] && diasBase > 0 ? ((pesoActual - base.peso) / diasBase) * 1000 : null;
   const muertes = l.mortalidad.reduce((s, m) => s + (Number(m.cantidad) || 0), 0);
   const mortalidad = l.cantidadInicial ? (muertes / l.cantidadInicial) * 100 : 0;
   const kgAlimento = l.alimento.reduce((s, a) => s + (Number(a.kg) || 0), 0);
