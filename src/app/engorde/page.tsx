@@ -128,7 +128,7 @@ export default function EngordePage() {
       <div className="grid grid-cols-2 gap-2">
         <Dato titulo="Lotes activos" valor={lotes ? activos.length : "–"} />
         <Dato titulo="Animales en engorde" valor={lotes ? animales : "–"} />
-        {([15, 30] as const).map((n) => {
+        {([30, 15] as const).map((n) => {
           const lista = n === 15 ? salen15 : salen30;
           const abierto = desplegado === n;
           return (
@@ -139,8 +139,8 @@ export default function EngordePage() {
               aria-expanded={abierto}
               className={`rounded-2xl p-3.5 text-left ring-1 transition active:scale-[0.98] ${abierto ? "bg-sky-50 ring-sky-200" : "bg-white ring-slate-200/80"}`}
             >
-              <span className="flex items-center justify-between gap-1">
-                <span className="text-xs font-medium text-slate-500">Salen en {n} días</span>
+              <span className="flex items-start justify-between gap-1">
+                <span className="text-xs font-medium leading-snug text-slate-500">Salidas siguientes {n} días</span>
                 <svg viewBox="0 0 20 20" className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${abierto ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M5 8l5 5 5-5" />
                 </svg>
