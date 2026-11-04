@@ -45,6 +45,7 @@ import { exportarContabilidadLote, loteTieneMadre } from "@/lib/exportarLote";
 import { puede } from "@/lib/nube";
 import Modal from "@/components/Modal";
 import ConfirmarHierro from "@/components/ConfirmarHierro";
+import IconoBulto from "@/components/IconoBulto";
 import { ETAPAS_ALIMENTACION, leerConfig } from "@/lib/config";
 
 /** Indicadores calculados de un lote */
@@ -823,7 +824,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
       etiqueta={accion === "resumen" ? "Lote de engorde" : nombreLote(lote)}
       titulo={titulos[accion]}
       subtitulo={accion === "resumen" ? `${lote.vivos} animales · ${lote.activo ? "activo" : "cerrado"}` : undefined}
-      icono={ICONOS_ACCION[accion]}
+      icono={accion === "alimento" ? <IconoBulto /> : ICONOS_ACCION[accion]}
       onCerrar={accion === "resumen" ? onCerrar : limpiar}
     >
       {accion === "resumen" ? (
