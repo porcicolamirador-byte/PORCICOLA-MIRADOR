@@ -18,3 +18,15 @@ export default function IconoBulto({ className = "h-10 w-10" }: { className?: st
     </svg>
   );
 }
+
+/** Factura con signo $ (ícono a color para "Otro gasto del lote") */
+export function IconoFacturaGasto({ className = "h-10 w-10" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+      <path d="M12 6h24v36l-4-3-4 3-4-3-4 3-4-3-4 3z" fill="#f8fafc" />
+      <path d="M17 15h14M17 21h14M17 27h8" stroke="#94a3b8" strokeWidth={2.2} strokeLinecap="round" />
+      <circle cx="31" cy="31" r="7" fill="#16a34a" />
+      <path d="M31 27v8M33 28.6h-3a1.4 1.4 0 0 0 0 2.8h2a1.4 1.4 0 0 1 0 2.8h-3" fill="none" stroke="#fff" strokeWidth={1.6} strokeLinecap="round" />
+    </svg>
+  );
+}

@@ -46,7 +46,7 @@ import { exportarContabilidadLote, loteTieneMadre } from "@/lib/exportarLote";
 import { puede } from "@/lib/nube";
 import Modal from "@/components/Modal";
 import ConfirmarHierro from "@/components/ConfirmarHierro";
-import IconoBulto from "@/components/IconoBulto";
+import IconoBulto, { IconoFacturaGasto } from "@/components/IconoBulto";
 import { ETAPAS_ALIMENTACION, leerConfig } from "@/lib/config";
 
 /** Indicadores calculados de un lote */
@@ -909,7 +909,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
       etiqueta={accion === "resumen" ? "Lote de engorde" : nombreLote(lote)}
       titulo={titulos[accion]}
       subtitulo={accion === "resumen" ? `${lote.vivos} animales · ${lote.activo ? "activo" : "cerrado"}` : undefined}
-      icono={accion === "alimento" ? <IconoBulto /> : ICONOS_ACCION[accion]}
+      icono={accion === "alimento" ? <IconoBulto /> : accion === "gasto" ? <IconoFacturaGasto /> : ICONOS_ACCION[accion]}
       onCerrar={accion === "resumen" ? onCerrar : limpiar}
     >
       {accion === "resumen" ? (
@@ -1260,7 +1260,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
           {accion === "gasto" && (
             <>
               <Campo etiqueta="Producto o servicio">
-                <Entrada value={gastoDesc} onChange={(v) => setGastoDesc(v.slice(0, 80))} placeholder="Dato" required />
+                <Entrada value={gastoDesc} onChange={(v) => setGastoDesc(v.slice(0, 80))} placeholder="Ingresar referencia" required />
               </Campo>
               <div className="grid grid-cols-2 gap-3">
                 <Campo etiqueta="Cantidad *">
@@ -1269,12 +1269,12 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                     inputMode="decimal"
                     value={gastoCant}
                     onChange={(v) => setGastoCant(v.replace(/[^\d.,]/g, "").slice(0, 8))}
-                    placeholder="Dato"
+                    placeholder=""
                     required
                   />
                 </Campo>
                 <Campo etiqueta="Valor unitario *">
-                  <EntradaPesos value={valor} onChange={setValor} placeholder="Dato" required />
+                  <EntradaPesos value={valor} onChange={setValor} placeholder="" required />
                 </Campo>
               </div>
               <div className="flex items-center justify-between rounded-xl bg-sky-50 px-3.5 py-2.5 ring-1 ring-sky-100">
