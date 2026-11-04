@@ -200,7 +200,9 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
     }
 
     const { desteteMin, desteteMax } = leerConfig();
-    if (diasDesdeParto >= desteteMin && diasDesdeParto <= desteteMax) {
+    // Si ya se registró el destete de este parto, la alerta desaparece
+    const yaDestetada = historial.some((r) => r.tipo === 'Destete' && (r.fecha || '') >= (regParto.fecha || ''));
+    if (!yaDestetada && diasDesdeParto >= desteteMin && diasDesdeParto <= desteteMax) {
       tareas.push({
         id: cerda.id,
         tipo: 'Destete próximo',
@@ -232,10 +234,12 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
 
   if (regDestete) {
     const diasDesdeDestete = calcularDiasEntre(regDestete.fecha || hoy, hoy);
-    if (diasDesdeDestete >= 4 && diasDesdeDestete <= 8) {
+    // Desde el destete se revisa el celo hasta el día 8, salvo que ya se registró celo o inseminación después
+    const celoRegistrado = historial.some((r) => ['Celo', 'Inseminación'].includes(r.tipo || '') && (r.fecha || '') >= (regDestete.fecha || ''));
+    if (!celoRegistrado && diasDesdeDestete >= 0 && diasDesdeDestete <= 8) {
       tareas.push({
         id: cerda.id,
-        tipo: 'Detección de celo',
+        tipo: 'Revisión de celo',
         prioridad: 'alta',
         descripcion: 'Monitorear aparición de celo postdestete',
         dias: diasDesdeDestete,
