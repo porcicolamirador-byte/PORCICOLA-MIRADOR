@@ -37,6 +37,8 @@ export default function JaulaPage() {
   const [area, setArea] = useState<Area | null>(null);
   const [jaulaSel, setJaulaSel] = useState<string | null>(null);
   const [elegida, setElegida] = useState("");
+  const [trasladando, setTrasladando] = useState(false);
+  const [masOpciones, setMasOpciones] = useState(false);
   // Desde la ficha de una cerda: ?cerda=ID (&area=…&jaula=…) abre su jaula para cambiarla
   const [cerdaOrigen, setCerdaOrigen] = useState("");
   useEffect(() => {
@@ -83,6 +85,8 @@ export default function JaulaPage() {
 
   const abrirJaula = (codigo: string) => {
     setJaulaSel(codigo);
+    setTrasladando(false);
+    setMasOpciones(false);
     // Si vino desde una cerda sin esta jaula, queda elegida para ubicarla aquí
     setElegida(cerdaOrigen && datos?.porJaula.get(codigo)?.c.id !== cerdaOrigen ? cerdaOrigen : "");
   };
@@ -207,56 +211,120 @@ export default function JaulaPage() {
         ))}
       </div>
 
-      {jaulaSel && (
-        <Modal abierta etiqueta={cfg.titulo} titulo={`Jaula ${jaulaSel}`} subtitulo={ocupante ? `Cerda ${ocupante.c.id} · ${ocupante.estado}` : "Libre"} onCerrar={() => setJaulaSel(null)}>
-          <div className="flex flex-col gap-3">
-            {ocupante && (
-              <div className="grid grid-cols-2 gap-2">
-                <Boton variante="secundario" onClick={() => router.push(`/cerda/${encodeURIComponent(ocupante.c.id)}`)}>
-                  Ver cerda
-                </Boton>
+      {jaulaSel && (() => {
+        // Trasladar: de gestación se pasa a lactancia y de lactancia a gestación
+        const otra: Area = area === "gestacion" ? "lactancia" : "gestacion";
+        const cfgOtra = AREAS[otra];
+        const libres = Array.from({ length: cfgOtra.porFila * cfgOtra.filas }, (_, i) => codigoJaula(cfgOtra.prefijo, i + 1)).filter(
+          (j) => !datos?.porJaula.has(j)
+        );
+        return (
+          <Modal abierta etiqueta={cfg.titulo} titulo={`Jaula ${jaulaSel}`} subtitulo={ocupante ? `Cerda ${ocupante.c.id} · ${ocupante.estado}` : "Libre"} onCerrar={() => setJaulaSel(null)}>
+            {ocupante ? (
+              <div className="flex flex-col gap-3">
+                {!trasladando ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Boton variante="secundario" onClick={() => router.push(`/cerda/${encodeURIComponent(ocupante.c.id)}`)}>
+                      Ver cerda
+                    </Boton>
+                    <Boton onClick={() => setTrasladando(true)}>Trasladar</Boton>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="mb-2 text-sm font-medium text-slate-700">
+                      Trasladar a {cfgOtra.titulo.toLowerCase()} · elige una jaula libre
+                    </p>
+                    {libres.length === 0 ? (
+                      <p className="text-sm text-slate-500">No hay jaulas libres en {cfgOtra.titulo.toLowerCase()}.</p>
+                    ) : (
+                      <div className={`grid gap-1.5 ${otra === "lactancia" ? "grid-cols-5" : "grid-cols-6"}`}>
+                        {libres.map((j) => (
+                          <button
+                            key={j}
+                            type="button"
+                            onClick={() => {
+                              asignar(j, ocupante.c.id);
+                              setJaulaSel(null);
+                              setTrasladando(false);
+                              setArea(otra);
+                            }}
+                            className="rounded-xl bg-slate-50 py-2.5 text-xs font-bold tabular-nums text-slate-700 ring-1 ring-slate-200 transition active:bg-sky-50 active:ring-sky-300"
+                          >
+                            {j}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <button type="button" onClick={() => setTrasladando(false)} className="mt-3 text-sm font-semibold text-slate-500 active:opacity-70">
+                      Cancelar
+                    </button>
+                  </div>
+                )}
+
+                {/* Desocupar queda escondido: solo si la cerda sale de la granja o del área */}
+                <div className="rounded-2xl ring-1 ring-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setMasOpciones((v) => !v)}
+                    aria-expanded={masOpciones}
+                    className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-sm font-medium text-slate-500 active:opacity-70"
+                  >
+                    Más opciones
+                    <svg viewBox="0 0 20 20" className={`h-4 w-4 text-slate-400 transition-transform ${masOpciones ? "rotate-90" : ""}`} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M8 5l5 5-5 5" />
+                    </svg>
+                  </button>
+                  {masOpciones && (
+                    <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-3.5 py-2.5">
+                      <span className="min-w-0 text-xs leading-snug text-slate-500">Deja la jaula libre (la cerda queda sin jaula).</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          asignar(jaulaSel, null);
+                          setJaulaSel(null);
+                        }}
+                        className="shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold text-rose-600 ring-1 ring-rose-200 transition active:bg-rose-50"
+                      >
+                        Desocupar
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <div>
+                  <p className="mb-1 text-sm font-medium text-slate-700">Ubicar cerda</p>
+                  {opciones.length === 0 ? (
+                    <p className="text-sm text-slate-500">No hay cerdas para ubicar.</p>
+                  ) : (
+                    <SelectorApp
+                      valor={elegida}
+                      onCambiar={setElegida}
+                      titulo={`Cerda para ${jaulaSel}`}
+                      placeholder="Elige la cerda"
+                      opciones={opciones}
+                      className="w-full"
+                      claseBoton="h-11 rounded-xl bg-slate-50 px-3.5 text-base text-slate-900 ring-1 ring-slate-200"
+                    />
+                  )}
+                </div>
                 <Boton
-                  variante="secundario"
-                  className="text-rose-600"
+                  disabled={!elegida}
                   onClick={() => {
-                    asignar(jaulaSel, null);
+                    asignar(jaulaSel, elegida);
                     setJaulaSel(null);
                   }}
+                  className="w-full"
                 >
-                  Desocupar
+                  Guardar
                 </Boton>
+                <p className="text-xs leading-snug text-slate-500">Si la cerda estaba en otra jaula, se mueve a esta y la anterior queda libre.</p>
               </div>
             )}
-            <div>
-              <p className="mb-1 text-sm font-medium text-slate-700">{ocupante ? "Cambiar por otra cerda" : "Ubicar cerda"}</p>
-              {opciones.length === 0 ? (
-                <p className="text-sm text-slate-500">No hay otras cerdas para ubicar.</p>
-              ) : (
-                <SelectorApp
-                  valor={elegida}
-                  onCambiar={setElegida}
-                  titulo={`Cerda para ${jaulaSel}`}
-                  placeholder="Elige la cerda"
-                  opciones={opciones}
-                  className="w-full"
-                  claseBoton="h-11 rounded-xl bg-slate-50 px-3.5 text-base text-slate-900 ring-1 ring-slate-200"
-                />
-              )}
-            </div>
-            <Boton
-              disabled={!elegida}
-              onClick={() => {
-                asignar(jaulaSel, elegida);
-                setJaulaSel(null);
-              }}
-              className="w-full"
-            >
-              Guardar
-            </Boton>
-            <p className="text-xs leading-snug text-slate-500">Si la cerda estaba en otra jaula, se mueve a esta y la anterior queda libre.</p>
-          </div>
-        </Modal>
-      )}
+          </Modal>
+        );
+      })()}
     </ModuloPage>
   );
 }
