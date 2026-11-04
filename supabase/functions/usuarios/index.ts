@@ -5,6 +5,7 @@
 //   { accion: "actualizar", id, nombre?, rol?, permisos?, granjas?, modulos_ocultos?, activo?, pin? }   (granjas: null = todas)
 //   { accion: "eliminar", id }   → borra la cuenta para siempre (sus registros se conservan)
 //   { accion: "reiniciar", pin }  → borra TODOS los datos de la granja (no los usuarios); pide el PIN del administrador
+//   { accion: "modulos", modulos_ocultos }  → módulos del Dashboard desactivados para todos (menos el administrador)
 //   { accion: "yo" }   → perfil del usuario que llama (cualquier usuario activo)
 import { admin, contrasenaDe, publico, correoDe, CORS, json, PIN_ENTRADA, PIN_VALIDO, usuarioDeLaPeticion, USUARIO_VALIDO } from "../_compartido/comun.ts";
 
@@ -37,7 +38,12 @@ Deno.serve(async (req) => {
 
   if (accion === "yo") {
     const { activo: _a, ...datos } = yo;
-    return json({ perfil: datos });
+    // Módulos desactivados para todos; el administrador siempre ve todos
+    const { data: aj } = await admin.from("app_ajustes").select("modulos_ocultos").eq("id", 1).maybeSingle();
+    const globales: string[] = aj?.modulos_ocultos ?? [];
+    return json({
+      perfil: { ...datos, modulos_ocultos: yo.rol === "admin" ? [] : globales, ...(yo.rol === "admin" ? { modulos_globales: globales } : {}) },
+    });
   }
   if (yo.rol !== "admin") return json({ error: "Solo el administrador puede hacer esto" }, 403);
 
@@ -118,6 +124,13 @@ Deno.serve(async (req) => {
         await admin.auth.admin.updateUserById(id, { ban_duration: cambios.activo ? "none" : "876000h" });
       }
       return json({ usuario: perfil });
+    }
+
+    if (accion === "modulos") {
+      const lista = limpiarModulos(cuerpo.modulos_ocultos);
+      const { error } = await admin.from("app_ajustes").upsert({ id: 1, modulos_ocultos: lista, actualizado_en: new Date().toISOString(), actualizado_por: yo.usuario });
+      if (error) throw error;
+      return json({ modulos_ocultos: lista });
     }
 
     if (accion === "eliminar") {

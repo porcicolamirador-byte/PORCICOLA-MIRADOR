@@ -31,8 +31,10 @@ export interface PerfilNube {
   permisos: Partial<Record<PermisoNube, boolean>>;
   /** Granjas a las que entra (null o vacío de campo = todas, incluidas las nuevas) */
   granjas?: string[] | null;
-  /** Módulos del Dashboard desactivados para este usuario (vacío = todos activos) */
+  /** Módulos del Dashboard desactivados para este usuario (vacío = todos activos; el administrador siempre ve todos) */
   modulos_ocultos?: string[];
+  /** Solo para el administrador: módulos desactivados para todos los demás */
+  modulos_globales?: string[];
   /** Último cambio de PIN hecho por el administrador */
   pin_actualizado?: string | null;
   activo?: boolean;
@@ -251,6 +253,10 @@ export const actualizarUsuario = (
   id: string,
   cambios: Partial<Pick<PerfilNube, "nombre" | "rol" | "permisos" | "activo" | "granjas" | "modulos_ocultos">> & { pin?: string },
 ) => llamarFuncion<{ usuario: PerfilNube }>("usuarios", { accion: "actualizar", id, ...cambios }).then((r) => r.usuario);
+
+/** Módulos del Dashboard desactivados para todos los usuarios (el administrador siempre los ve) */
+export const guardarModulosGlobales = (modulos_ocultos: string[]) =>
+  llamarFuncion<{ modulos_ocultos: string[] }>("usuarios", { accion: "modulos", modulos_ocultos }).then((r) => r.modulos_ocultos);
 
 /** Borra un usuario para siempre (solo administrador). Sus registros se conservan. */
 /** Borra todos los datos de la granja en la nube (solo administrador, con su PIN) */

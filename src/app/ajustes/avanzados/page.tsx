@@ -3,7 +3,7 @@
 import SelectorApp from "@/components/SelectorApp";
 import { leerLog } from "@/lib/log";
 import { borrarTodoLocal } from "@/lib/sincronizar";
-import { actualizarPerfil, actualizarUsuario, consumoNube, ErrorNube, listarUsuarios, perfilGuardado, reiniciarBaseNube, type ConsumoNube, type PerfilNube } from "@/lib/nube";
+import { actualizarPerfil, consumoNube, ErrorNube, guardarModulosGlobales, perfilGuardado, reiniciarBaseNube, type ConsumoNube } from "@/lib/nube";
 import { MODULOS_DASHBOARD } from "@/lib/modulos";
 import Modal from "@/components/Modal";
 import { useEffect, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
@@ -123,11 +123,11 @@ export default function AjustesAvanzadosPage() {
       </Grupo>
       )}
 
-      {/* Solo el administrador: activar o desactivar módulos del Dashboard para cada usuario */}
+      {/* Solo el administrador: activar o desactivar módulos del Dashboard para todos (él siempre los ve) */}
       {esAdmin && (
       <Grupo titulo="Módulos del Dashboard">
-        <Desplegable icono="paridera" titulo="Módulos por usuario" resumen="Todos activos por defecto" abierto={abierto === "modulos"} onAlternar={() => alternar("modulos")}>
-          <ModulosUsuarios />
+        <Desplegable icono="paridera" titulo="Activar módulos" resumen="Todos activos por defecto" abierto={abierto === "modulos"} onAlternar={() => alternar("modulos")}>
+          <ModulosGlobales />
         </Desplegable>
       </Grupo>
       )}
@@ -607,34 +607,24 @@ function Parideras({ actual, onGuardar }: { actual: number; onGuardar: (n: numbe
   );
 }
 
-function ModulosUsuarios() {
-  const [usuarios, setUsuarios] = useState<PerfilNube[] | null>(null);
+function ModulosGlobales() {
+  const [ocultos, setOcultos] = useState<string[] | null>(null);
   const [error, setError] = useState("");
-  const [elegido, setElegido] = useState("");
   const [guardando, setGuardando] = useState("");
 
   useEffect(() => {
-    listarUsuarios()
-      .then((u) => {
-        setUsuarios(u);
-        setElegido((e) => e || u[0]?.id || "");
-      })
-      .catch(() => setError("No se pudo cargar la lista de usuarios. Revisa la conexión."));
+    actualizarPerfil()
+      .then((p) => setOcultos(p?.modulos_globales ?? []))
+      .catch(() => setError("No se pudo cargar. Revisa la conexión."));
   }, []);
 
-  const usuario = usuarios?.find((u) => u.id === elegido);
-  const ocultos = usuario?.modulos_ocultos ?? [];
-
   const cambiar = async (ruta: string, activo: boolean) => {
-    if (!usuario) return;
+    if (!ocultos) return;
     const nuevos = activo ? ocultos.filter((r) => r !== ruta) : [...new Set([...ocultos, ruta])];
     setGuardando(ruta);
     setError("");
     try {
-      const act = await actualizarUsuario(usuario.id, { modulos_ocultos: nuevos });
-      setUsuarios((lista) => (lista ?? []).map((u) => (u.id === act.id ? { ...u, modulos_ocultos: act.modulos_ocultos ?? nuevos } : u)));
-      // Si es el propio administrador, su Dashboard se actualiza de una vez
-      if (usuario.id === perfilGuardado()?.id) await actualizarPerfil();
+      setOcultos(await guardarModulosGlobales(nuevos));
     } catch {
       setError("No se pudo guardar. Revisa la conexión e intenta de nuevo.");
     } finally {
@@ -642,41 +632,30 @@ function ModulosUsuarios() {
     }
   };
 
-  if (error && !usuarios) return <p className="text-sm text-rose-600">{error}</p>;
-  if (!usuarios) return <p className="text-sm text-slate-500">Cargando usuarios…</p>;
+  if (error && !ocultos) return <p className="text-sm text-rose-600">{error}</p>;
+  if (!ocultos) return <p className="text-sm text-slate-500">Cargando…</p>;
 
   return (
     <div className="flex flex-col gap-3">
-      <SelectorApp
-        valor={elegido}
-        onCambiar={setElegido}
-        titulo="Usuario"
-        opciones={usuarios.map((u) => ({
-          valor: u.id,
-          texto: `${u.nombre} · ${u.usuario}${u.rol === "admin" ? " (admin)" : ""}`,
-        }))}
-        className="w-full"
-        claseBoton="h-11 rounded-xl bg-slate-50 px-3.5 text-base text-slate-900 ring-1 ring-slate-200"
-      />
-      {usuario && (
-        <ul className="divide-y divide-slate-100 rounded-2xl bg-white ring-1 ring-slate-200">
-          {MODULOS_DASHBOARD.map((m) => {
-            const activo = !ocultos.includes(m.ruta);
-            return (
-              <li key={m.ruta} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
-                <span className="min-w-0">
-                  <span className="block text-sm font-medium text-slate-900">{m.nombre}</span>
-                  <span className={`block text-xs ${activo ? "text-emerald-700" : "text-slate-400"}`}>{guardando === m.ruta ? "Guardando…" : activo ? "Activo" : "Desactivado"}</span>
+      <ul className="divide-y divide-slate-100 rounded-2xl bg-white ring-1 ring-slate-200">
+        {MODULOS_DASHBOARD.map((m) => {
+          const activo = !ocultos.includes(m.ruta);
+          return (
+            <li key={m.ruta} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-slate-900">{m.nombre}</span>
+                <span className={`block text-xs ${activo ? "text-emerald-700" : "text-slate-400"}`}>
+                  {guardando === m.ruta ? "Guardando…" : activo ? "Activo para todos" : "Solo administrador"}
                 </span>
-                <Interruptor activo={activo} onCambiar={(v) => void cambiar(m.ruta, v)} />
-              </li>
-            );
-          })}
-        </ul>
-      )}
+              </span>
+              <Interruptor activo={activo} onCambiar={(v) => void cambiar(m.ruta, v)} />
+            </li>
+          );
+        })}
+      </ul>
       {error && <p className="text-sm text-rose-600">{error}</p>}
       <p className="text-xs leading-snug text-slate-500">
-        Los módulos desactivados no aparecen en el Dashboard de ese usuario y no se pueden abrir. Los cambios se aplican en su teléfono la próxima vez que abra la app.
+        Un módulo desactivado no aparece ni se puede abrir para ningún usuario; el administrador siempre los ve todos. Se aplica en cada teléfono la próxima vez que abran la app.
       </p>
     </div>
   );
