@@ -80,12 +80,12 @@ export default function SelectorApp({
   );
 }
 
-const FILA = 48;
+const FILA = 38;
 const VISIBLES = 5;
 
 /**
  * Rueda para deslizar con el dedo entre las opciones (como la del iPhone):
- * la opción que queda en el centro es la marcada; "Elegir" la confirma.
+ * la opción que queda en el centro es la marcada; el botón de abajo la confirma.
  * Tocar una opción también la elige de una vez.
  */
 function Rueda({ opciones, valor, onElegir }: { opciones: OpcionSelector[]; valor: string; onElegir: (v: string) => void }) {
@@ -160,7 +160,7 @@ function Rueda({ opciones, valor, onElegir }: { opciones: OpcionSelector[]; valo
                 style={{ height: FILA }}
               >
                 <span className="min-w-0 truncate">
-                  <span className={`text-[16px] transition ${centro ? "font-semibold text-sky-900" : "text-slate-500"}`}>{o.texto}</span>
+                  <span className={`text-[15px] transition ${centro ? "font-semibold text-sky-900" : "text-slate-500"}`}>{o.texto}</span>
                   {o.detalle && <span className="ml-1.5 text-xs text-slate-400">{o.detalle}</span>}
                 </span>
               </button>
@@ -172,9 +172,9 @@ function Rueda({ opciones, valor, onElegir }: { opciones: OpcionSelector[]; valo
         type="button"
         disabled={!marcada || marcada.deshabilitado}
         onClick={() => marcada && onElegir(marcada.valor)}
-        className="mt-4 w-full rounded-2xl bg-sky-900 py-3 text-[15px] font-semibold text-white transition active:bg-sky-950 disabled:opacity-50"
+        className="mt-3 w-full truncate rounded-2xl bg-sky-900 px-3 py-2.5 text-[15px] font-semibold text-white transition active:bg-sky-950 disabled:opacity-50"
       >
-        Elegir{marcada ? ` · ${marcada.texto}` : ""}
+        {marcada?.texto ?? ""}
       </button>
     </div>
   );
