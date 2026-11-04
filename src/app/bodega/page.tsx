@@ -641,6 +641,8 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
     if (n <= 0) return setError("Escribe una cantidad mayor que cero.");
     if (!libre && n > disponible) return setError(`Solo hay ${fmt(disponible)} ${p.unidad} en bodega.`);
     if (!destino) return setError("Elige el destino del consumo.");
+    // Sin existencia y sin ninguna compra con precio: no hay con qué valorar el consumo del lote
+    if (destino !== "otro" && n > disponible + 1e-9 && !(item.ultimoPrecio > 0)) return setError("Sin valor de referencia");
     if (destino === "otro") {
       guardarSalidas([...leerSalidas(), { id: nuevoId(), productoId: p.id, fecha, hora, cantidad: n, nota: nota.trim() || undefined }]);
     } else {

@@ -828,6 +828,8 @@ export function registrarConsumoLote(datos: { loteId: string; productoId: string
   const lote = leerLotes().find((l) => l.id === datos.loteId);
   if (!item || !lote) return false;
   const p = item.producto;
+  // Sin existencia y sin precio de ninguna factura: "Sin valor de referencia", no se registra
+  if (datos.cantidad > Math.max(0, item.disponible) + 1e-9 && !(item.ultimoPrecio > 0)) return false;
   const corral = lote.corralId ? leerCorrales().find((c) => c.id === lote.corralId) : undefined;
   const salidaId = nuevoId();
   guardarSalidas([

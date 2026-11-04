@@ -668,6 +668,8 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   // Ajuste oculto: permite usar productos sin existencia (el inventario queda negativo)
   const sinLimite = esAlimento && leerConfig().permitirSinInventario;
   const excede = !!elegido && !sinLimite && cantidadNum > elegido.disponible;
+  // Sin existencia y sin ninguna factura con precio: no hay valor para el lote
+  const sinValor = !!elegido && sinLimite && cantidadNum > elegido.disponible + 1e-9 && !(elegido.ultimoPrecio > 0);
   const kgDe = (cantidad: number, unidad: string) => kgDeCantidad(cantidad, unidad, elegido?.producto.kgPorUnidad);
 
   const limpiar = () => {
@@ -743,6 +745,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
       const actual = calcularInventario().find((p) => p.producto.id === productoId);
       const libre = leerConfig().permitirSinInventario;
       if (!actual || (!libre && (actual.disponible <= 0 || n > actual.disponible))) return;
+      if (n > actual.disponible + 1e-9 && !(actual.ultimoPrecio > 0)) return;
       registrarConsumoLote({ loteId: lote.id, productoId: actual.producto.id, cantidad: n, fecha, hora });
     } else if (accion === "editarAlimento" && editIdx !== null) {
       if (legado) {
@@ -751,6 +754,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
         const actual = calcularInventario({ excluirSalida: registroEdit?.salidaId }).find((p) => p.producto.id === productoId);
         const libre = leerConfig().permitirSinInventario;
         if (!actual || (!libre && n > actual.disponible)) return;
+        if (n > actual.disponible + 1e-9 && !(actual.ultimoPrecio > 0)) return;
         editarConsumoLote(lote.id, editIdx, { productoId: actual.producto.id, cantidad: n, fecha, hora });
       }
     }
@@ -1229,7 +1233,8 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                     Solo hay {fmtCantidad(elegido.disponible)} {elegido.producto.unidad} en bodega.
                   </p>
                 )}
-                {elegido && cantidadNum > 0 && !excede && (
+                {sinValor && <p className="text-sm font-medium text-rose-600">Sin valor de referencia</p>}
+                {elegido && cantidadNum > 0 && !excede && !sinValor && (
                   <p className="text-xs text-slate-500">
                     Quedarán {fmtCantidad(elegido.disponible - cantidadNum)} {elegido.producto.unidad} en bodega
                     {kgDe(cantidadNum, elegido.producto.unidad) ? ` · ${fmtCantidad(kgDe(cantidadNum, elegido.producto.unidad))} kg para el lote` : ""}.
@@ -1243,7 +1248,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
               type="submit"
               disabled={
                 (accion === "corral" && (!corralSel || corrales.length === 0)) ||
-                (esAlimento && !legado && (!elegido || cantidadNum <= 0 || excede)) ||
+                (esAlimento && !legado && (!elegido || cantidadNum <= 0 || excede || sinValor)) ||
                 (legado && cantidadNum <= 0) ||
                 (accion === "gasto" && (!gastoDesc.trim() || !(gastoTotal > 0) || !gastoPago))
               }
