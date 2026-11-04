@@ -41,7 +41,7 @@ export interface Evento {
 }
 
 export const ESTILO: Record<Clase, { icono: string; fondo: string; texto: string }> = {
-  inseminar: { icono: "💉", fondo: "bg-sky-100", texto: "text-sky-800" },
+  inseminar: { icono: "🧬", fondo: "bg-sky-100", texto: "text-sky-800" },
   vigilar: { icono: "🔥", fondo: "bg-amber-100", texto: "text-amber-800" },
   repeticion: { icono: "🔁", fondo: "bg-amber-100", texto: "text-amber-800" },
   confirmar: { icono: "✅", fondo: "bg-blue-100", texto: "text-blue-800" },
@@ -267,7 +267,7 @@ export function calcularPlan(fechaHoy: string): PlanProgramacion {
     switch (repro?.tipo) {
       case "Celo": {
         const hasta = sumarDias(f, VENTANA_IA_TRAS_CELO);
-        t.accion = { icono: "💉", titulo: "Inseminar", detalle: `En celo desde el ${formatoFecha(f)}`, fecha: f, hasta };
+        t.accion = { icono: "🧬", titulo: "Inseminar", detalle: `En celo desde el ${formatoFecha(f)}`, fecha: f, hasta };
         pendientes.push({ tarjeta: t, desde: f, hasta });
         break;
       }

@@ -1,5 +1,6 @@
 "use client";
 
+import Emoji from "@/components/Emoji";
 import SelectorApp from "@/components/SelectorApp";
 import { borrarConRegistro, guardarConRegistro } from "@/lib/log";
 import { useEffect, useRef, useState, type TouchEvent } from "react";
@@ -120,7 +121,7 @@ const TIPOS_HISTORIAL = [
 function infoTipo(tipo: string): { icono: string; fondo: string; borde: string; texto: string } {
   switch (tipo) {
     case "Inseminación":
-      return { icono: "💉", fondo: "bg-sky-100", borde: "border-sky-100", texto: "text-sky-800" };
+      return { icono: "🧬", fondo: "bg-sky-100", borde: "border-sky-100", texto: "text-sky-800" };
     case "Confirmación de Gestación":
       return { icono: "✅", fondo: "bg-blue-100", borde: "border-blue-100", texto: "text-blue-800" };
     case "Celo":
@@ -915,7 +916,7 @@ export default function CerdaDetalle() {
                     titulo="Filtrar historial"
                     opciones={["Todos", ...tiposPresentes].map((t) => {
                       const n = t === "Todos" ? registros.length : registros.filter((r) => r.tipo === t).length;
-                      return { valor: t, texto: `${t === "Todos" ? "Todos los registros" : `${infoTipo(t).icono} ${t}`} · ${n}` };
+                      return { valor: t, texto: `${t === "Todos" ? "Todos los registros" : `${infoTipo(t).icono === "🍼" ? "" : `${infoTipo(t).icono} `}${t}`} · ${n}` };
                     })}
                     className="min-w-0 flex-1"
                   />
@@ -957,7 +958,7 @@ export default function CerdaDetalle() {
                                   aria-hidden="true"
                                   className={`relative z-10 mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-sm ring-[3px] ring-white ${info.fondo}`}
                                 >
-                                  {info.icono}
+                                  <Emoji e={info.icono} />
                                 </span>
 
                                 <div className="relative min-w-0 flex-1 overflow-hidden rounded-xl">
@@ -1262,7 +1263,7 @@ export default function CerdaDetalle() {
                 {datosGenerales.map((f) => (
                   <div key={f.etiqueta} className="flex items-center gap-3 px-3.5 py-3">
                     <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-base">
-                      {f.icono}
+                      <Emoji e={f.icono} />
                     </span>
                     <dt className="flex-1 text-sm text-slate-500">{f.etiqueta}</dt>
                     <dd className="max-w-[55%] truncate text-right text-sm font-semibold text-slate-900">{f.valor}</dd>

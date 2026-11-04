@@ -350,7 +350,7 @@ function EditarAplicacion({ lote, aplicacionId, onCerrar }: { lote: Lote; aplica
   if (!a) return null;
   const nombre = a.tipo === "Hierro" ? "Aplicación de hierro" : a.tipo;
   return (
-    <Modal abierta etiqueta={nombreLote(lote)} titulo={nombre} subtitulo="Editar o eliminar el registro" icono="💉" onCerrar={onCerrar}>
+    <Modal abierta etiqueta={nombreLote(lote)} titulo={nombre} subtitulo="Editar o eliminar el registro" icono="🧬" onCerrar={onCerrar}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -1036,7 +1036,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                     ap: a.id,
                     f: a.fecha,
                     h: a.hora ?? "",
-                    t: `Insumo: 💉 ${a.tipo === "Hierro" ? "Aplicación de hierro" : a.tipo}${a.nota ? ` · ${a.nota}` : ""}`,
+                    t: `Insumo: 🧬 ${a.tipo === "Hierro" ? "Aplicación de hierro" : a.tipo}${a.nota ? ` · ${a.nota}` : ""}`,
                   })),
                 ]
                   .sort((a, b) => b.f.localeCompare(a.f) || b.h.localeCompare(a.h))

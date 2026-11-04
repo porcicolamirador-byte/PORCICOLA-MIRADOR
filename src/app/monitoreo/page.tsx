@@ -1,5 +1,6 @@
 "use client";
 
+import Emoji from "@/components/Emoji";
 import { useMemo, useState, type FormEvent } from "react";
 import ModuloPage from "@/components/ModuloPage";
 import { Boton, Campo, Entrada, Hoja, IconoMas, Insignia, Selector, Tarjeta, Vacio } from "@/components/ui";
@@ -103,7 +104,7 @@ export default function MonitoreoPage() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate text-sm font-semibold text-slate-900">
-                    <span aria-hidden="true">{z.icono}</span> {z.zona}
+                    <span aria-hidden="true"><Emoji e={z.icono} /></span> {z.zona}
                   </span>
                   {z.ultima && (
                     <Insignia

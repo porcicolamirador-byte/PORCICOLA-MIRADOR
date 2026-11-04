@@ -1,5 +1,6 @@
 "use client";
 
+import Emoji from "@/components/Emoji";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
@@ -80,7 +81,7 @@ export default function ProgramacionPage() {
       <Chips
         opciones={[
           { valor: "cerdas", texto: "🐖 Cerdas" },
-          { valor: "inseminacion", texto: "💉 Plan IA" },
+          { valor: "inseminacion", texto: "🧬 Plan IA" },
           { valor: "agenda", texto: "📅 Agenda" },
           { valor: "calculadora", texto: "🧮 Calculadora" },
         ]}
@@ -127,7 +128,7 @@ function TarjetasCerdas({ plan, fechaHoy, onAbrir }: { plan: PlanProgramacion; f
           >
             <div className="flex items-start justify-between gap-1">
               <span className="min-w-0 truncate text-[15px] font-bold text-slate-900">{t.nombre.replace(/^Cerda /, "")}</span>
-              <span className="text-lg leading-none" aria-hidden="true">{t.accion.icono}</span>
+              <span className="text-lg leading-none" aria-hidden="true"><Emoji e={t.accion.icono} /></span>
             </div>
             <span className={`mt-1 self-start rounded-full px-2 py-0.5 text-[10px] font-semibold ${CHIP_ESTADO[t.estado] ?? CHIP_ESTADO["Sin registro"]}`}>
               {t.estado}
@@ -243,7 +244,7 @@ function PlanInseminacion({ plan, fechaHoy, onAbrir }: { plan: PlanProgramacion;
                     className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-50"
                   >
                     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-xl" aria-hidden="true">
-                      {t.accion.icono}
+                      <Emoji e={t.accion.icono} />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-slate-900">{t.nombre}</span>
@@ -321,7 +322,7 @@ function Agenda({ eventos, fechaHoy, onAbrir }: { eventos: Evento[]; fechaHoy: s
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className={`flex items-center gap-1.5 text-sm font-semibold ${est.texto}`}>
-                          <span aria-hidden="true">{est.icono}</span>
+                          <span aria-hidden="true"><Emoji e={est.icono} /></span>
                           <span className="truncate">{e.titulo}</span>
                         </span>
                         <span className="block truncate text-xs font-medium text-slate-800">{e.nombre}</span>
@@ -354,7 +355,7 @@ function Calculadora() {
   const parto = fecha ? sumarDias(fecha, diasGestacion) : "";
   const pasos = fecha
     ? [
-        { icono: "💉", titulo: "Inseminación", desde: fecha },
+        { icono: "🧬", titulo: "Inseminación", desde: fecha },
         { icono: "🔁", titulo: "Revisar repetición de celo", desde: sumarDias(fecha, REPETICION_CELO[0]), hasta: sumarDias(fecha, REPETICION_CELO[1]) },
         { icono: "✅", titulo: "Confirmar gestación", desde: sumarDias(fecha, CONFIRMAR_GESTACION[0]), hasta: sumarDias(fecha, CONFIRMAR_GESTACION[1]) },
         { icono: "🏠", titulo: "Entrar a paridera", desde: sumarDias(parto, -ANTES_PARTO_MATERNIDAD) },
@@ -384,7 +385,7 @@ function Calculadora() {
                   p.destacado ? "bg-sky-100" : "bg-slate-100"
                 }`}
               >
-                {p.icono}
+                <Emoji e={p.icono} />
               </span>
               <div
                 className={`min-w-0 flex-1 rounded-2xl px-3.5 py-2.5 ${

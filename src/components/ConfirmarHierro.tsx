@@ -21,7 +21,7 @@ export default function ConfirmarHierro({ loteId, onCerrar }: { loteId: string |
       etiqueta="Sanidad de la camada"
       titulo="Aplicación de hierro"
       subtitulo={lote ? `${nombreLote(lote)}${lote.origen ? ` · cerda ${lote.origen.cerdaId}` : ""}` : undefined}
-      icono="💉"
+      icono="🧬"
       onCerrar={cerrar}
     >
       {!lote ? (

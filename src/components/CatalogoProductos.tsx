@@ -20,7 +20,7 @@ import {
 export const CATEGORIAS_BODEGA: { valor: CategoriaBodega; icono: string }[] = [
   { valor: "Alimento", icono: "" }, // se dibuja como bulto de 40 kg (IconoCategoria)
   { valor: "Medicamentos", icono: "💊" },
-  { valor: "Vacunas", icono: "💉" },
+  { valor: "Vacunas", icono: "🧬" },
   { valor: "Limpieza", icono: "🧴" },
   { valor: "Otros", icono: "🧰" },
 ];
