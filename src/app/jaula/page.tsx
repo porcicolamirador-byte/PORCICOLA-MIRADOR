@@ -264,34 +264,42 @@ export default function JaulaPage() {
                     {libres.length === 0 ? (
                       <p className="text-sm text-slate-500">No hay jaulas libres en {cfgOtra.titulo.toLowerCase()}.</p>
                     ) : (
-                      <div className={`mt-1 grid gap-1.5 ${otra === "lactancia" ? "grid-cols-5" : "grid-cols-6"}`}>
-                        {destinos.map((j) => {
-                          // Ocupada: en rojo y no se puede elegir
-                          const ocupadaPor = datos?.porJaula.get(j)?.c.id;
-                          return (
-                            <button
-                              key={j}
-                              type="button"
-                              disabled={Boolean(ocupadaPor)}
-                              onClick={() => {
-                                if (ocupadaPor) return;
-                                asignar(j, ocupante.c.id);
-                                setJaulaSel(null);
-                                setTrasladando(false);
-                                setArea(otra);
-                              }}
-                              aria-label={ocupadaPor ? `${j} ocupada por ${ocupadaPor}` : `${j} libre`}
-                              className={`rounded-xl py-2 text-xs font-bold tabular-nums ring-1 transition ${
-                                ocupadaPor
-                                  ? "cursor-not-allowed bg-rose-50 text-rose-500 ring-rose-200"
-                                  : "bg-slate-50 text-slate-700 ring-slate-200 active:bg-sky-50 active:ring-sky-300"
-                              }`}
-                            >
-                              <span className="block">{j}</span>
-                              {ocupadaPor && <span className="block truncate px-0.5 text-[9px] font-semibold">{ocupadaPor}</span>}
-                            </button>
-                          );
-                        })}
+                      // Igual que en la granja: Fila 1 y Fila 2 una al lado de la otra
+                      <div className="mt-1 grid grid-cols-2 gap-2">
+                        {Array.from({ length: cfgOtra.filas }, (_, f) => (
+                          <div key={f} className="flex flex-col gap-1">
+                            <p className="text-center text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Fila {f + 1}</p>
+                            {destinos.slice(f * cfgOtra.porFila, (f + 1) * cfgOtra.porFila).map((j) => {
+                              // Ocupada: en rojo y no se puede elegir
+                              const ocupadaPor = datos?.porJaula.get(j)?.c.id;
+                              return (
+                                <button
+                                  key={j}
+                                  type="button"
+                                  disabled={Boolean(ocupadaPor)}
+                                  onClick={() => {
+                                    if (ocupadaPor) return;
+                                    asignar(j, ocupante.c.id);
+                                    setJaulaSel(null);
+                                    setTrasladando(false);
+                                    setArea(otra);
+                                  }}
+                                  aria-label={ocupadaPor ? `${j} ocupada por ${ocupadaPor}` : `${j} libre`}
+                                  className={`flex items-center justify-between gap-1 rounded-lg px-2.5 text-xs font-bold tabular-nums ring-1 transition ${
+                                    otra === "lactancia" ? "h-12" : "h-8"
+                                  } ${
+                                    ocupadaPor
+                                      ? "cursor-not-allowed bg-rose-50 text-rose-500 ring-rose-200"
+                                      : "bg-slate-50 text-slate-700 ring-slate-200 active:bg-sky-50 active:ring-sky-300"
+                                  }`}
+                                >
+                                  <span>{j}</span>
+                                  <span className={`truncate text-[10px] font-semibold ${ocupadaPor ? "" : "text-slate-300"}`}>{ocupadaPor ?? "Libre"}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ))}
                       </div>
                     )}
                     <button type="button" onClick={() => setTrasladando(false)} className="mt-3 text-sm font-semibold text-slate-500 active:opacity-70">
