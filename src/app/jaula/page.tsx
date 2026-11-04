@@ -246,9 +246,8 @@ export default function JaulaPage() {
         // Trasladar: de gestación se pasa a lactancia y de lactancia a gestación
         const otra: Area = area === "gestacion" ? "lactancia" : "gestacion";
         const cfgOtra = AREAS[otra];
-        const libres = Array.from({ length: cfgOtra.porFila * cfgOtra.filas }, (_, i) => codigoJaula(cfgOtra.prefijo, i + 1)).filter(
-          (j) => !datos?.porJaula.has(j)
-        );
+        const destinos = Array.from({ length: cfgOtra.porFila * cfgOtra.filas }, (_, i) => codigoJaula(cfgOtra.prefijo, i + 1));
+        const libres = destinos.filter((j) => !datos?.porJaula.has(j));
         return (
           <Modal abierta etiqueta={cfg.titulo} titulo={`Jaula ${jaulaSel}`} subtitulo={ocupante ? `Cerda ${ocupante.c.id} · ${ocupante.estado}` : "Libre"} onCerrar={() => setJaulaSel(null)}>
             {ocupante ? (
@@ -263,27 +262,39 @@ export default function JaulaPage() {
                 ) : (
                   <div>
                     <p className="mb-2 text-sm font-medium text-slate-700">
-                      Trasladar a {cfgOtra.titulo.toLowerCase()} · elige una jaula libre
+                      Trasladar a {cfgOtra.titulo.toLowerCase()} · elige una jaula libre (las rojas están ocupadas)
                     </p>
                     {libres.length === 0 ? (
                       <p className="text-sm text-slate-500">No hay jaulas libres en {cfgOtra.titulo.toLowerCase()}.</p>
                     ) : (
                       <div className={`grid gap-1.5 ${otra === "lactancia" ? "grid-cols-5" : "grid-cols-6"}`}>
-                        {libres.map((j) => (
-                          <button
-                            key={j}
-                            type="button"
-                            onClick={() => {
-                              asignar(j, ocupante.c.id);
-                              setJaulaSel(null);
-                              setTrasladando(false);
-                              setArea(otra);
-                            }}
-                            className="rounded-xl bg-slate-50 py-2.5 text-xs font-bold tabular-nums text-slate-700 ring-1 ring-slate-200 transition active:bg-sky-50 active:ring-sky-300"
-                          >
-                            {j}
-                          </button>
-                        ))}
+                        {destinos.map((j) => {
+                          // Ocupada: en rojo y no se puede elegir
+                          const ocupadaPor = datos?.porJaula.get(j)?.c.id;
+                          return (
+                            <button
+                              key={j}
+                              type="button"
+                              disabled={Boolean(ocupadaPor)}
+                              onClick={() => {
+                                if (ocupadaPor) return;
+                                asignar(j, ocupante.c.id);
+                                setJaulaSel(null);
+                                setTrasladando(false);
+                                setArea(otra);
+                              }}
+                              aria-label={ocupadaPor ? `${j} ocupada por ${ocupadaPor}` : `${j} libre`}
+                              className={`rounded-xl py-2 text-xs font-bold tabular-nums ring-1 transition ${
+                                ocupadaPor
+                                  ? "cursor-not-allowed bg-rose-50 text-rose-500 ring-rose-200"
+                                  : "bg-slate-50 text-slate-700 ring-slate-200 active:bg-sky-50 active:ring-sky-300"
+                              }`}
+                            >
+                              <span className="block">{j}</span>
+                              {ocupadaPor && <span className="block truncate px-0.5 text-[9px] font-semibold">{ocupadaPor}</span>}
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                     <button type="button" onClick={() => setTrasladando(false)} className="mt-3 text-sm font-semibold text-slate-500 active:opacity-70">
