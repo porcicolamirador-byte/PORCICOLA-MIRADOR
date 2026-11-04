@@ -625,7 +625,8 @@ export default function CerdaDetalle() {
     setExportandoParto(true);
     try {
       const info = infoParto(p);
-      const logo = logoPdf.current ?? (await cargarLogoJpeg("/images/logo.png"));
+      // Logo en buena resolución: también va como marca de agua
+      const logo = (await cargarLogoJpeg("/images/logo.png", 600)) ?? logoPdf.current;
       const blob = generarPdfParto({
         granja: nombreGranjaActual(),
         cerda: String(id),

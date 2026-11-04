@@ -139,6 +139,12 @@ export function generarPdfParto(d: DatosPdfParto): Blob {
   nota("Observaciones del parto", d.observaciones);
   nota("Observaciones de los lechones", d.observacionesLechones);
 
+  // Logo de la granja como marca de agua en el centro de la hoja
+  if (d.logo) {
+    const lado = 340;
+    L.marcaAgua((ANCHO - lado) / 2, 300, lado, lado);
+  }
+
   L.linea(M, DER, 806, P200, 0.6);
   L.texto(M, 822, `Porcícola ${d.granja} · Reporte de parto · Cerda ${d.cerda} · parto N.º ${d.numeroParto}`, 7.5, P400);
   return ensamblarPdf([L], d.logo);

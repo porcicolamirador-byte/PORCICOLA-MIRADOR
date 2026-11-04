@@ -86,6 +86,11 @@ export class Lienzo {
   imagen(x: number, y: number, w: number, h: number) {
     this.ops.push(`q ${n(w)} 0 0 ${n(h)} ${n(x)} ${n(ALTO - y - h)} cm /Im1 Do Q`);
   }
+
+  /** Logo transparente como marca de agua (usa la transparencia /GSm de la página) */
+  marcaAgua(x: number, y: number, w: number, h: number) {
+    this.ops.push(`q /GSm gs ${n(w)} 0 0 ${n(h)} ${n(x)} ${n(ALTO - y - h)} cm /Im1 Do Q`);
+  }
 }
 
 /** Ancho aproximado de un texto en Helvetica (suficiente para maquetar) */
@@ -251,7 +256,7 @@ export function ensamblarPdf(paginas: Lienzo[], logo?: LogoJpeg | null): Blob {
     const contenido = pag.ops.join("\n");
     objetos[6 + i * 2] =
       `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${ANCHO} ${ALTO}] ` +
-      `/Resources << /Font << /F1 3 0 R /F2 4 0 R >>${logo ? " /XObject << /Im1 5 0 R >>" : ""} >> /Contents ${7 + i * 2} 0 R >>`;
+      `/Resources << /Font << /F1 3 0 R /F2 4 0 R >>${logo ? " /XObject << /Im1 5 0 R >>" : ""} /ExtGState << /GSm << /Type /ExtGState /ca 0.07 /CA 0.07 >> >> >> /Contents ${7 + i * 2} 0 R >>`;
     objetos[7 + i * 2] = `<< /Length ${contenido.length} >>\nstream\n${contenido}\nendstream`;
   });
 
