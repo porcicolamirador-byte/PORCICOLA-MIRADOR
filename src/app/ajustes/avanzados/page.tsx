@@ -5,6 +5,7 @@ import { leerLog } from "@/lib/log";
 import { borrarTodoLocal } from "@/lib/sincronizar";
 import { actualizarPerfil, consumoNube, ErrorNube, guardarModulosGlobales, perfilGuardado, reiniciarBaseNube, type ConsumoNube } from "@/lib/nube";
 import { MODULOS_DASHBOARD } from "@/lib/modulos";
+import { guardarFormaJaulas, leerFormaJaulas } from "@/lib/jaulas";
 import Modal from "@/components/Modal";
 import { useEffect, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
@@ -20,6 +21,7 @@ import {
   leerConfig,
   type AlimentacionEstandar,
   type ConfigJaulas,
+  JAULAS_POR_DEFECTO,
   type ConfigGranja,
   type ProductosEtapa,
   CONSUMO_CERDAS_POR_DEFECTO,
@@ -46,6 +48,7 @@ export default function AjustesAvanzadosPage() {
   const alternar = (id: string) => setAbierto((a) => (a === id ? null : id));
   const version = useVersionDatos();
   void version; // vuelve a leer al cambiar los datos
+  const formaJaulas = cliente ? leerFormaJaulas() : JAULAS_POR_DEFECTO;
   const productos = cliente ? leerProductos().length : 0;
   const corrales = cliente ? leerCorrales().length : 0;
   useEffect(() => {
@@ -154,11 +157,11 @@ export default function AjustesAvanzadosPage() {
         <Desplegable
           icono="paridera"
           titulo="Jaulas"
-          resumen={`G ${config.jaulas.gestacion.filas * config.jaulas.gestacion.porFila} · L ${config.jaulas.lactancia.filas * config.jaulas.lactancia.porFila}`}
+          resumen={`G ${formaJaulas.gestacion.filas * formaJaulas.gestacion.porFila} · L ${formaJaulas.lactancia.filas * formaJaulas.lactancia.porFila}`}
           abierto={abierto === "jaulas"}
           onAlternar={() => alternar("jaulas")}
         >
-          <Jaulas actual={config.jaulas} onGuardar={(j) => guardar({ jaulas: j })} />
+          <Jaulas actual={formaJaulas} onGuardar={(j) => { guardarFormaJaulas(j); notificarCambio(); }} />
         </Desplegable>
         <Desplegable
           icono="alimento"
@@ -716,7 +719,7 @@ function Jaulas({ actual, onGuardar }: { actual: ConfigJaulas; onGuardar: (j: Co
 
   return (
     <>
-      <Encabezado icono="🧱" titulo="Jaulas" descripcion="Cuántas jaulas tiene cada área del módulo Jaula. Se numeran por fila: G-01, G-02… y L-01, L-02…" />
+      <Encabezado icono="🧱" titulo="Jaulas" descripcion="Cuántas jaulas tiene cada área del módulo Jaula (igual en todas las granjas). Se numeran por fila: G-01, G-02… y L-01, L-02…" />
       <form onSubmit={enviar} className="flex flex-col gap-3">
         {area("Área gestación", "gf", "gp", "jaulas")}
         {area("Área lactancia", "lf", "lp", "parideras")}

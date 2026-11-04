@@ -13,7 +13,8 @@ import ModuloPage from "@/components/ModuloPage";
 import Modal from "@/components/Modal";
 import SelectorApp from "@/components/SelectorApp";
 import { Boton } from "@/components/ui";
-import { JAULAS_POR_DEFECTO, leerConfig, type ConfigJaulas } from "@/lib/config";
+import { JAULAS_POR_DEFECTO, type ConfigJaulas } from "@/lib/config";
+import { leerFormaJaulas } from "@/lib/jaulas";
 import { estadoDeCerda, guardarCerdas, leerCerdas, leerHistorial, notificarCambio, useVersionDatos } from "@/lib/datos";
 import { CLAVE_JAULAS, granjaActual, leerGranjas, nombreGranjaActual } from "@/lib/sincronizar";
 import { guardarConRegistro } from "@/lib/log";
@@ -59,7 +60,13 @@ function leerMapa(): EntradaMapa[] {
   }
 }
 const guardarMapa = (m: EntradaMapa[]) => {
-  guardarConRegistro(CLAVE_JAULAS, m);
+  // Se conserva el elemento de configuración (cantidad de jaulas)
+  let extra: unknown[] = [];
+  try {
+    const v = JSON.parse(localStorage.getItem(CLAVE_JAULAS) || "[]");
+    extra = Array.isArray(v) ? v.filter((e) => e && e.id === "_config") : [];
+  } catch {}
+  guardarConRegistro(CLAVE_JAULAS, [...m, ...extra]);
 };
 const entradaMapa = (jaula: string, cerdaId: string, granja: string, estado: string): EntradaMapa => ({
   id: jaula,
@@ -102,7 +109,7 @@ export default function JaulaPage() {
     }
   }, []);
 
-  const AREAS = useMemo(() => areasDe(version >= 0 ? leerConfig().jaulas : JAULAS_POR_DEFECTO), [version]);
+  const AREAS = useMemo(() => areasDe(version >= 0 ? leerFormaJaulas() : JAULAS_POR_DEFECTO), [version]);
   const datos = useMemo(() => {
     if (version < 0) return null;
     const granja = granjaActual();
