@@ -119,6 +119,28 @@ export interface ConfigGranja {
   consumoCerdas: ConsumoCerdas;
   /** Permite usar productos de bodega sin existencia (el inventario puede quedar negativo) */
   permitirSinInventario: boolean;
+  /** Jaulas del módulo Jaula: filas y jaulas por fila de cada área */
+  jaulas: ConfigJaulas;
+}
+
+export interface FormaJaulas {
+  filas: number;
+  porFila: number;
+}
+export interface ConfigJaulas {
+  gestacion: FormaJaulas;
+  lactancia: FormaJaulas;
+}
+export const JAULAS_POR_DEFECTO: ConfigJaulas = { gestacion: { filas: 2, porFila: 17 }, lactancia: { filas: 2, porFila: 5 } };
+const entero = (v: unknown, min: number, max: number, def: number) =>
+  typeof v === "number" && Number.isInteger(v) && v >= min && v <= max ? v : def;
+function leerJaulas(v: unknown): ConfigJaulas {
+  const o = (v && typeof v === "object" ? v : {}) as Partial<Record<keyof ConfigJaulas, Partial<FormaJaulas>>>;
+  const forma = (k: keyof ConfigJaulas): FormaJaulas => ({
+    filas: entero(o[k]?.filas, 1, 4, JAULAS_POR_DEFECTO[k].filas),
+    porFila: entero(o[k]?.porFila, 1, 40, JAULAS_POR_DEFECTO[k].porFila),
+  });
+  return { gestacion: forma("gestacion"), lactancia: forma("lactancia") };
 }
 
 export const CLAVE_CONFIG = "config-granja";
@@ -139,6 +161,7 @@ export const CONFIG_POR_DEFECTO: ConfigGranja = {
   productosEtapa: PRODUCTOS_ETAPA_POR_DEFECTO,
   consumoCerdas: CONSUMO_CERDAS_POR_DEFECTO,
   permitirSinInventario: false,
+  jaulas: JAULAS_POR_DEFECTO,
 };
 
 const esClave = (v: unknown): v is string => typeof v === "string" && /^\d{4}$/.test(v);
@@ -198,6 +221,7 @@ export function leerConfig(): ConfigGranja {
       productosEtapa: leerProductosEtapa(c.productosEtapa),
       consumoCerdas: leerConsumoCerdas(c.consumoCerdas),
       permitirSinInventario: c.permitirSinInventario === true,
+      jaulas: leerJaulas(c.jaulas),
     };
   } catch {
     return CONFIG_POR_DEFECTO;

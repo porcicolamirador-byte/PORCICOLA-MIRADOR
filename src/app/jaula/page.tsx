@@ -13,14 +13,29 @@ import ModuloPage from "@/components/ModuloPage";
 import Modal from "@/components/Modal";
 import SelectorApp from "@/components/SelectorApp";
 import { Boton } from "@/components/ui";
+import { JAULAS_POR_DEFECTO, leerConfig, type ConfigJaulas } from "@/lib/config";
 import { estadoDeCerda, guardarCerdas, leerCerdas, leerHistorial, useVersionDatos } from "@/lib/datos";
 
 type Area = "gestacion" | "lactancia";
 
-const AREAS: Record<Area, { titulo: string; prefijo: string; porFila: number; filas: number; descripcion: string }> = {
-  gestacion: { titulo: "Área gestación", prefijo: "G", porFila: 17, filas: 2, descripcion: "2 filas de 17 jaulas" },
-  lactancia: { titulo: "Área lactancia", prefijo: "L", porFila: 5, filas: 2, descripcion: "2 filas de 5 parideras" },
-};
+type ConfigArea = { titulo: string; prefijo: string; porFila: number; filas: number; descripcion: string };
+/** Áreas según Ajustes ocultos → Jaulas (por defecto 2 × 17 y 2 × 5) */
+const areasDe = (j: ConfigJaulas): Record<Area, ConfigArea> => ({
+  gestacion: {
+    titulo: "Área gestación",
+    prefijo: "G",
+    porFila: j.gestacion.porFila,
+    filas: j.gestacion.filas,
+    descripcion: `${j.gestacion.filas} ${j.gestacion.filas === 1 ? "fila" : "filas"} de ${j.gestacion.porFila} jaulas`,
+  },
+  lactancia: {
+    titulo: "Área lactancia",
+    prefijo: "L",
+    porFila: j.lactancia.porFila,
+    filas: j.lactancia.filas,
+    descripcion: `${j.lactancia.filas} ${j.lactancia.filas === 1 ? "fila" : "filas"} de ${j.lactancia.porFila} parideras`,
+  },
+});
 
 const codigoJaula = (prefijo: string, n: number) => `${prefijo}-${String(n).padStart(2, "0")}`;
 
@@ -54,6 +69,7 @@ export default function JaulaPage() {
     }
   }, []);
 
+  const AREAS = useMemo(() => areasDe(version >= 0 ? leerConfig().jaulas : JAULAS_POR_DEFECTO), [version]);
   const datos = useMemo(() => {
     if (version < 0) return null;
     const cerdas = leerCerdas()
@@ -236,7 +252,8 @@ export default function JaulaPage() {
 
       {/* Las filas van una al lado de la otra (como el pasillo de la granja) */}
       <div
-        className="grid grid-cols-2 gap-3"
+        className="grid gap-3"
+        style={{ gridTemplateColumns: `repeat(${cfg.filas}, minmax(0, 1fr))` }}
         onTouchStart={(e) => {
           const t = e.touches[0];
           toque.current = { x: t.clientX, y: t.clientY };
@@ -312,7 +329,7 @@ export default function JaulaPage() {
                       <p className="text-sm text-slate-500">No hay jaulas libres en {cfgOtra.titulo.toLowerCase()}.</p>
                     ) : (
                       // Igual que en la granja: Fila 1 y Fila 2 una al lado de la otra
-                      <div className="mt-1 grid grid-cols-2 gap-2">
+                      <div className="mt-1 grid gap-2" style={{ gridTemplateColumns: `repeat(${cfgOtra.filas}, minmax(0, 1fr))` }}>
                         {Array.from({ length: cfgOtra.filas }, (_, f) => (
                           <div key={f} className="flex flex-col gap-1">
                             <p className="text-center text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Fila {f + 1}</p>

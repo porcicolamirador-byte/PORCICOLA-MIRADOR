@@ -18,6 +18,7 @@ import {
   guardarConfig,
   leerConfig,
   type AlimentacionEstandar,
+  type ConfigJaulas,
   type ConfigGranja,
   type ProductosEtapa,
   CONSUMO_CERDAS_POR_DEFECTO,
@@ -139,6 +140,15 @@ export default function AjustesAvanzadosPage() {
           onAlternar={() => alternar("parideras")}
         >
           <Parideras actual={config.parideras} onGuardar={(n) => guardar({ parideras: n })} />
+        </Desplegable>
+        <Desplegable
+          icono="paridera"
+          titulo="Jaulas"
+          resumen={`G ${config.jaulas.gestacion.filas * config.jaulas.gestacion.porFila} · L ${config.jaulas.lactancia.filas * config.jaulas.lactancia.porFila}`}
+          abierto={abierto === "jaulas"}
+          onAlternar={() => alternar("jaulas")}
+        >
+          <Jaulas actual={config.jaulas} onGuardar={(j) => guardar({ jaulas: j })} />
         </Desplegable>
         <Desplegable
           icono="alimento"
@@ -580,6 +590,74 @@ function Parideras({ actual, onGuardar }: { actual: number; onGuardar: (n: numbe
         </div>
         {!actual && <p className="text-xs text-amber-700">Aún no está configurado: el motor no controla la capacidad.</p>}
         <Boton type="submit" disabled={!valido || n === actual}>
+          Guardar
+        </Boton>
+      </form>
+    </>
+  );
+}
+
+function Jaulas({ actual, onGuardar }: { actual: ConfigJaulas; onGuardar: (j: ConfigJaulas) => void }) {
+  const aTexto = (j: ConfigJaulas) => ({
+    gf: String(j.gestacion.filas),
+    gp: String(j.gestacion.porFila),
+    lf: String(j.lactancia.filas),
+    lp: String(j.lactancia.porFila),
+  });
+  const [v, setV] = useState(aTexto(actual));
+  const n = (t: string) => Number(t);
+  const ok = (t: string, max: number) => t !== "" && Number.isInteger(n(t)) && n(t) >= 1 && n(t) <= max;
+  const valido = ok(v.gf, 4) && ok(v.lf, 4) && ok(v.gp, 40) && ok(v.lp, 40);
+  const nuevo: ConfigJaulas = {
+    gestacion: { filas: n(v.gf), porFila: n(v.gp) },
+    lactancia: { filas: n(v.lf), porFila: n(v.lp) },
+  };
+  const igual = JSON.stringify(nuevo) === JSON.stringify(actual);
+
+  const enviar = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!valido) return;
+    onGuardar(nuevo);
+    await avisar({
+      titulo: "Jaulas actualizadas",
+      mensaje: `Gestación: ${nuevo.gestacion.filas} × ${nuevo.gestacion.porFila} = ${nuevo.gestacion.filas * nuevo.gestacion.porFila} jaulas. Lactancia: ${nuevo.lactancia.filas} × ${nuevo.lactancia.porFila} = ${nuevo.lactancia.filas * nuevo.lactancia.porFila} parideras.`,
+    });
+  };
+
+  const campo = (clave: keyof typeof v, etiqueta: string, max: number) => (
+    <label className="flex min-w-0 flex-col gap-1">
+      <span className="text-xs font-medium text-slate-500">{etiqueta}</span>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={v[clave]}
+        onChange={(e) => setV((x) => ({ ...x, [clave]: e.target.value.replace(/\D/g, "").slice(0, 2) }))}
+        aria-label={etiqueta}
+        className={`h-11 w-full rounded-xl border bg-slate-50 px-3 text-center text-lg font-semibold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-sky-200 ${ok(v[clave], max) ? "border-slate-200" : "border-rose-300"}`}
+      />
+    </label>
+  );
+  const area = (titulo: string, f: keyof typeof v, p: keyof typeof v, palabra: string) => (
+    <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
+      <div className="mb-2 flex items-baseline justify-between">
+        <p className="text-sm font-semibold text-slate-900">{titulo}</p>
+        <p className="text-xs tabular-nums text-slate-500">{ok(v[f], 4) && ok(v[p], 40) ? `${n(v[f]) * n(v[p])} ${palabra}` : "—"}</p>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {campo(f, "Filas (1 a 4)", 4)}
+        {campo(p, `${palabra[0].toUpperCase()}${palabra.slice(1)} por fila (1 a 40)`, 40)}
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      <Encabezado icono="🧱" titulo="Jaulas" descripcion="Cuántas jaulas tiene cada área del módulo Jaula. Se numeran por fila: G-01, G-02… y L-01, L-02…" />
+      <form onSubmit={enviar} className="flex flex-col gap-3">
+        {area("Área gestación", "gf", "gp", "jaulas")}
+        {area("Área lactancia", "lf", "lp", "parideras")}
+        <p className="text-xs leading-snug text-slate-500">Si reduces la cantidad, las cerdas que estaban en jaulas que ya no existen quedan como “sin jaula asignada”.</p>
+        <Boton type="submit" disabled={!valido || igual}>
           Guardar
         </Boton>
       </form>
