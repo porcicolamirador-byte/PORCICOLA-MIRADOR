@@ -261,13 +261,10 @@ export default function JaulaPage() {
                   </div>
                 ) : (
                   <div>
-                    <p className="mb-2 text-sm font-medium text-slate-700">
-                      Trasladar a {cfgOtra.titulo.toLowerCase()} · elige una jaula libre (las rojas están ocupadas)
-                    </p>
                     {libres.length === 0 ? (
                       <p className="text-sm text-slate-500">No hay jaulas libres en {cfgOtra.titulo.toLowerCase()}.</p>
                     ) : (
-                      <div className={`grid gap-1.5 ${otra === "lactancia" ? "grid-cols-5" : "grid-cols-6"}`}>
+                      <div className={`mt-1 grid gap-1.5 ${otra === "lactancia" ? "grid-cols-5" : "grid-cols-6"}`}>
                         {destinos.map((j) => {
                           // Ocupada: en rojo y no se puede elegir
                           const ocupadaPor = datos?.porJaula.get(j)?.c.id;
