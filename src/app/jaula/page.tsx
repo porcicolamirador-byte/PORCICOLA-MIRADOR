@@ -40,6 +40,7 @@ export default function JaulaPage() {
   const [trasladando, setTrasladando] = useState(false);
   const toque = useRef<{ x: number; y: number } | null>(null);
   const [masOpciones, setMasOpciones] = useState(false);
+  const [verSinJaula, setVerSinJaula] = useState(false);
   // Desde la ficha de una cerda: ?cerda=ID (&area=…&jaula=…) abre su jaula para cambiarla
   const [cerdaOrigen, setCerdaOrigen] = useState("");
   useEffect(() => {
@@ -66,6 +67,14 @@ export default function JaulaPage() {
     return { cerdas, porJaula };
   }, [version]);
 
+  // Cerdas activas sin una jaula válida de gestación o lactancia
+  const codigosValidos = new Set(
+    (Object.keys(AREAS) as Area[]).flatMap((a) => Array.from({ length: AREAS[a].porFila * AREAS[a].filas }, (_, i) => codigoJaula(AREAS[a].prefijo, i + 1)))
+  );
+  const sinJaula = (datos?.cerdas ?? [])
+    .filter((x) => !codigosValidos.has(String(x.c.jaula ?? "").trim().toUpperCase()))
+    .sort((a, b) => String(a.c.id).localeCompare(String(b.c.id), "es", { numeric: true }));
+
   const conteo = (a: Area) => {
     const cfg = AREAS[a];
     let ocupadas = 0;
@@ -82,6 +91,8 @@ export default function JaulaPage() {
       return c;
     });
     guardarCerdas(lista);
+    // La cerda que se estaba ubicando ya quedó en su jaula
+    if (cerdaId && cerdaId === cerdaOrigen) setCerdaOrigen("");
   };
 
   const abrirJaula = (codigo: string) => {
@@ -101,8 +112,8 @@ export default function JaulaPage() {
         {cerdaOrigen && (
           <div className="flex items-center justify-between gap-2 rounded-2xl bg-amber-50 px-3.5 py-2.5 text-sm text-amber-900 ring-1 ring-amber-200">
             <span className="min-w-0">Ubicando la cerda <b className="arete-id">{cerdaOrigen}</b>: {area ? "toca la jaula donde va" : "elige el área"}.</span>
-            <button type="button" onClick={() => router.push(`/cerda/${encodeURIComponent(cerdaOrigen)}`)} className="shrink-0 text-xs font-semibold text-sky-700">
-              Volver
+            <button type="button" onClick={() => setCerdaOrigen("")} className="shrink-0 text-xs font-semibold text-sky-700">
+              Cancelar
             </button>
           </div>
         )}
@@ -167,12 +178,48 @@ export default function JaulaPage() {
           </button>
         ))}
       </div>
-      <p className="-mt-1 text-center text-[11px] text-slate-400">Desliza hacia el lado para cambiar de área</p>
+      {/* Cerdas sin jaula: línea discreta que se despliega con sus ID */}
+      {sinJaula.length > 0 && (
+        <div className="rounded-2xl bg-white ring-1 ring-slate-200/80">
+          <button
+            type="button"
+            onClick={() => setVerSinJaula((v) => !v)}
+            aria-expanded={verSinJaula}
+            className="flex w-full items-center justify-between gap-2 px-3.5 py-2 text-left text-xs text-slate-500 active:opacity-70"
+          >
+            <span>
+              <b className="font-semibold text-amber-600 tabular-nums">{sinJaula.length}</b> {sinJaula.length === 1 ? "cerda sin jaula asignada" : "cerdas sin jaula asignada"}
+            </span>
+            <svg viewBox="0 0 20 20" className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${verSinJaula ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M5 8l5 5 5-5" />
+            </svg>
+          </button>
+          {verSinJaula && (
+            <div className="flex flex-wrap gap-1.5 border-t border-slate-100 px-3.5 py-2.5">
+              {sinJaula.map((x) => (
+                <button
+                  key={x.c.id}
+                  type="button"
+                  onClick={() => {
+                    // Queda elegida: al tocar una jaula libre ya viene lista para ubicarla
+                    setCerdaOrigen(x.c.id);
+                    setVerSinJaula(false);
+                  }}
+                  className="arete-id rounded-lg bg-amber-100 px-2 py-1 text-xs font-black tabular-nums text-amber-950 ring-1 ring-amber-300 active:scale-95"
+                >
+                  {x.c.id}
+                </button>
+              ))}
+              <p className="w-full pt-1 text-[11px] text-slate-400">Toca una para ubicarla y luego elige la jaula.</p>
+            </div>
+          )}
+        </div>
+      )}
       {cerdaOrigen && (
         <div className="flex items-center justify-between gap-2 rounded-2xl bg-amber-50 px-3.5 py-2.5 text-sm text-amber-900 ring-1 ring-amber-200">
           <span className="min-w-0">Ubicando la cerda <b className="arete-id">{cerdaOrigen}</b>: {area ? "toca la jaula donde va" : "elige el área"}.</span>
-          <button type="button" onClick={() => router.push(`/cerda/${encodeURIComponent(cerdaOrigen)}`)} className="shrink-0 text-xs font-semibold text-sky-700">
-            Volver
+          <button type="button" onClick={() => setCerdaOrigen("")} className="shrink-0 text-xs font-semibold text-sky-700">
+            Cancelar
           </button>
         </div>
       )}
