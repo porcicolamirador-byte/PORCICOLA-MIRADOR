@@ -74,6 +74,13 @@ const CATEGORIA_GASTO: Record<CategoriaBodega, string> = {
 
 type Vista = "inventario" | "reponer" | "facturas";
 
+/** Orden fijo de los alimentos en Bodega; los demás productos van después, por nombre */
+const ORDEN_BODEGA = ["PR-01", "IN-01", "ML-01", "MC-01", "CG-01", "CL-01"];
+const posicionBodega = (p: ProductoBodega) => {
+  const i = ORDEN_BODEGA.indexOf(codigoDe(p));
+  return i < 0 ? ORDEN_BODEGA.length : i;
+};
+
 export default function BodegaPage() {
   const router = useRouter();
   const version = useVersionDatos();
@@ -107,7 +114,7 @@ export default function BodegaPage() {
   const bajos = datos?.inventario.filter((i) => i.bajoMinimo) ?? [];
   const inventarioVisible = (vista === "reponer" ? bajos : datos?.inventario ?? [])
     .filter((i) => !q || i.producto.nombre.toLowerCase().includes(q))
-    .sort((a, b) => a.producto.nombre.localeCompare(b.producto.nombre, "es"));
+    .sort((a, b) => posicionBodega(a.producto) - posicionBodega(b.producto) || a.producto.nombre.localeCompare(b.producto.nombre, "es"));
   const facturasVisibles = (datos?.facturas ?? []).filter(
     (f) => !q || f.numero.toLowerCase().includes(q) || (f.proveedor ?? "").toLowerCase().includes(q)
   );
