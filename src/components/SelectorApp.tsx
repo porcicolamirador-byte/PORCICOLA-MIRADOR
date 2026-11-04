@@ -5,7 +5,7 @@
  * del navegador): un botón que muestra lo elegido y abre una ventana con las opciones.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Modal from "@/components/Modal";
 
@@ -65,37 +65,117 @@ export default function SelectorApp({
       </button>
       {abierta && montado && createPortal(
         <Modal abierta etiqueta={etiqueta} titulo={titulo} onCerrar={() => setAbierta(false)}>
-          <ul className="-mx-1 flex flex-col">
-            {opciones.map((o) => {
-              const elegida = o.valor === valor;
-              return (
-                <li key={o.valor}>
-                  <button
-                    type="button"
-                    disabled={o.deshabilitado}
-                    onClick={() => {
-                      onCambiar(o.valor);
-                      setAbierta(false);
-                    }}
-                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition active:bg-slate-100 disabled:opacity-40 ${elegida ? "bg-sky-50" : ""}`}
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className={`block truncate text-[15px] ${elegida ? "font-semibold text-sky-900" : "text-slate-800"}`}>{o.texto}</span>
-                      {o.detalle && <span className="block truncate text-xs text-slate-500">{o.detalle}</span>}
-                    </span>
-                    {elegida && (
-                      <svg viewBox="0 0 20 20" className="h-5 w-5 shrink-0 text-sky-600" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="m4.5 10.5 3.5 3.5 7.5-8" />
-                      </svg>
-                    )}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          <Rueda
+            opciones={opciones}
+            valor={valor}
+            onElegir={(v) => {
+              onCambiar(v);
+              setAbierta(false);
+            }}
+          />
         </Modal>,
         document.body
       )}
     </>
+  );
+}
+
+const FILA = 48;
+const VISIBLES = 5;
+
+/**
+ * Rueda para deslizar con el dedo entre las opciones (como la del iPhone):
+ * la opción que queda en el centro es la marcada; "Elegir" la confirma.
+ * Tocar una opción también la elige de una vez.
+ */
+function Rueda({ opciones, valor, onElegir }: { opciones: OpcionSelector[]; valor: string; onElegir: (v: string) => void }) {
+  const caja = useRef<HTMLDivElement>(null);
+  const inicial = Math.max(0, opciones.findIndex((o) => o.valor === valor && !o.deshabilitado));
+  const [indice, setIndice] = useState(inicial);
+  const espera = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    if (caja.current) caja.current.scrollTop = inicial * FILA;
+    return () => clearTimeout(espera.current);
+    // Solo al abrir
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const alDeslizar = () => {
+    const el = caja.current;
+    if (!el) return;
+    const i = Math.min(opciones.length - 1, Math.max(0, Math.round(el.scrollTop / FILA)));
+    if (i !== indice) {
+      setIndice(i);
+      try {
+        navigator.vibrate?.(5);
+      } catch {
+        // sin vibración
+      }
+    }
+    // Al soltar, si quedó en una opción deshabilitada, pasa a la siguiente disponible
+    clearTimeout(espera.current);
+    espera.current = setTimeout(() => {
+      if (!opciones[i]?.deshabilitado) return;
+      const j = [...opciones.keys()].filter((k) => !opciones[k].deshabilitado).sort((x, y) => Math.abs(x - i) - Math.abs(y - i))[0];
+      if (j !== undefined) el.scrollTo({ top: j * FILA, behavior: "smooth" });
+    }, 160);
+  };
+
+  const marcada = opciones[indice];
+  const relleno = ((VISIBLES - 1) / 2) * FILA;
+
+  return (
+    <div>
+      <div className="relative -mx-1" style={{ height: VISIBLES * FILA }}>
+        {/* Franja de la opción marcada */}
+        <div className="pointer-events-none absolute inset-x-0 rounded-xl bg-sky-50 ring-1 ring-sky-100" style={{ top: relleno, height: FILA }} />
+        <div
+          ref={caja}
+          onScroll={alDeslizar}
+          role="listbox"
+          aria-activedescendant={marcada ? `rueda-${indice}` : undefined}
+          className="relative h-full snap-y snap-mandatory overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          style={{
+            paddingTop: relleno,
+            paddingBottom: relleno,
+            touchAction: "pan-y",
+            WebkitOverflowScrolling: "touch",
+            maskImage: "linear-gradient(to bottom, transparent, #000 32%, #000 68%, transparent)",
+            WebkitMaskImage: "linear-gradient(to bottom, transparent, #000 32%, #000 68%, transparent)",
+          }}
+        >
+          {opciones.map((o, i) => {
+            const centro = i === indice;
+            return (
+              <button
+                key={o.valor}
+                id={`rueda-${i}`}
+                type="button"
+                role="option"
+                aria-selected={centro}
+                disabled={o.deshabilitado}
+                onClick={() => onElegir(o.valor)}
+                className="flex w-full snap-center items-center justify-center gap-2 px-3 text-center disabled:opacity-35"
+                style={{ height: FILA }}
+              >
+                <span className="min-w-0 truncate">
+                  <span className={`text-[16px] transition ${centro ? "font-semibold text-sky-900" : "text-slate-500"}`}>{o.texto}</span>
+                  {o.detalle && <span className="ml-1.5 text-xs text-slate-400">{o.detalle}</span>}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <button
+        type="button"
+        disabled={!marcada || marcada.deshabilitado}
+        onClick={() => marcada && onElegir(marcada.valor)}
+        className="mt-4 w-full rounded-2xl bg-sky-900 py-3 text-[15px] font-semibold text-white transition active:bg-sky-950 disabled:opacity-50"
+      >
+        Elegir{marcada ? ` · ${marcada.texto}` : ""}
+      </button>
+    </div>
   );
 }
