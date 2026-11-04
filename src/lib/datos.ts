@@ -1071,7 +1071,9 @@ export function registrarGastoProduccion(datos: { descripcion: string; cantidad?
 }
 
 /** Categorías de Contabilidad para los gastos de un lote */
-export const CATEGORIAS_GASTO_LOTE = ["Medicamentos y vacunas", "Mantenimiento", "Transporte", "Mano de obra", "Otros gastos"];
+export const CATEGORIAS_GASTO_LOTE = ["Medicamentos y vacunas", "Insumos", "Mano de obra", "Mantenimiento", "Otros gastos"];
+/** Nombre corto que se muestra en la lista (en Contabilidad queda con su nombre completo) */
+export const textoCategoriaLote = (c: string) => (c === "Medicamentos y vacunas" ? "Medicamentos/Vacunas" : c);
 
 /** Registra otro gasto del lote y lo suma como gasto en Contabilidad */
 export function registrarGastoLote(

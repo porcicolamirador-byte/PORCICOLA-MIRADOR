@@ -22,6 +22,7 @@ import {
   registrarGastoLote,
   eliminarGastoLote,
   CATEGORIAS_GASTO_LOTE,
+  textoCategoriaLote,
   nombreLote,
   siguienteCodigoLote,
   tomarCodigoLote,
@@ -1284,7 +1285,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                 <span className="text-base font-bold tabular-nums text-sky-900">{formatoPesos(gastoTotal)}</span>
               </div>
               <Campo etiqueta="Categoría en Contabilidad">
-                <Selector value={gastoCat} onChange={setGastoCat} opciones={CATEGORIAS_GASTO_LOTE.map((c) => ({ valor: c, texto: c }))} />
+                <Selector value={gastoCat} onChange={setGastoCat} titulo="Categoría" opciones={CATEGORIAS_GASTO_LOTE.map((c) => ({ valor: c, texto: textoCategoriaLote(c) }))} />
               </Campo>
               <Campo etiqueta="Método de pago *">
                 <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1">
