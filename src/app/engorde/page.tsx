@@ -262,7 +262,7 @@ export default function EngordePage() {
                       <span className={`font-black leading-none tabular-nums ${numero ? "text-xl" : "text-[11px]"}`}>{numero ?? (l.codigo || "–")}</span>
                     </div>
                     <div className="min-w-0 flex-1">
-                      <span className="block text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-400">{l.origen ? "Edad" : "En el lote"}</span>
+                      <span className="block text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-400">{!l.activo ? (l.origen ? "Edad al cierre" : "Al cierre") : l.origen ? "Edad" : "En el lote"}</span>
                       <span className="block truncate text-lg font-black leading-tight tabular-nums text-slate-900">
                         {edad.meses > 0 ? (
                           <>
@@ -317,7 +317,7 @@ export default function EngordePage() {
                       </div>
                     </div>
                     <span className="shrink-0 text-right text-xs leading-tight text-slate-500">
-                      <span className="block text-[10px] uppercase tracking-wide text-slate-400">{l.origen ? "Edad" : "En el lote"}</span>
+                      <span className="block text-[10px] uppercase tracking-wide text-slate-400">{!l.activo ? (l.origen ? "Edad al cierre" : "Al cierre") : l.origen ? "Edad" : "En el lote"}</span>
                       <span className="font-semibold tabular-nums text-slate-700">
                         {textoEdad(edadMesesDias(l.fechaIngreso, l.activo ? hoy() : l.fechaSalida || hoy()))}
                       </span>
@@ -953,7 +953,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
             )}
             <div className="min-w-0 rounded-xl bg-white px-3 py-2 ring-1 ring-slate-200">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                {lote.origen ? "Edad" : "Tiempo en el lote"}
+                {!lote.activo ? (lote.origen ? "Edad al cierre" : "Tiempo en el lote (al cierre)") : lote.origen ? "Edad" : "Tiempo en el lote"}
               </p>
               <p className="text-base font-bold tabular-nums text-slate-900">{textoEdad(edad)}</p>
               <p className="truncate text-xs text-slate-500">
