@@ -30,6 +30,7 @@ import {
   leerCorrales,
   leerProductos,
   codigoDe,
+  salidaEstimadaLote,
   KG_POR_BULTO,
   leerCerdas,
   leerSalidas,
@@ -221,6 +222,11 @@ export default function EngordePage() {
                       <span className="block truncate text-[10px] tabular-nums text-slate-500">
                         <b className="font-semibold text-slate-700">{l.vivos}</b> {l.vivos === 1 ? "animal" : "animales"}
                       </span>
+                      {salidaEstimadaLote(l) && l.activo && (
+                        <span className="block truncate text-[10px] tabular-nums text-emerald-700">
+                          Salida ≈ <b className="font-semibold">{formatoFecha(salidaEstimadaLote(l), true)}</b>
+                        </span>
+                      )}
                     </div>
                   </button>
                 </li>
@@ -243,6 +249,9 @@ export default function EngordePage() {
                       <p className="truncate text-xs text-slate-500">
                         {l.origen ? `🐖 De la cerda ${l.origen.cerdaId} · parto automático` : `🐖 Cerda ${CERDA_MANUAL} · lote manual`}
                       </p>
+                      {salidaEstimadaLote(l) && l.activo && (
+                        <p className="truncate text-xs font-medium text-emerald-700">Salida aprox. {formatoFecha(salidaEstimadaLote(l), true)}</p>
+                      )}
                       </div>
                     </div>
                     <span className="shrink-0 text-right text-xs leading-tight text-slate-500">

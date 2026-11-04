@@ -1255,6 +1255,19 @@ export function sumarDias(fecha: string, dias: number): string {
   return `${f.getFullYear()}-${mm}-${dd}`;
 }
 
+/** Suma meses de calendario (31 ene + 1 mes = 28/29 feb) */
+export function sumarMeses(fecha: string, meses: number): string {
+  const [a, m, d] = fecha.split("-").map(Number);
+  const destino = new Date(a, (m || 1) - 1 + meses, 1);
+  const ultimo = new Date(destino.getFullYear(), destino.getMonth() + 1, 0).getDate();
+  destino.setDate(Math.min(d || 1, ultimo));
+  return `${destino.getFullYear()}-${String(destino.getMonth() + 1).padStart(2, "0")}-${String(destino.getDate()).padStart(2, "0")}`;
+}
+
+/** Salida aproximada de un lote: 5 meses exactos desde el parto (solo lotes que vienen de un parto) */
+export const MESES_HASTA_SALIDA = 5;
+export const salidaEstimadaLote = (l: Lote) => (l.origen && l.fechaIngreso ? sumarMeses(l.fechaIngreso, MESES_HASTA_SALIDA) : undefined);
+
 export function diasEntre(desde: string, hasta: string): number {
   const a = new Date(`${desde}T00:00:00`).getTime();
   const b = new Date(`${hasta}T00:00:00`).getTime();
