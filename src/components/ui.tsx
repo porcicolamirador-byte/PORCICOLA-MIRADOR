@@ -145,16 +145,26 @@ export function Entrada({
   step?: number | "any";
   inputMode?: "text" | "numeric" | "decimal";
 }) {
+  // Números con decimales (pesos en kg, cantidades): campo de texto con teclado decimal,
+  // así se puede escribir 11,3 o 11.3 (el campo numérico del navegador rechaza la coma)
+  const decimal = type === "number" && inputMode === "decimal";
   return (
     <input
-      type={type}
+      type={decimal ? "text" : type}
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e) => {
+        if (!decimal) return onChange(e.target.value);
+        // Solo números y un separador decimal (coma o punto)
+        const limpio = e.target.value.replace(/[^\d.,]/g, "");
+        const i = limpio.search(/[.,]/);
+        onChange(i < 0 ? limpio : limpio.slice(0, i + 1) + limpio.slice(i + 1).replace(/[.,]/g, ""));
+      }}
       placeholder={placeholder}
       required={required}
-      min={min}
-      step={step}
+      min={decimal ? undefined : min}
+      step={decimal ? undefined : step}
       inputMode={inputMode}
+      autoComplete={decimal ? "off" : undefined}
       className={claseCampo}
     />
   );

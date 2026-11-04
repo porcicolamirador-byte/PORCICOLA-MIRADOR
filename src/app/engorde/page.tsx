@@ -609,7 +609,7 @@ function NuevoLote({ abierta, onCerrar }: { abierta: boolean; onCerrar: () => vo
         fechaIngreso: fecha,
         cantidadInicial: n,
         vivos: n,
-        pesoInicial: Number(peso) || 0,
+        pesoInicial: Number(String(peso).replace(",", ".")) || 0,
         pesajes: [],
         mortalidad: [],
         alimento: [],
