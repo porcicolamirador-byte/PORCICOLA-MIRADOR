@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { guardarConRegistro, registrarLog, sinRegistro } from "@/lib/log";
 import type { Cerda, Registro } from "@/utils/pendingTasks";
+import { CLAVE_PRESTAMOS, granjaActual, leerGranjas } from "@/lib/sincronizar";
 
 /* ═════════════════════ Claves de almacenamiento ═════════════════════
  * Todo se guarda en el navegador (localStorage). Las claves "cerdas",
@@ -770,6 +771,40 @@ export function calcularInventario(opciones: { incluirInactivos?: boolean; exclu
     });
   }
 
+  // Préstamos entre granjas: salen de la que presta y entran a la que recibe (y al revés al devolver)
+  const granja = granjaActual();
+  const productoPorCodigo = (codigo: string) =>
+    productos.find((p) => codigoDe(p) === codigo && p.unidad === "bultos") ?? productos.find((p) => codigoDe(p) === codigo);
+  for (const pr of leerPrestamos()) {
+    if (pr.de !== granja && pr.a !== granja) continue;
+    const p = productoPorCodigo(pr.codigo);
+    if (!p) continue;
+    const presto = pr.de === granja;
+    const cantidad = Number(pr.cantidad) || 0;
+    agregar(p, {
+      fecha: pr.fecha,
+      hora: pr.hora,
+      tipo: presto ? "salida" : "entrada",
+      cantidad,
+      base: cantidad * factorKg(p),
+      detalle: presto ? `Préstamo a ${pr.aNombre}` : `Préstamo de ${pr.deNombre}`,
+      origen: p,
+      precioBase: !presto && pr.valorUnitario > 0 ? pr.valorUnitario / factorKg(p) : undefined,
+    });
+    for (const d of pr.devoluciones ?? []) {
+      const c = Number(d.cantidad) || 0;
+      agregar(p, {
+        fecha: d.fecha,
+        hora: d.hora,
+        tipo: presto ? "entrada" : "salida",
+        cantidad: c,
+        base: c * factorKg(p),
+        detalle: presto ? `Devolución de ${pr.aNombre}` : `Devolución a ${pr.deNombre}`,
+        origen: p,
+      });
+    }
+  }
+
   return productos
     .filter((p) => opciones.incluirInactivos || p.activo !== false)
     .map((producto) => {
@@ -813,6 +848,87 @@ const fmtNum = (n: number) => n.toLocaleString("es-CO", { maximumFractionDigits:
  * cada artículo se vuelve un producto y su existencia queda como
  * "saldo inicial". Se ejecuta una sola vez.
  */
+/* ───────────── Préstamos de bultos entre granjas ───────────── */
+
+export interface DevolucionPrestamo {
+  id: string;
+  fecha: string;
+  hora?: string;
+  cantidad: number;
+}
+/** Préstamo de una bodega a otra (común a todas las granjas) */
+export interface PrestamoBodega {
+  id: string;
+  de: string;
+  deNombre: string;
+  a: string;
+  aNombre: string;
+  codigo: string;
+  nombre: string;
+  unidad: string;
+  cantidad: number;
+  /** Último precio de la granja que presta (para valorar lo recibido) */
+  valorUnitario: number;
+  fecha: string;
+  hora?: string;
+  devoluciones: DevolucionPrestamo[];
+}
+export function leerPrestamos(): PrestamoBodega[] {
+  const v = leer<PrestamoBodega[]>(CLAVE_PRESTAMOS, []);
+  return Array.isArray(v) ? v.filter((p) => p && p.id && p.de && p.a && p.codigo) : [];
+}
+const guardarPrestamos = (l: PrestamoBodega[]) => escribir(CLAVE_PRESTAMOS, l);
+export const pendientePrestamo = (p: PrestamoBodega) =>
+  Math.max(0, (Number(p.cantidad) || 0) - (p.devoluciones ?? []).reduce((s, d) => s + (Number(d.cantidad) || 0), 0));
+const nombreGranja = (id: string) => leerGranjas().find((g) => g.id === id)?.nombre ?? id;
+
+/** Presta a otra granja: sale de esta bodega y entra a la otra */
+export function prestarProducto(productoId: string, aGranja: string, cantidad: number): string | null {
+  const item = calcularInventario().find((i) => i.producto.id === productoId);
+  if (!item) return "Producto no encontrado";
+  const codigo = codigoDe(item.producto);
+  if (!codigo) return "El producto necesita un código para prestarlo (así lo reconoce la otra granja)";
+  if (!(cantidad > 0)) return "Escribe una cantidad mayor que cero";
+  if (cantidad > item.disponible + 1e-9) return `Solo hay ${fmtNum(item.disponible)} ${item.producto.unidad} en bodega`;
+  const de = granjaActual();
+  if (aGranja === de) return "Elige otra granja";
+  guardarPrestamos([
+    ...leerPrestamos(),
+    {
+      id: nuevoId(),
+      de,
+      deNombre: nombreGranja(de),
+      a: aGranja,
+      aNombre: nombreGranja(aGranja),
+      codigo,
+      nombre: item.producto.nombre,
+      unidad: item.producto.unidad,
+      cantidad,
+      valorUnitario: item.ultimoPrecio || 0,
+      fecha: hoy(),
+      hora: horaActual(),
+      devoluciones: [],
+    },
+  ]);
+  return null;
+}
+
+/** Devuelve (todo o parte) de un préstamo recibido, según lo que haya en esta bodega */
+export function devolverPrestamo(prestamoId: string, cantidad: number): string | null {
+  const lista = leerPrestamos();
+  const pr = lista.find((p) => p.id === prestamoId);
+  if (!pr || pr.a !== granjaActual()) return "Préstamo no encontrado";
+  const falta = pendientePrestamo(pr);
+  if (!(cantidad > 0)) return "Escribe una cantidad mayor que cero";
+  if (cantidad > falta + 1e-9) return `Solo se deben ${fmtNum(falta)} ${pr.unidad}`;
+  const item = calcularInventario().find((i) => codigoDe(i.producto) === pr.codigo && !i.subproducto);
+  if (!item || cantidad > item.disponible + 1e-9) return `No hay suficiente ${pr.nombre} en bodega para devolver`;
+  guardarPrestamos(
+    lista.map((p) => (p.id === prestamoId ? { ...p, devoluciones: [...(p.devoluciones ?? []), { id: nuevoId(), fecha: hoy(), hora: horaActual(), cantidad }] } : p))
+  );
+  return null;
+}
+
 /** Kilos que trae cada bulto de alimento */
 export const KG_POR_BULTO = 40;
 export const kgDeCantidad = (cantidad: number, unidad: string, kgPorUnidad?: number) =>

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
-import { Boton, Campo, Chevron, Chips, Entrada, IconoMas, Insignia, SeccionDesplegable, Selector, Vacio, EntradaPesos } from "@/components/ui";
+import { Boton, Campo, Chevron, Chips, Entrada, IconoMas, Insignia, SeccionDesplegable, Selector, Vacio, EntradaPesos, CLASE_SELECTOR } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
 import { puede } from "@/lib/nube";
 import DialogoClave from "@/components/DialogoClave";
@@ -12,13 +12,18 @@ import Modal from "@/components/Modal";
 import SelectorApp from "@/components/SelectorApp";
 import { generarPdfSalidas } from "@/lib/pdfSalidas";
 import { cargarLogoJpeg, entregarPdf } from "@/lib/pdfFicha";
-import { nombreGranjaActual } from "@/lib/sincronizar";
+import { granjaActual, leerGranjas, nombreGranjaActual } from "@/lib/sincronizar";
 import PagoFactura from "@/components/PagoFactura";
 import { calcularConsumoCerdas, type ConsumoAlimentoCerdas } from "@/lib/consumoCerdas";
 import { CATEGORIAS_BODEGA, IconoCategoria, RecuadroCategoria } from "@/components/CatalogoProductos";
 import {
   calcularInventario,
   codigoDe,
+  devolverPrestamo,
+  leerPrestamos,
+  pendientePrestamo,
+  prestarProducto,
+  type PrestamoBodega,
   formatoFecha,
   formatoPesos,
   guardarFacturas,
@@ -187,6 +192,7 @@ export default function BodegaPage() {
             onChange={setVista}
           />
 
+          {vista === "inventario" && !q && <AvisosPrestamos />}
           {vista === "inventario" && !q && <TarjetaGastosProduccion />}
           {vista === "inventario" && !q && <TarjetaConsumoCerdas />}
           {vista === "inventario" && !q && <SalidasALotes />}
@@ -621,6 +627,8 @@ function NuevaFactura({
 function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerrar: () => void }) {
   const { producto: p, existencia, disponible, subproducto, bajoMinimo, movimientos } = item;
   const [salida, setSalida] = useState(false);
+  const [prestar, setPrestar] = useState(false);
+  const otrasGranjas = leerGranjas().filter((g) => g.id !== granjaActual());
   const [cantidad, setCantidad] = useState("");
   const [fecha, setFecha] = useState(hoy());
   const [hora, setHora] = useState(horaActual());
@@ -692,6 +700,11 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
           <Boton variante="secundario" onClick={() => (puede("bodega") ? setSalida(true) : void avisarSinPermisoBodega())} disabled={!libre && disponible <= 0}>
             − Registrar salida (consumo)
           </Boton>
+          {otrasGranjas.length > 0 && !subproducto && (
+            <Boton variante="secundario" onClick={() => (puede("bodega") ? setPrestar(true) : void avisarSinPermisoBodega())} disabled={disponible <= 0}>
+              ⇄ Prestar a otra granja
+            </Boton>
+          )}
           <SeccionDesplegable titulo="Movimientos" cantidad={movimientos.length}>
             {movimientos.length === 0 ? (
               <p className="text-sm text-slate-500">Sin movimientos. Ingresa una factura con este producto.</p>
@@ -785,6 +798,144 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
           </div>
         </form>
       )}
+      {prestar && <PrestarProducto item={item} granjas={otrasGranjas} onCerrar={() => setPrestar(false)} />}
+    </Modal>
+  );
+}
+
+/** Prestar bultos a la bodega de otra granja */
+function PrestarProducto({ item, granjas, onCerrar }: { item: ExistenciaProducto; granjas: { id: string; nombre: string }[]; onCerrar: () => void }) {
+  const p = item.producto;
+  const [destino, setDestino] = useState("");
+  const [cantidad, setCantidad] = useState("");
+  const [error, setError] = useState("");
+  const guardar = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!destino) return setError("Elige la granja que recibe.");
+    const n = num(cantidad);
+    const r = prestarProducto(p.id, destino, n);
+    if (r) return setError(r);
+    const g = granjas.find((x) => x.id === destino)?.nombre ?? "";
+    onCerrar();
+    await avisar({ titulo: "Préstamo registrado", mensaje: `Se prestaron ${fmt(n)} ${p.unidad} de ${p.nombre} a ${g}. Quedará como deuda en su bodega hasta que los devuelva.` });
+  };
+  return (
+    <Modal abierta etiqueta={p.nombre} titulo="Prestar a otra granja" subtitulo={`Hay ${fmt(item.disponible)} ${p.unidad}`} onCerrar={onCerrar}>
+      <form onSubmit={guardar} className="flex flex-col gap-3.5">
+        <Campo etiqueta="Granja que recibe *">
+          <SelectorApp
+            valor={destino}
+            onCambiar={setDestino}
+            titulo="Granja que recibe"
+            placeholder="Elige la granja"
+            opciones={granjas.map((g) => ({ valor: g.id, texto: g.nombre }))}
+            className="w-full"
+            claseBoton={CLASE_SELECTOR}
+          />
+        </Campo>
+        <Campo etiqueta={`Cantidad (${p.unidad}) *`}>
+          <Entrada type="number" inputMode="decimal" value={cantidad} onChange={setCantidad} />
+        </Campo>
+        {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
+        <div className="grid grid-cols-2 gap-2">
+          <Boton variante="secundario" onClick={onCerrar}>
+            Cancelar
+          </Boton>
+          <Boton type="submit" disabled={!destino || !(num(cantidad) > 0)}>
+            Prestar
+          </Boton>
+        </div>
+        <p className="text-xs leading-snug text-slate-500">
+          Sale de esta bodega y entra a la otra. En la otra granja quedará un aviso naranja de lo que debe, con la opción de devolver.
+        </p>
+      </form>
+    </Modal>
+  );
+}
+
+/** Avisos naranja de préstamos pendientes entre granjas (lo que se debe y lo que deben) */
+function AvisosPrestamos() {
+  const version = useVersionDatos();
+  const [devolver, setDevolver] = useState<PrestamoBodega | null>(null);
+  const datos = useMemo(() => {
+    if (version < 0) return null;
+    const g = granjaActual();
+    const pendientes = leerPrestamos().filter((p) => pendientePrestamo(p) > 0);
+    const inv = calcularInventario();
+    const hay = (codigo: string) => inv.find((i) => codigoDe(i.producto) === codigo && !i.subproducto)?.disponible ?? 0;
+    return {
+      debo: pendientes.filter((p) => p.a === g).map((p) => ({ p, hay: hay(p.codigo) })),
+      meDeben: pendientes.filter((p) => p.de === g),
+    };
+  }, [version]);
+  if (!datos || (datos.debo.length === 0 && datos.meDeben.length === 0)) return null;
+  return (
+    <div className="flex flex-col gap-2">
+      {datos.debo.map(({ p, hay }) => (
+        <div key={p.id} className="flex items-center gap-3 rounded-2xl bg-orange-50 px-3.5 py-3 ring-1 ring-orange-200">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-orange-800">
+              Debes {fmt(pendientePrestamo(p))} {p.unidad} de {p.nombre}
+            </p>
+            <p className="text-xs text-orange-700">
+              Préstamo de {p.deNombre} · {formatoFecha(p.fecha, true)}
+              {hay <= 0 ? " · sin existencia para devolver" : ""}
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={hay <= 0}
+            onClick={() => (puede("bodega") ? setDevolver(p) : void avisarSinPermisoBodega())}
+            className="shrink-0 rounded-full bg-orange-600 px-3.5 py-2 text-xs font-semibold text-white transition active:scale-95 disabled:opacity-40"
+          >
+            Devolver
+          </button>
+        </div>
+      ))}
+      {datos.meDeben.map((p) => (
+        <div key={p.id} className="rounded-2xl bg-orange-50/60 px-3.5 py-2.5 ring-1 ring-orange-100">
+          <p className="text-sm font-semibold text-orange-700">
+            {p.aNombre} te debe {fmt(pendientePrestamo(p))} {p.unidad} de {p.nombre}
+          </p>
+          <p className="text-xs text-orange-600">Prestado el {formatoFecha(p.fecha, true)}</p>
+        </div>
+      ))}
+      {devolver && <DevolverPrestamo prestamo={devolver} onCerrar={() => setDevolver(null)} />}
+    </div>
+  );
+}
+
+function DevolverPrestamo({ prestamo: p, onCerrar }: { prestamo: PrestamoBodega; onCerrar: () => void }) {
+  const falta = pendientePrestamo(p);
+  const hay = calcularInventario().find((i) => codigoDe(i.producto) === p.codigo && !i.subproducto)?.disponible ?? 0;
+  const maximo = Math.max(0, Math.min(falta, hay));
+  const [cantidad, setCantidad] = useState(String(Math.floor(maximo * 100) / 100).replace(".", ","));
+  const [error, setError] = useState("");
+  const guardar = async (e: FormEvent) => {
+    e.preventDefault();
+    const n = num(cantidad);
+    const r = devolverPrestamo(p.id, n);
+    if (r) return setError(r);
+    onCerrar();
+    await avisar({ titulo: "Devolución registrada", mensaje: `Se devolvieron ${fmt(n)} ${p.unidad} de ${p.nombre} a ${p.deNombre}.` });
+  };
+  return (
+    <Modal abierta etiqueta={p.nombre} titulo={`Devolver a ${p.deNombre}`} subtitulo={`Debes ${fmt(falta)} ${p.unidad} · hay ${fmt(hay)} en bodega`} onCerrar={onCerrar}>
+      <form onSubmit={guardar} className="flex flex-col gap-3.5">
+        <Campo etiqueta={`Cantidad a devolver (${p.unidad}) *`}>
+          <Entrada type="number" inputMode="decimal" value={cantidad} onChange={setCantidad} />
+        </Campo>
+        {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
+        <div className="grid grid-cols-2 gap-2">
+          <Boton variante="secundario" onClick={onCerrar}>
+            Cancelar
+          </Boton>
+          <Boton type="submit" disabled={!(num(cantidad) > 0) || num(cantidad) > maximo + 1e-9}>
+            Devolver
+          </Boton>
+        </div>
+        <p className="text-xs leading-snug text-slate-500">Sale de esta bodega y vuelve a la de {p.deNombre}. Puedes devolver por partes.</p>
+      </form>
     </Modal>
   );
 }
