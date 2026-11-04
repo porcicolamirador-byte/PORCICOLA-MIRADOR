@@ -210,12 +210,6 @@ export default function ContabilidadPage() {
             </div>
           ))}
         </div>
-        {datos && datos.credito > 0 && (
-          <div className="flex items-center justify-between border-t border-slate-100 px-3 py-1.5 text-[12px]">
-            <span className="text-slate-500">Crédito por pagar del mes (incluido en el balance)</span>
-            <span className="font-bold tabular-nums text-orange-600">−{formatoPesos(datos.credito)}</span>
-          </div>
-        )}
       </section>
 
       <FacturasCredito version={version} />
