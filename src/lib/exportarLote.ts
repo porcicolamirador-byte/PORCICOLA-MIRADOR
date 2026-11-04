@@ -17,6 +17,9 @@ import {
   leerProductos,
   nombreLote,
   sumarDias,
+  abonadoFactura,
+  totalFactura,
+  trazabilidadSalidas,
   type Alimento,
   type GastoLote,
   type Lote,
@@ -219,11 +222,24 @@ function creditoDelLote(lote: Lote) {
   const cuentas = new Map(leerCuentasPorPagar().map((c) => [c.id, c]));
   let total = 0;
   let abonado = 0;
+  // Otros gastos del lote registrados a crédito
   for (const g of lote.gastos ?? []) {
     if (!g.cuentaId) continue;
     total += Number(g.valor) || 0;
     const c = cuentas.get(g.cuentaId);
     abonado += Math.min(Number(g.valor) || 0, (c?.abonos ?? []).reduce((t, a) => t + (Number(a.monto) || 0), 0));
   }
-  return { total, abonado };
+  // Alimento e insumos que salieron de facturas a crédito (reparto por factura, primero en entrar)
+  const salidasDelLote = new Set(lote.alimento.map((a) => a.salidaId).filter(Boolean) as string[]);
+  for (const t of trazabilidadSalidas()) {
+    if (t.salida.loteId !== lote.id && !salidasDelLote.has(t.salida.id)) continue;
+    for (const parte of t.partes) {
+      if (parte.factura.pago !== "credito" || !(parte.valor > 0)) continue;
+      const totalF = totalFactura(parte.factura);
+      const pagado = totalF > 0 ? Math.min(1, abonadoFactura(parte.factura) / totalF) : 0;
+      total += parte.valor;
+      abonado += parte.valor * pagado;
+    }
+  }
+  return { total: Math.round(total), abonado: Math.round(abonado) };
 }
