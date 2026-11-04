@@ -44,6 +44,7 @@ const RUTAS = [
   "/monitoreo",
   "/bodega",
   "/programacion",
+  "/jaula",
   "/calendario",
   "/cerda/_",
   "/cerda/_/parto",

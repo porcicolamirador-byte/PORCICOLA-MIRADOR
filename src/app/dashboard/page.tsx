@@ -88,6 +88,14 @@ const modulos = [
     card: "bg-white border-slate-200",
   },
   {
+    nombre: "Jaula",
+    descripcion: "Ubicación de las cerdas",
+    ruta: "/jaula",
+    icon: "🧱",
+    tile: "bg-slate-100 text-slate-700",
+    card: "bg-white border-slate-200",
+  },
+  {
     nombre: "Programación",
     descripcion: "Inseminación y partos",
     ruta: "/programacion",
@@ -143,6 +151,12 @@ const TRAZOS: Record<string, ReactNode> = {
       <rect x="2.5" y="6" width="19" height="13" rx="2.5" />
       <path d="M16 12.5h2M2.5 10h19" />
       <path d="M6 6V4.5h11V6" />
+    </>
+  ),
+  Jaula: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M9 5v14M15 5v14M3 12h18" />
     </>
   ),
   Programación: (
