@@ -805,7 +805,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
     if (
       !(await confirmar({
         titulo: `⚠️ Eliminar ${nombreLote(lote)}`,
-        mensaje: "Atención: si el lote se elimina, sus productos e insumos registrados serán devueltos y quitados de la contabilidad. Esta acción no se puede deshacer.",
+        mensaje: "Todos los productos e insumos asociados serán devueltos al inventario y se reversarán los movimientos contables correspondientes. ¡Esta acción será irreversible!",
         aceptar: "Eliminar lote",
         destructivo: true,
       }))
