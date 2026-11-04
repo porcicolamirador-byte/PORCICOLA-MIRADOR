@@ -102,6 +102,15 @@ export default function EngordePage() {
       .some((t) => String(t).toLowerCase().includes(q));
   const visibles = (lotes ?? []).filter((l) => (vista === "activos" ? l.activo : !l.activo) && coincide(l));
   const animales = activos.reduce((s, l) => s + l.vivos, 0);
+  // Próximas salidas (5 meses desde el parto), contadas desde hoy: 0–15 días (incluye las ya vencidas) y 16–30 días
+  const proximas = activos
+    .map((l) => ({ lote: l, fecha: salidaEstimadaLote(l) }))
+    .filter((x): x is { lote: Lote; fecha: string } => Boolean(x.fecha))
+    .map((x) => ({ ...x, dias: diasEntre(hoy(), x.fecha) }))
+    .sort((a, b) => a.dias - b.dias);
+  const salen15 = proximas.filter((x) => x.dias <= 15);
+  const salen30 = proximas.filter((x) => x.dias > 15 && x.dias <= 30);
+  const [desplegado, setDesplegado] = useState<15 | 30 | null>(null);
   const lote = lotes?.find((l) => l.id === seleccionado) ?? null;
 
   return (
@@ -119,6 +128,59 @@ export default function EngordePage() {
       <div className="grid grid-cols-2 gap-2">
         <Dato titulo="Lotes activos" valor={lotes ? activos.length : "–"} />
         <Dato titulo="Animales en engorde" valor={lotes ? animales : "–"} />
+        {([15, 30] as const).map((n) => {
+          const lista = n === 15 ? salen15 : salen30;
+          const abierto = desplegado === n;
+          return (
+            <button
+              key={n}
+              type="button"
+              onClick={() => setDesplegado(abierto ? null : n)}
+              aria-expanded={abierto}
+              className={`rounded-2xl p-3.5 text-left ring-1 transition active:scale-[0.98] ${abierto ? "bg-sky-50 ring-sky-200" : "bg-white ring-slate-200/80"}`}
+            >
+              <span className="flex items-center justify-between gap-1">
+                <span className="text-xs font-medium text-slate-500">Salen en {n} días</span>
+                <svg viewBox="0 0 20 20" className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${abierto ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M5 8l5 5 5-5" />
+                </svg>
+              </span>
+              <span className={`mt-0.5 block text-2xl font-semibold leading-tight tracking-tight tabular-nums ${lista.length ? (n === 15 ? "text-amber-600" : "text-sky-700") : "text-slate-900"}`}>
+                {lotes ? lista.length : "–"}
+                <span className="ml-1 text-xs font-medium text-slate-500">{lista.length === 1 ? "lote" : "lotes"}</span>
+              </span>
+            </button>
+          );
+        })}
+        {desplegado && (() => {
+          const lista = desplegado === 15 ? salen15 : salen30;
+          return (
+            <div className="col-span-2 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/80">
+              {lista.length === 0 ? (
+                <p className="px-3.5 py-3 text-sm text-slate-500">Ningún lote sale en los próximos {desplegado} días.</p>
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {lista.map(({ lote: l, fecha, dias }) => (
+                    <li key={l.id}>
+                      <button type="button" onClick={() => setSeleccionado(l.id)} className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left active:bg-slate-50">
+                        <span className="shrink-0 rounded-lg bg-sky-100 px-2 py-0.5 text-xs font-bold tabular-nums text-sky-800">{l.codigo || "Lote"}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-slate-900">Salida {formatoFecha(fecha, true)}</span>
+                          <span className="block truncate text-xs text-slate-500">
+                            Cerda {l.origen?.cerdaId} · {l.vivos} {l.vivos === 1 ? "animal" : "animales"}
+                          </span>
+                        </span>
+                        <span className={`shrink-0 text-xs font-semibold tabular-nums ${dias < 0 ? "text-rose-600" : dias <= 15 ? "text-amber-600" : "text-sky-700"}`}>
+                          {dias < 0 ? `Pasó hace ${-dias} d` : dias === 0 ? "Hoy" : `En ${dias} d`}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       <div className="relative">
