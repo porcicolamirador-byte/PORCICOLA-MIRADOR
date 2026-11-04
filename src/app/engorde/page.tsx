@@ -96,7 +96,7 @@ export default function EngordePage() {
   const nombresMadres = useMemo(() => (version < 0 ? new Map<string, string>() : new Map(leerCerdas().map((c) => [c.id, c.nombre ?? ""]))), [version]);
   const coincide = (l: Lote) =>
     !q ||
-    [l.codigo, l.nombre, l.origen?.cerdaId, l.origen?.codigoParto, l.origen ? nombresMadres.get(l.origen.cerdaId) : ""]
+    [l.codigo, l.nombre, l.origen?.cerdaId ?? CERDA_MANUAL, l.origen?.codigoParto, l.origen ? nombresMadres.get(l.origen.cerdaId) : ""]
       .filter(Boolean)
       .some((t) => String(t).toLowerCase().includes(q));
   const visibles = (lotes ?? []).filter((l) => (vista === "activos" ? l.activo : !l.activo) && coincide(l));
@@ -215,11 +215,9 @@ export default function EngordePage() {
                           </>
                         )}
                       </span>
-                      {l.origen && (
-                        <span className="block truncate text-[10px] text-slate-500">
-                          Cerda <b className="font-semibold text-slate-700">{l.origen.cerdaId}</b>
-                        </span>
-                      )}
+                      <span className="block truncate text-[10px] text-slate-500">
+                        Cerda <b className="font-semibold text-slate-700">{l.origen?.cerdaId ?? CERDA_MANUAL}</b>
+                      </span>
                       <span className="block truncate text-[10px] tabular-nums text-slate-500">
                         <b className="font-semibold text-slate-700">{l.vivos}</b> {l.vivos === 1 ? "animal" : "animales"}
                       </span>
@@ -242,9 +240,9 @@ export default function EngordePage() {
                       )}
                       <div className="min-w-0">
                       {l.nombre && l.nombre !== l.codigo && <p className="truncate font-semibold text-slate-900">{l.nombre}</p>}
-                      {l.origen && (
-                        <p className="truncate text-xs text-slate-500">🐖 De la cerda {l.origen.cerdaId} · parto automático</p>
-                      )}
+                      <p className="truncate text-xs text-slate-500">
+                        {l.origen ? `🐖 De la cerda ${l.origen.cerdaId} · parto automático` : `🐖 Cerda ${CERDA_MANUAL} · lote manual`}
+                      </p>
                       </div>
                     </div>
                     <span className="shrink-0 text-right text-xs leading-tight text-slate-500">
@@ -586,6 +584,9 @@ function NuevoLote({ abierta, onCerrar }: { abierta: boolean; onCerrar: () => vo
 
 type Accion = "resumen" | "pesaje" | "muerte" | "alimento" | "editarAlimento" | "corral" | "gasto";
 
+/** Cerda que se muestra en los lotes creados a mano (sin parto) */
+const CERDA_MANUAL = "0000";
+
 const ICONOS_ACCION: Record<Accion, string> = { resumen: "🐖", pesaje: "⚖️", muerte: "⚠️", alimento: "🥣", editarAlimento: "✏️", corral: "🏚️", gasto: "💊" };
 
 /** Espacio que muestra el corral guardado del lote */
@@ -855,7 +856,14 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
               </div>
             ) : null;
           })()}
-          <div className={`grid gap-1.5 ${lote.origen ? "grid-cols-2" : "grid-cols-1"}`}>
+          <div className="grid grid-cols-2 gap-1.5">
+            {!lote.origen && (
+              <div className="min-w-0 rounded-xl bg-white px-3 py-2 ring-1 ring-slate-200">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Madre</p>
+                <p className="truncate text-base font-bold tabular-nums text-slate-900">{CERDA_MANUAL}</p>
+                <p className="truncate text-xs text-slate-500">Lote manual</p>
+              </div>
+            )}
             {lote.origen && (
               <button
                 type="button"
