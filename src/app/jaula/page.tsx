@@ -7,7 +7,7 @@
  * La jaula queda guardada en la ficha de la cerda (campo "Jaula").
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import Modal from "@/components/Modal";
@@ -38,6 +38,7 @@ export default function JaulaPage() {
   const [jaulaSel, setJaulaSel] = useState<string | null>(null);
   const [elegida, setElegida] = useState("");
   const [trasladando, setTrasladando] = useState(false);
+  const toque = useRef<{ x: number; y: number } | null>(null);
   const [masOpciones, setMasOpciones] = useState(false);
   // Desde la ficha de una cerda: ?cerda=ID (&area=…&jaula=…) abre su jaula para cambiarla
   const [cerdaOrigen, setCerdaOrigen] = useState("");
@@ -151,9 +152,22 @@ export default function JaulaPage() {
 
   return (
     <ModuloPage titulo={cfg.titulo} subtitulo={`${c.ocupadas} de ${c.total} ocupadas`} tono="sky">
-      <button type="button" onClick={() => setArea(null)} className="-mt-1 self-start text-sm font-semibold text-sky-700 active:opacity-70">
-        ‹ Jaula
-      </button>
+      {/* Cambiar de área tocando aquí o deslizando la pantalla hacia el lado */}
+      <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1" role="tablist">
+        {(Object.keys(AREAS) as Area[]).map((a) => (
+          <button
+            key={a}
+            type="button"
+            role="tab"
+            aria-selected={area === a}
+            onClick={() => setArea(a)}
+            className={`rounded-xl py-2 text-sm font-semibold transition ${area === a ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+          >
+            {AREAS[a].titulo.replace("Área ", "")}
+          </button>
+        ))}
+      </div>
+      <p className="-mt-1 text-center text-[11px] text-slate-400">Desliza hacia el lado para cambiar de área</p>
       {cerdaOrigen && (
         <div className="flex items-center justify-between gap-2 rounded-2xl bg-amber-50 px-3.5 py-2.5 text-sm text-amber-900 ring-1 ring-amber-200">
           <span className="min-w-0">Ubicando la cerda <b className="arete-id">{cerdaOrigen}</b>: {area ? "toca la jaula donde va" : "elige el área"}.</span>
@@ -174,7 +188,24 @@ export default function JaulaPage() {
       </div>
 
       {/* Las filas van una al lado de la otra (como el pasillo de la granja) */}
-      <div className="grid grid-cols-2 gap-3">
+      <div
+        className="grid grid-cols-2 gap-3"
+        onTouchStart={(e) => {
+          const t = e.touches[0];
+          toque.current = { x: t.clientX, y: t.clientY };
+        }}
+        onTouchEnd={(e) => {
+          const ini = toque.current;
+          toque.current = null;
+          if (!ini) return;
+          const t = e.changedTouches[0];
+          const dx = t.clientX - ini.x;
+          const dy = t.clientY - ini.y;
+          // Deslizar claramente hacia el lado (no al hacer scroll)
+          if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+          setArea(dx < 0 ? "lactancia" : "gestacion");
+        }}
+      >
         {Array.from({ length: cfg.filas }, (_, f) => (
           <section key={f} className="rounded-3xl bg-white p-2.5 ring-1 ring-slate-200/80">
             <p className="mb-2 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Fila {f + 1}</p>
