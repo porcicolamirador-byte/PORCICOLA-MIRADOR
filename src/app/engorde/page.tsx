@@ -658,8 +658,15 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   // Productos de bodega: los que tienen existencia primero; sin existencia aparecen desactivados
   // Al editar, lo que ya se había descontado con este registro cuenta como disponible
   const inventario = esAlimento && !legado ? calcularInventario({ excluirSalida: registroEdit?.salidaId }) : [];
+  // Primero los alimentos de engorde en el orden de las etapas; luego los demás
+  const ORDEN_ENGORDE = ["PR-01", "IN-01", "ML-01", "MC-01"];
+  const posicion = (p: (typeof inventario)[number]) => {
+    const i = ORDEN_ENGORDE.indexOf(codigoDe(p.producto));
+    return i < 0 ? ORDEN_ENGORDE.length : i;
+  };
   const productos = [...inventario].sort(
     (a, b) =>
+      posicion(a) - posicion(b) ||
       Number(b.disponible > 0) - Number(a.disponible > 0) ||
       Number(b.producto.categoria === "Alimento") - Number(a.producto.categoria === "Alimento") ||
       a.producto.nombre.localeCompare(b.producto.nombre, "es"),
