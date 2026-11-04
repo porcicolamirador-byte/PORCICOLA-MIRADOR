@@ -1077,7 +1077,7 @@ function TarjetaConsumoCerdas() {
             <BloqueConsumo titulo="Alimento de lactancia" a={datos.lactancia} />
             {leerConfig().consumoCerdas.descontarGestacion && (
               <p className="rounded-xl bg-sky-50 px-3 py-2 text-[11px] leading-snug text-sky-800 ring-1 ring-sky-100">
-                Los dos alimentos se descuentan solos de la bodega cada día (salidas «Consumo automático»).
+                Los alimentos de producción descuentan automáticamente de bodega diariamente «salidas - Consumo automático».
               </p>
             )}
             <p className="px-1 text-[11px] leading-snug text-slate-500">
