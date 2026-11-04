@@ -36,6 +36,7 @@ export default function Home() {
         {/* Marca */}
         <section className="relative z-10 flex flex-1 flex-col items-center justify-center px-8">
           <div className="splash-logo logo-circulo">
+            <span className="splash-brillo relative block overflow-hidden rounded-full">
             <Image
               src="/images/logo.png"
               alt="Granja Porcícola El Mirador"
@@ -44,6 +45,7 @@ export default function Home() {
               priority
               className="h-auto w-[230px] sm:w-[290px]"
             />
+            </span>
           </div>
 
           <p className="splash-sub mt-1 text-center text-[13px] font-medium uppercase tracking-[0.22em] text-sky-900/60">
@@ -53,15 +55,25 @@ export default function Home() {
 
         {/* Progreso */}
         <section className="relative z-10 mx-auto w-full max-w-xs px-8 pb-10">
-          <div
-            className="h-1.5 w-full overflow-hidden rounded-full bg-sky-900/10"
-            role="progressbar"
-            aria-label="Cargando la aplicación"
-          >
-            <div
-              className="splash-bar h-full rounded-full bg-sky-700"
+          <div className="relative pt-9">
+            {/* El cerdito va saltando en la punta de la barra */}
+            <span
+              className="splash-cerdo pointer-events-none absolute top-0 block -translate-x-1/2"
               style={{ animationDuration: `${DURACION_CARGA}ms` }}
-            />
+              aria-hidden="true"
+            >
+              <span className="splash-salto block text-[28px] leading-none">🐷</span>
+            </span>
+            <div
+              className="h-1.5 w-full overflow-hidden rounded-full bg-sky-900/10"
+              role="progressbar"
+              aria-label="Cargando la aplicación"
+            >
+              <div
+                className="splash-bar h-full rounded-full bg-sky-700"
+                style={{ animationDuration: `${DURACION_CARGA}ms` }}
+              />
+            </div>
           </div>
 
           <p className="mt-8 text-center text-[11px] text-slate-400">
@@ -85,6 +97,36 @@ export default function Home() {
           animation-fill-mode: both;
         }
 
+        .splash-cerdo {
+          left: 0;
+          animation-name: splash-avanzar;
+          animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+          animation-fill-mode: both;
+        }
+        .splash-salto {
+          animation: splash-rebote 300ms ease-in-out infinite alternate;
+        }
+        .splash-brillo::after {
+          content: "";
+          position: absolute;
+          inset: -20%;
+          background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.75) 50%, transparent 60%);
+          transform: translateX(-120%);
+          animation: splash-destello 2.8s ease-in-out 600ms infinite;
+          pointer-events: none;
+        }
+        @keyframes splash-avanzar {
+          from { left: 0; }
+          to { left: 100%; }
+        }
+        @keyframes splash-rebote {
+          from { transform: translateY(0); }
+          to { transform: translateY(-7px) rotate(-6deg); }
+        }
+        @keyframes splash-destello {
+          0%, 20% { transform: translateX(-120%); }
+          65%, 100% { transform: translateX(120%); }
+        }
         @keyframes splash-rise {
           from {
             opacity: 0;
@@ -114,8 +156,13 @@ export default function Home() {
 
         @media (prefers-reduced-motion: reduce) {
           .splash-logo,
-          .splash-sub {
+          .splash-sub,
+          .splash-salto,
+          .splash-brillo::after {
             animation: none;
+          }
+          .splash-cerdo {
+            animation-duration: 1ms !important;
           }
           .splash-bar {
             animation-duration: 1ms !important;
