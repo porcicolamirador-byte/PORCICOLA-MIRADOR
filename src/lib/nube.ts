@@ -31,6 +31,8 @@ export interface PerfilNube {
   permisos: Partial<Record<PermisoNube, boolean>>;
   /** Granjas a las que entra (null o vacío de campo = todas, incluidas las nuevas) */
   granjas?: string[] | null;
+  /** Módulos del Dashboard desactivados para este usuario (vacío = todos activos) */
+  modulos_ocultos?: string[];
   /** Último cambio de PIN hecho por el administrador */
   pin_actualizado?: string | null;
   activo?: boolean;
@@ -247,7 +249,7 @@ export const crearUsuario = (datos: { usuario: string; nombre: string; pin: stri
 
 export const actualizarUsuario = (
   id: string,
-  cambios: Partial<Pick<PerfilNube, "nombre" | "rol" | "permisos" | "activo" | "granjas">> & { pin?: string },
+  cambios: Partial<Pick<PerfilNube, "nombre" | "rol" | "permisos" | "activo" | "granjas" | "modulos_ocultos">> & { pin?: string },
 ) => llamarFuncion<{ usuario: PerfilNube }>("usuarios", { accion: "actualizar", id, ...cambios }).then((r) => r.usuario);
 
 /** Borra un usuario para siempre (solo administrador). Sus registros se conservan. */

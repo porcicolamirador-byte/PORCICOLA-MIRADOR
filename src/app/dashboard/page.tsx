@@ -9,6 +9,7 @@ import { puedeCrearGranjas, puedeVerGranja } from "@/lib/nube";
 import { cambiarGranja, crearGranja, granjaActual, leerGranjas, nombreGranjaActual, sincronizar } from "@/lib/sincronizar";
 import { registrarLog } from "@/lib/log";
 import SummaryCard from "@/components/SummaryCard";
+import { useModulosOcultos } from "@/lib/modulos";
 import PageShell from "@/components/PageShell";
 import BottomNav from "@/components/BottomNav";
 import {
@@ -223,6 +224,7 @@ export default function Dashboard() {
   const router = useRouter();
 
   // Granja en uso (cada granja tiene sus propios datos)
+  const ocultos = useModulosOcultos();
   const [granjaNombre, setGranjaNombre] = useState("El Mirador");
   const [verGranjas, setVerGranjas] = useState(false);
   const [crearGranjaAbierto, setCrearGranjaAbierto] = useState(false);
@@ -297,7 +299,8 @@ export default function Dashboard() {
   ];
 
   const hayCriticas = cerdasCriticas.length > 0;
-  const [destacado, ...otrosModulos] = modulos;
+  // Solo los módulos activos para este usuario (Ajustes ocultos → Módulos del Dashboard)
+  const [destacado, ...otrosModulos] = modulos.filter((m) => !ocultos.includes(m.ruta));
 
   return (
     <PageShell bgColor={COLOR_PAGINA} className="flex flex-col">
@@ -389,6 +392,7 @@ export default function Dashboard() {
 
           <div className="grid grid-cols-2 gap-2.5">
             {/* Gestación: el módulo de uso diario ocupa todo el ancho */}
+            {destacado && (
             <button
               type="button"
               onClick={() => router.push(destacado.ruta)}
@@ -410,6 +414,7 @@ export default function Dashboard() {
                 </p>
               </div>
             </button>
+            )}
 
             {otrosModulos.map((modulo) => (
               <button

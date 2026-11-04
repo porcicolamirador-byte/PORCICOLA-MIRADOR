@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useModulosOcultos } from "@/lib/modulos";
 import PageShell from "@/components/PageShell";
 
 export const TONOS = {
@@ -39,6 +40,10 @@ export default function ModuloPage({
   children: ReactNode;
 }) {
   const router = useRouter();
+  const ruta = usePathname();
+  const ocultos = useModulosOcultos();
+  // Módulo desactivado para este usuario (en desarrollo): no se muestra su contenido
+  const bloqueado = ocultos.some((r) => ruta === r || ruta.startsWith(`${r}/`));
 
   return (
     <PageShell bgColor="#ffffff">
@@ -65,8 +70,14 @@ export default function ModuloPage({
           </div>
           {accion}
         </header>
+        {bloqueado && (
+          <div className="rounded-3xl bg-slate-50 px-5 py-8 text-center ring-1 ring-slate-200">
+            <p className="text-base font-semibold text-slate-900">Módulo no disponible</p>
+            <p className="mt-1 text-sm text-slate-500">Este módulo no está activo para tu usuario. Pídele al administrador que lo active.</p>
+          </div>
+        )}
 
-        {children}
+        {!bloqueado && children}
       </div>
     </PageShell>
   );

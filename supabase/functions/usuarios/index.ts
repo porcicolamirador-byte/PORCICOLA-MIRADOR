@@ -2,7 +2,7 @@
 // Acciones:
 //   { accion: "listar" }
 //   { accion: "crear", usuario, nombre, pin, rol?, permisos? }
-//   { accion: "actualizar", id, nombre?, rol?, permisos?, granjas?, activo?, pin? }   (granjas: null = todas)
+//   { accion: "actualizar", id, nombre?, rol?, permisos?, granjas?, modulos_ocultos?, activo?, pin? }   (granjas: null = todas)
 //   { accion: "eliminar", id }   → borra la cuenta para siempre (sus registros se conservan)
 //   { accion: "reiniciar", pin }  → borra TODOS los datos de la granja (no los usuarios); pide el PIN del administrador
 //   { accion: "yo" }   → perfil del usuario que llama (cualquier usuario activo)
@@ -12,6 +12,9 @@ const PERMISOS = ["eliminar", "bodega", "ajustes", "contabilidad"] as const;
 /** null = todas las granjas (incluidas las nuevas); lista = solo esas */
 const limpiarGranjas = (g: unknown): string[] | null =>
   Array.isArray(g) ? [...new Set(g.filter((x): x is string => typeof x === "string" && /^[a-z0-9]{1,40}$/i.test(x)))].slice(0, 50) : null;
+/** Rutas de módulos desactivados (vacío = todos activos) */
+const limpiarModulos = (m: unknown): string[] =>
+  Array.isArray(m) ? [...new Set(m.filter((x): x is string => typeof x === "string" && /^\/[a-z0-9-]{1,40}$/.test(x)))].slice(0, 40) : [];
 const limpiarPermisos = (p: unknown) => {
   const o = (p && typeof p === "object" ? p : {}) as Record<string, unknown>;
   return Object.fromEntries(PERMISOS.map((k) => [k, o[k] === true]));
@@ -40,7 +43,7 @@ Deno.serve(async (req) => {
 
   try {
     if (accion === "listar") {
-      const { data, error } = await admin.from("perfiles").select("id, usuario, nombre, rol, permisos, granjas, pin_actualizado, activo, creado_en").order("creado_en");
+      const { data, error } = await admin.from("perfiles").select("id, usuario, nombre, rol, permisos, granjas, modulos_ocultos, pin_actualizado, activo, creado_en").order("creado_en");
       if (error) throw error;
       return json({ usuarios: data });
     }
@@ -65,7 +68,7 @@ Deno.serve(async (req) => {
       const { data: perfil, error: e2 } = await admin
         .from("perfiles")
         .insert({ id: creado.user.id, usuario, nombre, rol, permisos: limpiarPermisos(cuerpo.permisos), granjas: limpiarGranjas(cuerpo.granjas), pin_actualizado: new Date().toISOString() })
-        .select("id, usuario, nombre, rol, permisos, granjas, pin_actualizado, activo, creado_en")
+        .select("id, usuario, nombre, rol, permisos, granjas, modulos_ocultos, pin_actualizado, activo, creado_en")
         .single();
       if (e2) {
         await admin.auth.admin.deleteUser(creado.user.id);
@@ -85,6 +88,7 @@ Deno.serve(async (req) => {
       if (cuerpo.permisos !== undefined) cambios.permisos = limpiarPermisos(cuerpo.permisos);
       if (typeof cuerpo.activo === "boolean") cambios.activo = cuerpo.activo;
       if (cuerpo.granjas !== undefined) cambios.granjas = limpiarGranjas(cuerpo.granjas);
+      if (cuerpo.modulos_ocultos !== undefined) cambios.modulos_ocultos = limpiarModulos(cuerpo.modulos_ocultos);
 
       // El administrador no puede quitarse a sí mismo el rol ni desactivarse (quedaría sin acceso)
       if (id === yo.id && (cambios.rol === "trabajador" || cambios.activo === false)) {
@@ -105,7 +109,7 @@ Deno.serve(async (req) => {
         .from("perfiles")
         .update(cambios)
         .eq("id", id)
-        .select("id, usuario, nombre, rol, permisos, granjas, pin_actualizado, activo, creado_en")
+        .select("id, usuario, nombre, rol, permisos, granjas, modulos_ocultos, pin_actualizado, activo, creado_en")
         .single();
       if (error) throw error;
 
