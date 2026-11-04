@@ -347,7 +347,7 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
           </Campo>
         )}
         <Campo etiqueta="Descripción">
-          <Entrada value={descripcion} onChange={setDescripcion} placeholder="Dato" />
+          <Entrada value={descripcion} onChange={setDescripcion} />
         </Campo>
         <div className="grid grid-cols-2 gap-3">
           <Campo etiqueta="Valor *">

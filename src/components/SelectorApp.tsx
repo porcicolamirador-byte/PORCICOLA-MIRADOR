@@ -80,8 +80,8 @@ export default function SelectorApp({
   );
 }
 
-const FILA = 38;
-const VISIBLES = 5;
+const FILA = 30;
+const VISIBLES = 7;
 
 /**
  * Rueda para deslizar con el dedo entre las opciones (como la del iPhone):

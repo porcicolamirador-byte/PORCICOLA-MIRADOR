@@ -770,7 +770,7 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
           )}
           {destino === "otro" && (
             <Campo etiqueta="Nota">
-              <Entrada value={nota} onChange={setNota} placeholder="Dato" />
+              <Entrada value={nota} onChange={setNota} />
             </Campo>
           )}
           {destino && destino !== "otro" && num(cantidad) > 0 && kgDeCantidad(num(cantidad), p.unidad, p.kgPorUnidad) > 0 && (
@@ -1224,14 +1224,14 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
       {nuevo ? (
         <form onSubmit={guardar} className="flex flex-col gap-3.5">
           <Campo etiqueta="Producto o servicio">
-            <Entrada value={descripcion} onChange={(v) => setDescripcion(v.slice(0, 80))} placeholder="Dato" required />
+            <Entrada value={descripcion} onChange={(v) => setDescripcion(v.slice(0, 80))} required />
           </Campo>
           <div className="grid grid-cols-2 gap-3">
             <Campo etiqueta="Cantidad">
-              <Entrada value={cantidad} onChange={(v) => setCantidad(v.slice(0, 40))} placeholder="Dato" />
+              <Entrada value={cantidad} onChange={(v) => setCantidad(v.slice(0, 40))} />
             </Campo>
             <Campo etiqueta="Valor total">
-              <EntradaPesos value={valor} onChange={setValor} placeholder="Dato" required />
+              <EntradaPesos value={valor} onChange={setValor} required />
             </Campo>
           </div>
           <div className="grid grid-cols-2 gap-3">

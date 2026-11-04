@@ -387,7 +387,7 @@ export function SeccionDesplegable({
 export function EntradaPesos({
   value,
   onChange,
-  placeholder = "0",
+  placeholder = "",
   required,
 }: {
   value: string;

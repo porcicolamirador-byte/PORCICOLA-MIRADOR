@@ -1078,7 +1078,7 @@ export default function Gestacion() {
             </div>
             {raza === "OTRA" && (
               <Campo etiqueta="¿Cuál raza?">
-                <input type="text" placeholder="Dato" value={otraRaza} onChange={(e) => setOtraRaza(e.target.value)} className="block w-full min-w-0 max-w-full appearance-none rounded-xl bg-slate-50 px-3.5 py-2.5 text-base text-slate-900 ring-1 ring-slate-200 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-600" />
+                <input type="text" value={otraRaza} onChange={(e) => setOtraRaza(e.target.value)} className="block w-full min-w-0 max-w-full appearance-none rounded-xl bg-slate-50 px-3.5 py-2.5 text-base text-slate-900 ring-1 ring-slate-200 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-600" />
               </Campo>
             )}
             {(idError || razaError) && <p className="-mt-2 text-[13px] text-red-600">{idError || razaError}</p>}
