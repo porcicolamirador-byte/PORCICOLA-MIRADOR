@@ -71,15 +71,8 @@ export default function ContabilidadPage() {
         .filter((m) => m.tipo === "gasto")
         .reduce<Record<string, number>>((acc, m) => ({ ...acc, [m.categoria]: (acc[m.categoria] ?? 0) + m.monto }), {})
     ).sort((a, b) => b[1] - a[1]);
-    // Saldo a crédito de las facturas y gastos del mes (aún sin pagar): resta del balance
-    const credito =
-      leerFacturas()
-        .filter((f) => f.pago === "credito" && f.fecha.slice(0, 7) === mes)
-        .reduce((t, f) => t + saldoFactura(f), 0) +
-      leerCuentasPorPagar()
-        .filter((c) => c.fecha.slice(0, 7) === mes)
-        .reduce((t, c) => t + saldoCuenta(c), 0);
-    return { movs, ingresos, gastos, porCategoria, credito };
+    // Lo comprado a crédito no cuenta hasta que se paga: cada abono entra como gasto
+    return { movs, ingresos, gastos, porCategoria };
   }, [version, mes]);
 
   const eliminar = async (id: string) => {
@@ -164,7 +157,7 @@ export default function ContabilidadPage() {
     guardarMovimientos(leerMovimientos().filter((m) => m.id !== id));
   };
 
-  const balance = datos ? datos.ingresos - datos.gastos - datos.credito : 0;
+  const balance = datos ? datos.ingresos - datos.gastos : 0;
 
   // Solo el administrador o quien tenga el permiso ve la contabilidad
   if (version >= 0 && !puede("contabilidad")) {
