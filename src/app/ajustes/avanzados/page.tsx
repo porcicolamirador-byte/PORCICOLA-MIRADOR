@@ -1,5 +1,6 @@
 "use client";
 
+import SelectorApp from "@/components/SelectorApp";
 import { leerLog } from "@/lib/log";
 import { borrarTodoLocal } from "@/lib/sincronizar";
 import { consumoNube, ErrorNube, perfilGuardado, reiniciarBaseNube, type ConsumoNube } from "@/lib/nube";
@@ -680,33 +681,23 @@ function Alimentacion({
               {(() => {
                 const libres = catalogo.filter(([c]) => !unidos[clave].includes(c));
                 return (
-                  <div className="relative">
-                    <select
-                      value=""
-                      onChange={(e) => e.target.value && alternarCodigo(clave, e.target.value)}
-                      disabled={libres.length === 0}
-                      aria-label={`Unir producto a ${nombre}`}
-                      className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-3 pr-9 text-sm text-slate-600 outline-none focus:ring-2 focus:ring-sky-200 disabled:opacity-60"
-                    >
-                      <option value="">
-                        {catalogo.length === 0
-                          ? "No hay productos con código"
-                          : libres.length === 0
-                            ? "Todos los productos están unidos"
-                            : unidos[clave].length
-                              ? "Agregar otro producto…"
-                              : "Unir producto de bodega…"}
-                      </option>
-                      {libres.map(([c, n]) => (
-                        <option key={c} value={c}>
-                          {c} · {n}
-                        </option>
-                      ))}
-                    </select>
-                    <svg viewBox="0 0 20 20" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M5 8l5 5 5-5" />
-                    </svg>
-                  </div>
+                  <SelectorApp
+                    valor=""
+                    onCambiar={(v) => v && alternarCodigo(clave, v)}
+                    deshabilitado={libres.length === 0}
+                    titulo={`Unir producto a ${nombre}`}
+                    placeholder={
+                      catalogo.length === 0
+                        ? "No hay productos con código"
+                        : libres.length === 0
+                          ? "Todos los productos están unidos"
+                          : unidos[clave].length
+                            ? "Agregar otro producto…"
+                            : "Unir producto de bodega…"
+                    }
+                    opciones={libres.map(([c, n]) => ({ valor: c, texto: `${c} · ${n}` }))}
+                    className="w-full"
+                  />
                 );
               })()}
             </div>
@@ -874,26 +865,19 @@ function ConsumoCerdasAjuste({ actual, onGuardar }: { actual: ConsumoCerdas; onG
   );
 
   const selector = (k: "codigoGestacion" | "codigoLactancia", etiqueta: string) => (
-    <label className="flex items-center gap-3 px-3.5 py-2">
+    <div className="flex items-center gap-3 px-3.5 py-2">
       <span className="w-20 shrink-0 text-xs font-medium text-slate-500">{etiqueta}</span>
-      <span className="relative min-w-0 flex-1">
-        <select
-          value={codigos[k]}
-          onChange={(e) => setCodigos((c) => ({ ...c, [k]: e.target.value }))}
-          className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-3 pr-9 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-sky-200"
-        >
-          {!catalogo.some(([c]) => c === codigos[k]) && <option value={codigos[k]}>{codigos[k]} · sin producto en bodega</option>}
-          {catalogo.map(([c, n]) => (
-            <option key={c} value={c}>
-              {c} · {n}
-            </option>
-          ))}
-        </select>
-        <svg viewBox="0 0 20 20" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M5 8l5 5 5-5" />
-        </svg>
-      </span>
-    </label>
+      <SelectorApp
+        valor={codigos[k]}
+        onCambiar={(v) => setCodigos((c) => ({ ...c, [k]: v }))}
+        titulo={`Alimento de ${etiqueta.toLowerCase()}`}
+        opciones={[
+          ...(catalogo.some(([c]) => c === codigos[k]) ? [] : [{ valor: codigos[k], texto: `${codigos[k]} · sin producto en bodega` }]),
+          ...catalogo.map(([c, n]) => ({ valor: c, texto: `${c} · ${n}` })),
+        ]}
+        className="flex-1"
+      />
+    </div>
   );
 
   const titulo = "-mb-1 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400";

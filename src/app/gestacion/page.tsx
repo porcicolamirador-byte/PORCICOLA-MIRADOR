@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState, type TouchEvent } from "react";
 import { useRouter } from "next/navigation";
 import PageShell from "@/components/PageShell";
 import Modal from "@/components/Modal";
-import { Boton, Campo } from "@/components/ui";
+import { Boton, Campo, Selector } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
 import { puede } from "@/lib/nube";
 import { leerConfig } from "@/lib/config";
@@ -1068,12 +1068,12 @@ export default function Gestacion() {
                 />
               </Campo>
               <Campo etiqueta="Raza">
-                <select value={raza} onChange={(e) => setRaza(e.target.value)} className="block w-full min-w-0 max-w-full appearance-none rounded-xl bg-slate-50 px-3.5 py-2.5 text-base text-slate-900 ring-1 ring-slate-200 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-600">
-                  {RAZAS.map((r) => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                  <option value="OTRA">Otra</option>
-                </select>
+                <Selector
+                  value={raza}
+                  onChange={setRaza}
+                  titulo="Raza"
+                  opciones={[...RAZAS.map((r) => ({ valor: r, texto: r })), { valor: "OTRA", texto: "Otra" }]}
+                />
               </Campo>
             </div>
             {raza === "OTRA" && (

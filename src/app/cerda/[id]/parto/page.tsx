@@ -1,5 +1,7 @@
 "use client";
 
+import { CLASE_SELECTOR } from "@/components/ui";
+import SelectorApp from "@/components/SelectorApp";
 import { guardarConRegistro } from "@/lib/log";
 import { useEffect, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -212,9 +214,7 @@ export default function RegistrarParto() {
                 <input type="time" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} className={`${inputBase} appearance-none`} />
               </Campo>
               <Campo etiqueta="Tipo de parto">
-                <select value={tipoParto} onChange={(e) => setTipoParto(e.target.value)} className={inputBase}>
-                  {TIPOS_PARTO.map((t) => <option key={t}>{t}</option>)}
-                </select>
+                <SelectorApp valor={tipoParto} onCambiar={setTipoParto} titulo="Tipo de parto" opciones={TIPOS_PARTO.map((t) => ({ valor: t, texto: t }))} className="w-full" claseBoton={CLASE_SELECTOR} />
               </Campo>
               <Campo etiqueta="Asistido por">
                 <input value={asistidoPor} onChange={(e) => setAsistidoPor(e.target.value)} placeholder="Nombre" className={inputBase} />
@@ -278,9 +278,7 @@ export default function RegistrarParto() {
                   onChange={(e) => setPesoCerda(e.target.value.replace(/[^0-9.,]/g, ""))} className={inputBase} />
               </Campo>
               <Campo etiqueta="Estado de salud">
-                <select value={estadoSalud} onChange={(e) => setEstadoSalud(e.target.value)} className={inputBase}>
-                  {ESTADOS_SALUD.map((t) => <option key={t}>{t}</option>)}
-                </select>
+                <SelectorApp valor={estadoSalud} onCambiar={setEstadoSalud} titulo="Estado de salud" opciones={ESTADOS_SALUD.map((t) => ({ valor: t, texto: t }))} className="w-full" claseBoton={CLASE_SELECTOR} />
               </Campo>
             </div>
             <div className="mt-3">

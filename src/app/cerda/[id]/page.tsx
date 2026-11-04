@@ -1,5 +1,6 @@
 "use client";
 
+import SelectorApp from "@/components/SelectorApp";
 import { borrarConRegistro, guardarConRegistro } from "@/lib/log";
 import { useEffect, useRef, useState, type TouchEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -1095,20 +1096,14 @@ export default function CerdaDetalle() {
                 {/* TIPO */}
                 <div>
                   <label className="text-sm text-gray-600 font-medium">Tipo de registro</label>
-                  <select
-                    value={tipo}
-                    onChange={(e) => setTipo(e.target.value)}
-                    className="w-full max-w-[320px] mt-1 px-4 py-2 rounded-2xl bg-gray-100 border border-gray-300 text-black outline-none box-border"
-                  >
-                    <option>Inseminación</option>
-                    <option>Celo</option>
-                    <option>Parto</option>
-                    <option>Destete</option>
-                    <option>Aborto</option>
-                    <option>Baja</option>
-                    <option>Tratamiento</option>
-                    <option>Evento</option>
-                  </select>
+                  <SelectorApp
+                    valor={tipo}
+                    onCambiar={setTipo}
+                    titulo="Tipo de registro"
+                    opciones={["Inseminación", "Celo", "Parto", "Destete", "Aborto", "Baja", "Tratamiento", "Evento"].map((t) => ({ valor: t, texto: t }))}
+                    className="w-full max-w-[320px]"
+                    claseBoton={"mt-1 rounded-2xl bg-gray-100 border border-gray-300 px-4 py-2 text-base text-black"}
+                  />
                 </div>
 
                 {/* FECHA */}
@@ -1127,17 +1122,15 @@ export default function CerdaDetalle() {
                 {tipo === "Inseminación" && (
                   <div>
                     <label className="block text-sm text-gray-600 font-medium">Genética *</label>
-                    <select
-                      value={tipoGenetica}
-                      onChange={(e) => setTipoGenetica(e.target.value)}
-                      className="w-full max-w-[320px] mt-1 px-4 py-2 rounded-2xl bg-gray-100 border border-gray-300 text-black outline-none box-border"
-                    >
-                      <option value="">Selecciona la genética</option>
-                      {GENETICAS.map((g) => (
-                        <option key={g} value={g}>{g}</option>
-                      ))}
-                      <option value="OTRA">Otro…</option>
-                    </select>
+                    <SelectorApp
+                      valor={tipoGenetica}
+                      onCambiar={setTipoGenetica}
+                      titulo="Genética"
+                      placeholder="Selecciona la genética"
+                      opciones={[...GENETICAS.map((g) => ({ valor: g, texto: g })), { valor: "OTRA", texto: "Otro…" }]}
+                      className="w-full max-w-[320px]"
+                      claseBoton={"mt-1 rounded-2xl bg-gray-100 border border-gray-300 px-4 py-2 text-base text-black"}
+                    />
                     {tipoGenetica === "OTRA" && (
                       <input
                         type="text"
