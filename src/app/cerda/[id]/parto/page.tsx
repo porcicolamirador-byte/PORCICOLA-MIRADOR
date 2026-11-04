@@ -82,8 +82,7 @@ export default function RegistrarParto() {
   const [vivos, setVivos] = useState("");
   const [muertos, setMuertos] = useState("");
   const [momias, setMomias] = useState("");
-  const [pesoPromedio, setPesoPromedio] = useState("");
-  const [raza, setRaza] = useState("");
+  const [pesoPromedio, setPesoPromedio] = useState("1.25");
   const [pesoCerda, setPesoCerda] = useState("");
   const [estadoSalud, setEstadoSalud] = useState("Buena");
   const [observaciones, setObservaciones] = useState("");
@@ -141,7 +140,6 @@ export default function RegistrarParto() {
       muertos: nMuertos,
       momias: nMomias,
       pesoPromedio: aNumero(pesoPromedio) ?? undefined,
-      raza: raza.trim() || undefined,
       // Genética de la inseminación de esta camada (no se cambia aquí)
       genetica: (ultimaInseminacion as { genetica?: string } | undefined)?.genetica || undefined,
       pesoCerda: aNumero(pesoCerda) ?? undefined,
@@ -248,7 +246,7 @@ export default function RegistrarParto() {
             )}
             <div className="mt-3 grid grid-cols-2 gap-3">
               <Campo etiqueta="Peso promedio (kg)">
-                <input type="tel" inputMode="decimal" value={pesoPromedio} placeholder="Ej: 1.4"
+                <input type="tel" inputMode="decimal" value={pesoPromedio} placeholder="1.25"
                   onChange={(e) => setPesoPromedio(e.target.value.replace(/[^0-9.,]/g, ""))} className={inputBase} />
               </Campo>
               <div className="col-span-2">
@@ -258,9 +256,6 @@ export default function RegistrarParto() {
                   </div>
                 </Campo>
               </div>
-              <Campo etiqueta="Raza / cruce">
-                <input value={raza} onChange={(e) => setRaza(e.target.value)} placeholder="Ej: Pietrain x Camborough" className={inputBase} />
-              </Campo>
             </div>
             <div className="mt-3">
               <Campo etiqueta="Observaciones de los lechones">
