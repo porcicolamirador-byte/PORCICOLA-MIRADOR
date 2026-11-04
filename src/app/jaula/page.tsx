@@ -34,7 +34,7 @@ const COLOR_ESTADO: Record<string, string> = {
 export default function JaulaPage() {
   const router = useRouter();
   const version = useVersionDatos();
-  const [area, setArea] = useState<Area | null>(null);
+  const [area, setArea] = useState<Area | null>("gestacion");
   const [jaulaSel, setJaulaSel] = useState<string | null>(null);
   const [elegida, setElegida] = useState("");
   const [trasladando, setTrasladando] = useState(false);
