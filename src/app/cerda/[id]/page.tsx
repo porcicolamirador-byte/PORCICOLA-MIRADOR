@@ -4,7 +4,7 @@ import Emoji from "@/components/Emoji";
 import SelectorApp from "@/components/SelectorApp";
 import Modal from "@/components/Modal";
 import { generarPdfParto } from "@/lib/pdfParto";
-import { nombreGranjaActual } from "@/lib/sincronizar";
+import { CLAVE_JAULAS, granjaActual, nombreGranjaActual } from "@/lib/sincronizar";
 import { borrarConRegistro, guardarConRegistro } from "@/lib/log";
 import { useEffect, useRef, useState, type TouchEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -158,6 +158,19 @@ function tituloMes(clave: string): string {
 
 /** Genéticas para la inseminación (con "Otro…" se escribe a mano) */
 const GENETICAS = ["PIC 410 SUP", "PIC 410 TOP", "PIC 337 SUP", "PIC 337 TOP", "DUROC", "PIC L02", "PIC L03"];
+
+/** Jaula de la cerda según el mapa común de jaulas (igual en todas las granjas); si no, la de su ficha */
+function jaulaDeCerda(cerda: { id: string; jaula?: unknown }): string {
+  try {
+    const mapa = JSON.parse(localStorage.getItem(CLAVE_JAULAS) || "[]") as { id: string; cerdaId: string; granja: string }[];
+    const e = Array.isArray(mapa) ? mapa.find((x) => x && x.cerdaId === cerda.id && x.granja === granjaActual()) : undefined;
+    if (e) return e.id;
+    if (Array.isArray(mapa) && mapa.length) return "";
+  } catch {
+    // sin mapa
+  }
+  return String(cerda.jaula || "");
+}
 
 export default function CerdaDetalle() {
   const params = useParams<{ id: string }>();
@@ -604,7 +617,7 @@ export default function CerdaDetalle() {
     { icono: "🧬", etiqueta: "Raza", valor: cerda.raza || "–" },
     { icono: "📅", etiqueta: "Fecha de llegada", valor: cerda.fecha ? formatearFechaCorta(cerda.fecha) : "–" },
     { icono: "⚖️", etiqueta: "Peso de llegada", valor: cerda.peso ? `${cerda.peso} kg` : "–" },
-    { icono: "🧱", etiqueta: "Jaula", valor: cerda.jaula || "–" },
+    { icono: "🧱", etiqueta: "Jaula", valor: jaulaDeCerda(cerda) || "–" },
     { icono: "⏱️", etiqueta: "Tiempo en la granja", valor: cerda.fecha ? calcularEdadLlegada(cerda.fecha) : "–" },
   ];
 
@@ -845,7 +858,7 @@ export default function CerdaDetalle() {
             <button
               type="button"
               onClick={() => {
-                const j = String(cerda.jaula || "").trim().toUpperCase();
+                const j = jaulaDeCerda(cerda).trim().toUpperCase();
                 const area = j.startsWith("L-") ? "lactancia" : j.startsWith("G-") ? "gestacion" : "";
                 const q = new URLSearchParams({ cerda: String(cerda.id) });
                 if (area) {
@@ -861,7 +874,7 @@ export default function CerdaDetalle() {
                 <div className="text-[11px] text-gray-600">Jaula</div>
               </div>
               <div className="flex items-center gap-1 text-sm font-bold">
-                {cerda.jaula || "Ubicar"}
+                {jaulaDeCerda(cerda) || "Ubicar"}
                 <span className="text-sky-700" aria-hidden="true">›</span>
               </div>
             </button>

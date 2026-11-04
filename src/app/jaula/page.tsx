@@ -14,7 +14,9 @@ import Modal from "@/components/Modal";
 import SelectorApp from "@/components/SelectorApp";
 import { Boton } from "@/components/ui";
 import { JAULAS_POR_DEFECTO, leerConfig, type ConfigJaulas } from "@/lib/config";
-import { estadoDeCerda, guardarCerdas, leerCerdas, leerHistorial, useVersionDatos } from "@/lib/datos";
+import { estadoDeCerda, guardarCerdas, leerCerdas, leerHistorial, notificarCambio, useVersionDatos } from "@/lib/datos";
+import { CLAVE_JAULAS, granjaActual, leerGranjas, nombreGranjaActual } from "@/lib/sincronizar";
+import { guardarConRegistro } from "@/lib/log";
 
 type Area = "gestacion" | "lactancia";
 
@@ -35,6 +37,37 @@ const areasDe = (j: ConfigJaulas): Record<Area, ConfigArea> => ({
     filas: j.lactancia.filas,
     descripcion: `${j.lactancia.filas} ${j.lactancia.filas === 1 ? "fila" : "filas"} de ${j.lactancia.porFila} parideras`,
   },
+});
+
+/** Ocupante de una jaula (de esta granja o de otra) */
+type Ocupante = { c: { id: string; jaula?: unknown }; estado: string; granja: string; granjaNombre: string; propia: boolean };
+/** Entrada del mapa común: id = código de la jaula */
+interface EntradaMapa {
+  id: string;
+  cerdaId: string;
+  granja: string;
+  granjaNombre: string;
+  estado: string;
+  fecha: string;
+}
+function leerMapa(): EntradaMapa[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(CLAVE_JAULAS) || "[]");
+    return Array.isArray(v) ? v.filter((e) => e && typeof e.id === "string" && typeof e.cerdaId === "string") : [];
+  } catch {
+    return [];
+  }
+}
+const guardarMapa = (m: EntradaMapa[]) => {
+  guardarConRegistro(CLAVE_JAULAS, m);
+};
+const entradaMapa = (jaula: string, cerdaId: string, granja: string, estado: string): EntradaMapa => ({
+  id: jaula,
+  cerdaId,
+  granja,
+  granjaNombre: leerGranjas().find((g) => g.id === granja)?.nombre ?? granja,
+  estado,
+  fecha: new Date().toISOString(),
 });
 
 const codigoJaula = (prefijo: string, n: number) => `${prefijo}-${String(n).padStart(2, "0")}`;
@@ -72,23 +105,58 @@ export default function JaulaPage() {
   const AREAS = useMemo(() => areasDe(version >= 0 ? leerConfig().jaulas : JAULAS_POR_DEFECTO), [version]);
   const datos = useMemo(() => {
     if (version < 0) return null;
+    const granja = granjaActual();
     const cerdas = leerCerdas()
-      .map((c) => ({ c, estado: estadoDeCerda(leerHistorial(c.id)) }))
+      .map((c) => ({ c, estado: estadoDeCerda(leerHistorial(c.id)) as string, granja, granjaNombre: nombreGranjaActual(), propia: true }))
       .filter((x) => x.estado !== "Fuera del hato");
-    const porJaula = new Map<string, (typeof cerdas)[number]>();
-    for (const x of cerdas) {
-      const j = String(x.c.jaula ?? "").trim().toUpperCase();
-      if (j) porJaula.set(j, x);
+    const mapa = leerMapa();
+    const propias = new Map(cerdas.map((x) => [x.c.id, x]));
+    // El mapa es común a todas las granjas: las cerdas de otras granjas se muestran con lo guardado al ubicarlas
+    const porJaula = new Map<string, Ocupante>();
+    const jaulaDe = new Map<string, string>();
+    for (const e of mapa) {
+      if (e.granja === granja) {
+        const x = propias.get(e.cerdaId);
+        if (!x) continue; // cerda eliminada o dada de baja: la jaula queda libre
+        porJaula.set(e.id, x);
+        jaulaDe.set(e.cerdaId, e.id);
+      } else {
+        porJaula.set(e.id, { c: { id: e.cerdaId }, estado: e.estado || "", granja: e.granja, granjaNombre: e.granjaNombre || "otra granja", propia: false });
+      }
     }
-    return { cerdas, porJaula };
+    return { cerdas, porJaula, jaulaDe, granja };
   }, [version]);
 
-  // Cerdas activas sin una jaula válida de gestación o lactancia
+  // Una sola vez por cambio: pasa al mapa común las jaulas que ya tenían las cerdas en su ficha,
+  // y quita del mapa las cerdas de esta granja que ya no están
+  useEffect(() => {
+    if (!datos) return;
+    const mapa = leerMapa();
+    const granja = datos.granja;
+    const ids = new Set(datos.cerdas.map((x) => x.c.id));
+    let cambio = false;
+    let nuevo = mapa.filter((e) => {
+      const queda = e.granja !== granja || ids.has(e.cerdaId);
+      if (!queda) cambio = true;
+      return queda;
+    });
+    for (const x of datos.cerdas) {
+      const j = String(x.c.jaula ?? "").trim().toUpperCase();
+      if (!j || !/^[GL]-\d{2}$/.test(j)) continue;
+      if (nuevo.some((e) => e.granja === granja && e.cerdaId === x.c.id)) continue;
+      if (nuevo.some((e) => e.id === j)) continue;
+      nuevo = [...nuevo, entradaMapa(j, x.c.id, granja, x.estado)];
+      cambio = true;
+    }
+    if (cambio) guardarMapa(nuevo);
+  }, [datos]);
+
+  // Cerdas activas de esta granja sin una jaula válida de gestación o lactancia
   const codigosValidos = new Set(
     (Object.keys(AREAS) as Area[]).flatMap((a) => Array.from({ length: AREAS[a].porFila * AREAS[a].filas }, (_, i) => codigoJaula(AREAS[a].prefijo, i + 1)))
   );
   const sinJaula = (datos?.cerdas ?? [])
-    .filter((x) => !codigosValidos.has(String(x.c.jaula ?? "").trim().toUpperCase()))
+    .filter((x) => !codigosValidos.has(datos?.jaulaDe.get(x.c.id) ?? ""))
     .sort((a, b) => String(a.c.id).localeCompare(String(b.c.id), "es", { numeric: true }));
 
   const conteo = (a: Area) => {
@@ -98,15 +166,39 @@ export default function JaulaPage() {
     return { ocupadas, total: cfg.porFila * cfg.filas };
   };
 
-  /** Ubica la cerda en la jaula (una cerda por jaula: si estaba en otra, se mueve) */
-  const asignar = (jaula: string, cerdaId: string | null) => {
-    const lista = leerCerdas().map((c) => {
+  /**
+   * Ubica una cerda en la jaula (una cerda por jaula: si estaba en otra, se mueve).
+   * cerdaId null = desocupar. "granjaCerda" permite mover una cerda de otra granja.
+   */
+  const asignar = (jaula: string, cerdaId: string | null, granjaCerda = granjaActual()) => {
+    const granja = granjaActual();
+    const anterior = leerMapa().find((e) => e.id === jaula);
+    let mapa = leerMapa().filter((e) => e.id !== jaula && !(cerdaId && e.granja === granjaCerda && e.cerdaId === cerdaId));
+    if (cerdaId) {
+      const propia = granjaCerda === granja;
+      const estado = propia ? datos?.cerdas.find((x) => x.c.id === cerdaId)?.estado ?? "" : (leerMapa().find((e) => e.cerdaId === cerdaId && e.granja === granjaCerda)?.estado ?? "");
+      const e = entradaMapa(jaula, cerdaId, granjaCerda, estado);
+      if (!propia) e.granjaNombre = leerMapa().find((x) => x.cerdaId === cerdaId && x.granja === granjaCerda)?.granjaNombre ?? e.granjaNombre;
+      mapa = [...mapa, e];
+    }
+    guardarMapa(mapa);
+    // En la ficha de las cerdas de esta granja también queda la jaula
+    const fichas = leerCerdas();
+    let cambia = false;
+    const nuevas = fichas.map((c) => {
       const actual = String(c.jaula ?? "").trim().toUpperCase();
-      if (c.id === cerdaId) return { ...c, jaula };
-      if (actual === jaula) return { ...c, jaula: "" };
+      if (cerdaId && granjaCerda === granja && c.id === cerdaId) {
+        if (actual !== jaula) cambia = true;
+        return { ...c, jaula };
+      }
+      if (actual === jaula || (!cerdaId && anterior?.granja === granja && c.id === anterior.cerdaId)) {
+        if (actual) cambia = true;
+        return { ...c, jaula: "" };
+      }
       return c;
     });
-    guardarCerdas(lista);
+    if (cambia) guardarCerdas(nuevas);
+    else notificarCambio();
     // La cerda que se estaba ubicando ya quedó en su jaula
     if (cerdaId && cerdaId === cerdaOrigen) setCerdaOrigen("");
   };
@@ -174,8 +266,8 @@ export default function JaulaPage() {
   // Cerdas que se pueden ubicar: primero las que no tienen jaula
   const opciones = (datos?.cerdas ?? [])
     .filter((x) => x.c.id !== ocupante?.c.id)
-    .sort((a, b) => Number(Boolean(a.c.jaula)) - Number(Boolean(b.c.jaula)) || String(a.c.id).localeCompare(String(b.c.id), "es", { numeric: true }))
-    .map((x) => ({ valor: x.c.id, texto: `${x.c.id} · ${x.estado}${x.c.jaula ? ` · en ${x.c.jaula}` : ""}` }));
+    .sort((a, b) => Number(datos?.jaulaDe.has(a.c.id)) - Number(datos?.jaulaDe.has(b.c.id)) || String(a.c.id).localeCompare(String(b.c.id), "es", { numeric: true }))
+    .map((x) => ({ valor: x.c.id, texto: `${x.c.id} · ${x.estado}${datos?.jaulaDe.get(x.c.id) ? ` · en ${datos?.jaulaDe.get(x.c.id)}` : ""}` }));
 
   return (
     <ModuloPage titulo={cfg.titulo} subtitulo={`${c.ocupadas} de ${c.total} ocupadas`} tono="sky">
@@ -293,6 +385,7 @@ export default function JaulaPage() {
                         <span className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
                           <span className={`arete-id truncate font-black tabular-nums text-amber-950 ${grande ? "text-xl" : "text-sm"}`}>{x.c.id}</span>
                           <span className={`h-2 w-2 shrink-0 rounded-full ${color}`} aria-label={x.estado} />
+                          {!x.propia && <span className="sr-only">{x.granjaNombre}</span>}
                         </span>
                       ) : (
                         <span className={`flex-1 text-right text-slate-300 ${grande ? "text-sm" : "text-[11px]"}`}>Libre</span>
@@ -313,13 +406,17 @@ export default function JaulaPage() {
         const destinos = Array.from({ length: cfgOtra.porFila * cfgOtra.filas }, (_, i) => codigoJaula(cfgOtra.prefijo, i + 1));
         const libres = destinos.filter((j) => !datos?.porJaula.has(j));
         return (
-          <Modal abierta etiqueta={cfg.titulo} titulo={`Jaula ${jaulaSel}`} subtitulo={ocupante ? `Cerda ${ocupante.c.id} · ${ocupante.estado}` : "Libre"} onCerrar={() => setJaulaSel(null)}>
+          <Modal abierta etiqueta={cfg.titulo} titulo={`Jaula ${jaulaSel}`} subtitulo={ocupante ? `Cerda ${ocupante.c.id}${ocupante.estado ? ` · ${ocupante.estado}` : ""}${ocupante.propia ? "" : ` · ${ocupante.granjaNombre}`}` : "Libre"} onCerrar={() => setJaulaSel(null)}>
             {ocupante ? (
               <div className="flex flex-col gap-3">
                 {!trasladando ? (
                   <div className="grid grid-cols-2 gap-2">
-                    <Boton variante="secundario" onClick={() => router.push(`/cerda/${encodeURIComponent(ocupante.c.id)}`)}>
-                      Ver cerda
+                    <Boton
+                      variante="secundario"
+                      disabled={!ocupante.propia}
+                      onClick={() => ocupante.propia && router.push(`/cerda/${encodeURIComponent(ocupante.c.id)}`)}
+                    >
+                      {ocupante.propia ? "Ver cerda" : "De otra granja"}
                     </Boton>
                     <Boton onClick={() => setTrasladando(true)}>Trasladar</Boton>
                   </div>
@@ -343,7 +440,7 @@ export default function JaulaPage() {
                                   disabled={Boolean(ocupadaPor)}
                                   onClick={() => {
                                     if (ocupadaPor) return;
-                                    asignar(j, ocupante.c.id);
+                                    asignar(j, ocupante.c.id, ocupante.granja);
                                     setJaulaSel(null);
                                     setTrasladando(false);
                                     setArea(otra);

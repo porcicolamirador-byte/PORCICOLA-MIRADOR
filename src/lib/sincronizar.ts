@@ -37,10 +37,14 @@ const LISTAS = new Set([
 const VALORES = new Set(["config-granja", "ajustes", "bioseguridad-checks", "consumo-cerdas-dia"]);
 /** Lista de granjas: es común a todas (no se separa por granja) */
 export const CLAVE_GRANJAS = "granjas";
+/** Mapa de jaulas: es el mismo para todas las granjas (una jaula = una cerda de cualquier granja) */
+export const CLAVE_JAULAS = "jaulas-mapa";
+/** Claves comunes a todas las granjas (no se separan por granja) */
+const GLOBALES = new Set([CLAVE_GRANJAS, CLAVE_JAULAS]);
 const ID_VALOR = "valor";
 
 const esHistorial = (clave: string) => clave.startsWith("historial-");
-export const seSincroniza = (clave: string) => clave === CLAVE_GRANJAS || LISTAS.has(clave) || VALORES.has(clave) || esHistorial(clave);
+export const seSincroniza = (clave: string) => GLOBALES.has(clave) || LISTAS.has(clave) || VALORES.has(clave) || esHistorial(clave);
 
 /* ───────────── Granjas ───────────── */
 
@@ -69,12 +73,12 @@ export const nombreGranjaActual = () => leerGranjas().find((g) => g.id === granj
 
 /** Nombre de la colección en la nube para una clave del teléfono */
 function remota(clave: string, granja = granjaActual()) {
-  if (clave === CLAVE_GRANJAS || granja === GRANJA_PRINCIPAL) return clave;
+  if (GLOBALES.has(clave) || granja === GRANJA_PRINCIPAL) return clave;
   return `g:${granja}:${clave}`;
 }
 /** Clave del teléfono para una colección de la nube (null si es de otra granja) */
 function local(coleccion: string, granja = granjaActual()): string | null {
-  if (coleccion === CLAVE_GRANJAS) return coleccion;
+  if (GLOBALES.has(coleccion)) return coleccion;
   const m = /^g:([^:]+):(.+)$/.exec(coleccion);
   if (m) return m[1] === granja ? m[2] : null;
   return granja === GRANJA_PRINCIPAL ? coleccion : null;
@@ -338,7 +342,7 @@ async function bajar() {
   const meta = leerMeta();
   let cursor = (meta.cursores ?? {})[granja] ?? (granja === GRANJA_PRINCIPAL ? meta.cursor : null);
   // Solo se baja la granja elegida (y la lista de granjas)
-  const deLaGranja = granja === GRANJA_PRINCIPAL ? "&coleccion=not.like.g:*" : `&or=(coleccion.like.g:${granja}:*,coleccion.eq.${CLAVE_GRANJAS})`;
+  const deLaGranja = granja === GRANJA_PRINCIPAL ? "&coleccion=not.like.g:*" : `&or=(coleccion.like.g:${granja}:*,coleccion.in.(${[...GLOBALES].join(",")}))`;
   for (;;) {
     // Se repasan 2 minutos hacia atrás por si algún cambio se guardó con una hora anterior
     const desde = cursor ? new Date(ms(cursor) - 120_000).toISOString() : null;
@@ -375,7 +379,7 @@ function clavesLocales(): string[] {
   const out: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
-    if (k && k !== CLAVE_GRANJAS && (seSincroniza(k) || k === "engorde-secuencia-lotes" || k === "bodega-articulos")) out.push(k);
+    if (k && !GLOBALES.has(k) && (seSincroniza(k) || k === "engorde-secuencia-lotes" || k === "bodega-articulos")) out.push(k);
   }
   return out;
 }
@@ -481,7 +485,7 @@ export function borrarTodoLocal(generacion: number) {
       const k = localStorage.key(i);
       if (k && k.startsWith("granja-guardada:")) borrar.push(k);
     }
-    for (const k of [...clavesLocales(), ...borrar, CLAVE_GRANJAS, CLAVE_GRANJA_ACTUAL, CLAVE_COLA, "registro-actividad"]) localStorage.removeItem(k);
+    for (const k of [...clavesLocales(), ...borrar, CLAVE_GRANJAS, CLAVE_JAULAS, CLAVE_GRANJA_ACTUAL, CLAVE_COLA, "registro-actividad"]) localStorage.removeItem(k);
   } finally {
     aplicandoRemoto = false;
   }
