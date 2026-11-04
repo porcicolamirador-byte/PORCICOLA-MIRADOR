@@ -55,15 +55,7 @@ export default function Home() {
 
         {/* Progreso */}
         <section className="relative z-10 mx-auto w-full max-w-xs px-8 pb-10">
-          <div className="relative pt-9">
-            {/* El cerdito va saltando en la punta de la barra */}
-            <span
-              className="splash-cerdo pointer-events-none absolute top-0 block -translate-x-1/2"
-              style={{ animationDuration: `${DURACION_CARGA}ms` }}
-              aria-hidden="true"
-            >
-              <span className="splash-salto block text-[28px] leading-none">🐷</span>
-            </span>
+          <div>
             <div
               className="h-1.5 w-full overflow-hidden rounded-full bg-sky-900/10"
               role="progressbar"
