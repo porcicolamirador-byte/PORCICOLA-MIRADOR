@@ -118,10 +118,24 @@ export default function RegistrarParto() {
       return setError("Revisar Ciclo Reproductivo: faltan días de gestación");
     }
 
+    // Todos los datos son obligatorios, menos "Asistido por"
+    if (!horaInicio) return setError("Escribe la hora de inicio del parto");
+    if (!tipoParto) return setError("Elige el tipo de parto");
     const nVivos = aNumero(vivos);
     if (nVivos === null || nVivos < 0) return setError("Indica cuántos lechones nacieron vivos");
-    const nMuertos = Math.max(0, aNumero(muertos) ?? 0);
-    const nMomias = Math.max(0, aNumero(momias) ?? 0);
+    const nMuertosTxt = aNumero(muertos);
+    if (nMuertosTxt === null || nMuertosTxt < 0) return setError("Indica cuántos nacieron muertos (0 si ninguno)");
+    const nMomiasTxt = aNumero(momias);
+    if (nMomiasTxt === null || nMomiasTxt < 0) return setError("Indica cuántas momias hubo (0 si ninguna)");
+    const nPeso = aNumero(pesoPromedio);
+    if (nPeso === null || !(nPeso > 0)) return setError("Escribe el peso promedio de los lechones");
+    if (!observacionesLechones.trim()) return setError("Escribe las observaciones de los lechones");
+    const nPesoCerda = aNumero(pesoCerda);
+    if (nPesoCerda === null || !(nPesoCerda > 0)) return setError("Escribe el peso de la cerda");
+    if (!estadoSalud) return setError("Elige el estado de salud de la cerda");
+    if (!observaciones.trim()) return setError("Escribe las observaciones del parto");
+    const nMuertos = Math.max(0, nMuertosTxt);
+    const nMomias = Math.max(0, nMomiasTxt);
 
     const d = parsearFechaLocal(fecha);
     const { desteteMin, desteteMax } = leerConfig();
@@ -208,10 +222,10 @@ export default function RegistrarParto() {
                 <input type="date" value={fecha} max={fechaLocalISO(new Date())}
                   onChange={(e) => { setFecha(e.target.value); setError(""); }} className={`${inputBase} appearance-none`} />
               </Campo>
-              <Campo etiqueta="Hora de inicio">
+              <Campo etiqueta="Hora de inicio *">
                 <input type="time" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} className={`${inputBase} appearance-none`} />
               </Campo>
-              <Campo etiqueta="Tipo de parto">
+              <Campo etiqueta="Tipo de parto *">
                 <SelectorApp valor={tipoParto} onCambiar={setTipoParto} titulo="Tipo de parto" opciones={TIPOS_PARTO.map((t) => ({ valor: t, texto: t }))} className="w-full" claseBoton={CLASE_SELECTOR} />
               </Campo>
               <Campo etiqueta="Asistido por">
@@ -226,11 +240,11 @@ export default function RegistrarParto() {
                 <input type="tel" inputMode="numeric" value={vivos}
                   onChange={(e) => { setVivos(e.target.value.replace(/\D/g, "")); setError(""); }} className={inputBase} />
               </Campo>
-              <Campo etiqueta="Muertos">
+              <Campo etiqueta="Muertos *">
                 <input type="tel" inputMode="numeric" value={muertos}
                   onChange={(e) => setMuertos(e.target.value.replace(/\D/g, ""))} className={inputBase} />
               </Campo>
-              <Campo etiqueta="Momias">
+              <Campo etiqueta="Momias *">
                 <input type="tel" inputMode="numeric" value={momias}
                   onChange={(e) => setMomias(e.target.value.replace(/\D/g, ""))} className={inputBase} />
               </Campo>
@@ -245,7 +259,7 @@ export default function RegistrarParto() {
               </p>
             )}
             <div className="mt-3 grid grid-cols-2 gap-3">
-              <Campo etiqueta="Peso promedio (kg)">
+              <Campo etiqueta="Peso promedio (kg) *">
                 <input type="tel" inputMode="decimal" value={pesoPromedio} placeholder="1.25"
                   onChange={(e) => setPesoPromedio(e.target.value.replace(/[^0-9.,]/g, ""))} className={inputBase} />
               </Campo>
@@ -258,7 +272,7 @@ export default function RegistrarParto() {
               </div>
             </div>
             <div className="mt-3">
-              <Campo etiqueta="Observaciones de los lechones">
+              <Campo etiqueta="Observaciones de los lechones *">
                 <textarea value={observacionesLechones} onChange={(e) => setObservacionesLechones(e.target.value)}
                   placeholder="Tamaño, vitalidad, malformaciones…"
                   className="h-20 w-full resize-none rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-base outline-none focus:ring-2 focus:ring-sky-200" />
@@ -268,16 +282,16 @@ export default function RegistrarParto() {
 
           <Seccion titulo="Cerda">
             <div className="grid grid-cols-2 gap-3">
-              <Campo etiqueta="Peso de la cerda (kg)">
+              <Campo etiqueta="Peso de la cerda (kg) *">
                 <input type="tel" inputMode="decimal" value={pesoCerda}
                   onChange={(e) => setPesoCerda(e.target.value.replace(/[^0-9.,]/g, ""))} className={inputBase} />
               </Campo>
-              <Campo etiqueta="Estado de salud">
+              <Campo etiqueta="Estado de salud *">
                 <SelectorApp valor={estadoSalud} onCambiar={setEstadoSalud} titulo="Estado de salud" opciones={ESTADOS_SALUD.map((t) => ({ valor: t, texto: t }))} className="w-full" claseBoton={CLASE_SELECTOR} />
               </Campo>
             </div>
             <div className="mt-3">
-              <Campo etiqueta="Observaciones del parto">
+              <Campo etiqueta="Observaciones del parto *">
                 <textarea value={observaciones} onChange={(e) => setObservaciones(e.target.value)}
                   placeholder="Duración, complicaciones, medicamentos…"
                   className="h-20 w-full resize-none rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-base outline-none focus:ring-2 focus:ring-sky-200" />

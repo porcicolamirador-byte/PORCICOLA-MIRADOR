@@ -2,6 +2,9 @@
 
 import Emoji from "@/components/Emoji";
 import SelectorApp from "@/components/SelectorApp";
+import Modal from "@/components/Modal";
+import { generarPdfParto } from "@/lib/pdfParto";
+import { nombreGranjaActual } from "@/lib/sincronizar";
 import { borrarConRegistro, guardarConRegistro } from "@/lib/log";
 import { useEffect, useRef, useState, type TouchEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -15,6 +18,7 @@ import {
   formatoPesos,
   guardarMovimientos,
   leerMovimientos,
+  loteDelParto,
   lotesDeParto,
   nombreLote,
   nuevoId,
@@ -194,6 +198,7 @@ export default function CerdaDetalle() {
   const longPressTimer = useRef<number | null>(null);
   const logoPdf = useRef<LogoJpeg | null>(null);
   const [exportando, setExportando] = useState(false);
+  const [exportandoParto, setExportandoParto] = useState(false);
 
   useEffect(() => {
     if (!mostrarInfo || logoPdf.current) return;
@@ -603,6 +608,58 @@ export default function CerdaDetalle() {
     { icono: "⏱️", etiqueta: "Tiempo en la granja", valor: cerda.fecha ? calcularEdadLlegada(cerda.fecha) : "–" },
   ];
 
+  /** Número de parto (por fecha), inseminación de esa gestación, días y lote */
+  function infoParto(p: { fecha?: string; codigoParto?: string; vivos?: number; pesoPromedio?: number }) {
+    const partos = registros.filter((r) => r.tipo === "Parto").sort((a, b) => String(a.fecha || "").localeCompare(String(b.fecha || "")));
+    const i = partos.findIndex((r) => r === p || (r.codigoParto && r.codigoParto === p.codigoParto));
+    const numero = i >= 0 ? i + 1 : partos.length;
+    const ia = registros.find((r) => r.tipo === "Inseminación" && String(r.fecha || "") <= String(p.fecha || ""));
+    const diasGestacion = ia?.fecha && p.fecha ? calcularDiasEntre(ia.fecha, p.fecha) : null;
+    const lote = p.codigoParto ? loteDelParto(p.codigoParto) : undefined;
+    const pesoCamada = p.pesoPromedio && p.vivos ? Math.round(Number(p.pesoPromedio) * Number(p.vivos) * 100) / 100 : 0;
+    return { numero, fechaIA: ia?.fecha as string | undefined, diasGestacion, lote: lote ? `${lote.codigo ?? ""}${lote.activo ? "" : " (cerrado)"}` : "", pesoCamada };
+  }
+
+  async function exportarParto(p: Record<string, any>) {
+    if (exportandoParto) return;
+    setExportandoParto(true);
+    try {
+      const info = infoParto(p);
+      const logo = logoPdf.current ?? (await cargarLogoJpeg("/images/logo.png"));
+      const blob = generarPdfParto({
+        granja: nombreGranjaActual(),
+        cerda: String(id),
+        numeroParto: info.numero,
+        codigoParto: p.codigoParto || "",
+        fecha: p.fecha ? formatearFechaCorta(p.fecha) : "",
+        hora: p.horaInicio || "",
+        tipoParto: p.tipoParto || "",
+        asistidoPor: p.asistidoPor || "",
+        diasGestacion: info.diasGestacion !== null ? `${info.diasGestacion} días` : "",
+        fechaIA: info.fechaIA ? formatearFechaCorta(info.fechaIA) : "",
+        genetica: p.genetica || "",
+        vivos: Number(p.vivos) || 0,
+        muertos: Number(p.muertos) || 0,
+        momias: Number(p.momias) || 0,
+        pesoPromedio: p.pesoPromedio != null ? `${p.pesoPromedio} kg` : "",
+        pesoCamada: info.pesoCamada ? `${info.pesoCamada} kg` : "",
+        pesoCerda: p.pesoCerda != null ? `${p.pesoCerda} kg` : "",
+        estadoSalud: p.estadoSalud || "",
+        lote: info.lote,
+        destete: String(p.mensaje || "").replace(/^Destete entre /, "Entre "),
+        observaciones: p.observaciones || "",
+        observacionesLechones: p.observacionesLechones || "",
+        fechaGeneracion: formatearFechaCorta(fechaLocalISO(new Date())),
+        logo,
+      });
+      await entregarPdf(blob, `parto-${String(id).replace(/[^\w-]+/g, "_")}-n${info.numero}.pdf`);
+    } catch {
+      mostrarAviso("No se pudo generar el PDF");
+    } finally {
+      setExportandoParto(false);
+    }
+  }
+
   async function exportarPdf() {
     if (exportando) return;
     setExportando(true);
@@ -637,31 +694,85 @@ export default function CerdaDetalle() {
       className="min-h-screen bg-white p-3 pb-32 overflow-x-hidden"
       style={{ paddingTop: "calc(env(safe-area-inset-top) + 0.75rem)" }}
     >
-      {selectedRegistro && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setSelectedRegistro(null)}>
-          <div className="relative w-full max-w-lg rounded-2xl bg-white p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => setSelectedRegistro(null)} aria-label="Cerrar" className="absolute right-2 top-2 z-20 flex h-11 w-11 touch-manipulation items-center justify-center rounded-full text-slate-500 hover:text-slate-900 active:bg-slate-100">✕</button>
-            <h3 className="text-lg font-bold text-black">Resumen del parto</h3>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-700 sm:grid-cols-3">
-              <div className="rounded-lg bg-sky-50 p-2"><b>Lote</b><p>{selectedRegistro.codigoParto || "-"}</p></div>
-              <div className="rounded-lg bg-slate-100 p-2"><b>Fecha</b><p>{selectedRegistro.fecha ? formatearFechaCorta(selectedRegistro.fecha) : "-"}</p></div>
-              <div className="rounded-lg bg-slate-100 p-2"><b>Hora</b><p>{selectedRegistro.horaInicio || "-"}</p></div>
-              <div className="rounded-lg bg-slate-100 p-2"><b>Tipo</b><p>{selectedRegistro.tipoParto || "-"}</p></div>
-              <div className="rounded-lg bg-slate-100 p-2"><b>Asistido por</b><p>{selectedRegistro.asistidoPor || "-"}</p></div>
-              <div className="rounded-lg bg-slate-100 p-2"><b>Total nacidos</b><p>{selectedRegistro.lechones ?? "-"}</p></div>
-              <div className="rounded-lg bg-slate-100 p-2"><b>Vivos</b><p>{selectedRegistro.vivos ?? "-"}</p></div>
-              <div className="rounded-lg bg-slate-100 p-2"><b>Muertos</b><p>{selectedRegistro.muertos ?? "-"}</p></div>
-              <div className="rounded-lg bg-slate-100 p-2"><b>Peso promedio</b><p>{selectedRegistro.pesoPromedio != null ? `${selectedRegistro.pesoPromedio} kg` : "-"}</p></div>
-              <div className="rounded-lg bg-slate-100 p-2"><b>Genética</b><p>{selectedRegistro.genetica || "-"}</p></div>
-              <div className="rounded-lg bg-slate-100 p-2"><b>Raza</b><p>{selectedRegistro.raza || "-"}</p></div>
-              <div className="rounded-lg bg-slate-100 p-2"><b>Peso de cerda</b><p>{selectedRegistro.pesoCerda != null ? `${selectedRegistro.pesoCerda} kg` : "-"}</p></div>
-              <div className="rounded-lg bg-slate-100 p-2"><b>Estado de salud</b><p>{selectedRegistro.estadoSalud || "-"}</p></div>
-              <div className="col-span-2 rounded-lg bg-slate-100 p-2 sm:col-span-3"><b>Observaciones del parto</b><p className="mt-1 break-words">{selectedRegistro.observaciones || "-"}</p></div>
-              <div className="col-span-2 rounded-lg bg-slate-100 p-2 sm:col-span-3"><b>Observaciones de los lechones</b><p className="mt-1 break-words">{selectedRegistro.observacionesLechones || "-"}</p></div>
-            </div>
+      {selectedRegistro && (() => {
+        const p = selectedRegistro;
+        const info = infoParto(p);
+        const total = (Number(p.vivos) || 0) + (Number(p.muertos) || 0) + (Number(p.momias) || 0);
+        const fila = (k: string, v: string) => (
+          <div className="min-w-0">
+            <p className="text-[11px] text-slate-500">{k}</p>
+            <p className="truncate text-sm font-semibold text-slate-900">{v || "—"}</p>
           </div>
-        </div>
-      )}
+        );
+        return (
+          <Modal abierta etiqueta={`Parto N.º ${info.numero}`} titulo={`Cerda ${id}`} subtitulo={p.codigoParto} icono="🐷" onCerrar={() => setSelectedRegistro(null)}>
+            <div className="flex flex-col gap-4">
+              <div className="grid grid-cols-4 gap-1.5 text-center">
+                {[
+                  { t: "Nacidos", v: total, c: "text-slate-900" },
+                  { t: "Vivos", v: Number(p.vivos) || 0, c: "text-emerald-700" },
+                  { t: "Muertos", v: Number(p.muertos) || 0, c: Number(p.muertos) ? "text-rose-600" : "text-slate-900" },
+                  { t: "Momias", v: Number(p.momias) || 0, c: Number(p.momias) ? "text-rose-600" : "text-slate-900" },
+                ].map((x) => (
+                  <div key={x.t} className="rounded-2xl bg-slate-50 px-1 py-2.5 ring-1 ring-slate-100">
+                    <p className={`text-xl font-black leading-none tabular-nums ${x.c}`}>{x.v}</p>
+                    <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">{x.t}</p>
+                  </div>
+                ))}
+              </div>
+              <section>
+                <h4 className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-sky-700">Parto</h4>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+                  {fila("Fecha", p.fecha ? formatearFechaCorta(p.fecha) : "")}
+                  {fila("Hora de inicio", p.horaInicio || "")}
+                  {fila("Tipo", p.tipoParto || "")}
+                  {fila("Asistido por", p.asistidoPor || "")}
+                  {fila("Inseminación", info.fechaIA ? formatearFechaCorta(info.fechaIA) : "")}
+                  {fila("Días de gestación", info.diasGestacion !== null ? `${info.diasGestacion} días` : "")}
+                </div>
+              </section>
+              <section>
+                <h4 className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-sky-700">Camada y madre</h4>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+                  {fila("Peso promedio", p.pesoPromedio != null ? `${p.pesoPromedio} kg` : "")}
+                  {fila("Peso camada (vivos)", info.pesoCamada ? `${info.pesoCamada} kg` : "")}
+                  {fila("Genética", p.genetica || "")}
+                  {fila("Peso de la cerda", p.pesoCerda != null ? `${p.pesoCerda} kg` : "")}
+                  {fila("Estado de salud", p.estadoSalud || "")}
+                  {fila("Lote de engorde", info.lote)}
+                </div>
+              </section>
+              {(p.observaciones || p.observacionesLechones) && (
+                <section className="flex flex-col gap-2">
+                  {p.observaciones && (
+                    <div className="rounded-2xl bg-slate-50 px-3 py-2.5 ring-1 ring-slate-100">
+                      <p className="text-[11px] text-slate-500">Observaciones del parto</p>
+                      <p className="mt-0.5 break-words text-sm text-slate-800">{p.observaciones}</p>
+                    </div>
+                  )}
+                  {p.observacionesLechones && (
+                    <div className="rounded-2xl bg-slate-50 px-3 py-2.5 ring-1 ring-slate-100">
+                      <p className="text-[11px] text-slate-500">Observaciones de los lechones</p>
+                      <p className="mt-0.5 break-words text-sm text-slate-800">{p.observacionesLechones}</p>
+                    </div>
+                  )}
+                </section>
+              )}
+              <button
+                type="button"
+                onClick={() => void exportarParto(p)}
+                disabled={exportandoParto}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-900 py-3 text-[15px] font-semibold text-white transition active:bg-sky-950 disabled:opacity-60"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14" />
+                </svg>
+                {exportandoParto ? "Generando PDF…" : "Exportar reporte del parto"}
+              </button>
+            </div>
+          </Modal>
+        );
+      })()}
       {mensajeAviso && (
         <div style={{ bottom: "calc(env(safe-area-inset-bottom) + 5rem)" }} className="fixed left-1/2 z-[9999] -translate-x-1/2 rounded-full bg-red-500 px-6 py-2 text-center text-sm font-bold text-white shadow-lg">
           {mensajeAviso}
