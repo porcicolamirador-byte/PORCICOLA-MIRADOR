@@ -905,28 +905,25 @@ export default function CerdaDetalle() {
                 </button>
               </div>
 
-              {/* Filtros por tipo, con cantidad */}
+              {/* Filtro por tipo de registro (lista con el estilo de la app) */}
               {registros.length > 0 && (
-                <div className="mt-3 flex gap-2 overflow-x-auto px-4 pb-1">
-                  {["Todos", ...tiposPresentes].map((t) => {
-                    const activo = filtro === t;
-                    const n = t === "Todos" ? registros.length : registros.filter((r) => r.tipo === t).length;
-                    return (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setFiltro(t)}
-                        aria-pressed={activo}
-                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium transition ${
-                          activo ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                        }`}
-                      >
-                        {t !== "Todos" && <span aria-hidden="true">{infoTipo(t).icono}</span>}
-                        {t}
-                        <span className={`tabular-nums ${activo ? "text-white/70" : "text-slate-400"}`}>{n}</span>
-                      </button>
-                    );
-                  })}
+                <div className="mt-3 flex items-center gap-2 px-4">
+                  <span className="shrink-0 text-xs font-medium text-slate-500">Ver</span>
+                  <SelectorApp
+                    valor={tiposPresentes.includes(filtro as (typeof tiposPresentes)[number]) ? filtro : "Todos"}
+                    onCambiar={setFiltro}
+                    titulo="Filtrar historial"
+                    opciones={["Todos", ...tiposPresentes].map((t) => {
+                      const n = t === "Todos" ? registros.length : registros.filter((r) => r.tipo === t).length;
+                      return { valor: t, texto: `${t === "Todos" ? "Todos los registros" : `${infoTipo(t).icono} ${t}`} · ${n}` };
+                    })}
+                    className="min-w-0 flex-1"
+                  />
+                  {filtro !== "Todos" && (
+                    <button type="button" onClick={() => setFiltro("Todos")} className="shrink-0 text-xs font-semibold text-sky-700 active:opacity-70">
+                      Quitar
+                    </button>
+                  )}
                 </div>
               )}
 
