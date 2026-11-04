@@ -7,7 +7,7 @@
  * La jaula queda guardada en la ficha de la cerda (campo "Jaula").
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import Modal from "@/components/Modal";
@@ -37,6 +37,18 @@ export default function JaulaPage() {
   const [area, setArea] = useState<Area | null>(null);
   const [jaulaSel, setJaulaSel] = useState<string | null>(null);
   const [elegida, setElegida] = useState("");
+  // Desde la ficha de una cerda: ?cerda=ID (&area=…&jaula=…) abre su jaula para cambiarla
+  const [cerdaOrigen, setCerdaOrigen] = useState("");
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const a = q.get("area");
+    const j = q.get("jaula");
+    setCerdaOrigen(q.get("cerda") ?? "");
+    if (a === "gestacion" || a === "lactancia") {
+      setArea(a);
+      if (j) setJaulaSel(j.toUpperCase());
+    }
+  }, []);
 
   const datos = useMemo(() => {
     if (version < 0) return null;
@@ -71,7 +83,8 @@ export default function JaulaPage() {
 
   const abrirJaula = (codigo: string) => {
     setJaulaSel(codigo);
-    setElegida("");
+    // Si vino desde una cerda sin esta jaula, queda elegida para ubicarla aquí
+    setElegida(cerdaOrigen && datos?.porJaula.get(codigo)?.c.id !== cerdaOrigen ? cerdaOrigen : "");
   };
 
   const ocupante = jaulaSel ? datos?.porJaula.get(jaulaSel) : undefined;
@@ -80,6 +93,14 @@ export default function JaulaPage() {
   if (!area) {
     return (
       <ModuloPage titulo="Jaula" subtitulo="Ubicación de las cerdas" tono="sky">
+        {cerdaOrigen && (
+          <div className="flex items-center justify-between gap-2 rounded-2xl bg-amber-50 px-3.5 py-2.5 text-sm text-amber-900 ring-1 ring-amber-200">
+            <span className="min-w-0">Ubicando la cerda <b className="arete-id">{cerdaOrigen}</b>: {area ? "toca la jaula donde va" : "elige el área"}.</span>
+            <button type="button" onClick={() => router.push(`/cerda/${encodeURIComponent(cerdaOrigen)}`)} className="shrink-0 text-xs font-semibold text-sky-700">
+              Volver
+            </button>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           {(Object.keys(AREAS) as Area[]).map((a) => {
             const cfg = AREAS[a];
@@ -129,6 +150,14 @@ export default function JaulaPage() {
       <button type="button" onClick={() => setArea(null)} className="-mt-1 self-start text-sm font-semibold text-sky-700 active:opacity-70">
         ‹ Jaula
       </button>
+      {cerdaOrigen && (
+        <div className="flex items-center justify-between gap-2 rounded-2xl bg-amber-50 px-3.5 py-2.5 text-sm text-amber-900 ring-1 ring-amber-200">
+          <span className="min-w-0">Ubicando la cerda <b className="arete-id">{cerdaOrigen}</b>: {area ? "toca la jaula donde va" : "elige el área"}.</span>
+          <button type="button" onClick={() => router.push(`/cerda/${encodeURIComponent(cerdaOrigen)}`)} className="shrink-0 text-xs font-semibold text-sky-700">
+            Volver
+          </button>
+        </div>
+      )}
 
       {/* Leyenda de estados */}
       <div className="flex flex-wrap gap-x-3 gap-y-1 px-1 text-[11px] text-slate-500">

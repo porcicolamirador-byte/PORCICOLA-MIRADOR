@@ -841,13 +841,30 @@ export default function CerdaDetalle() {
 
           {/* TARJETAS GRIS APILADAS (ahora encima) */}
           <div className="space-y-1 mb-3">
-            <div className="bg-gray-100 rounded-md p-1 flex items-center justify-between">
+            {/* Jaula: al tocarla abre el módulo Jaula para ubicarla o cambiarla */}
+            <button
+              type="button"
+              onClick={() => {
+                const j = String(cerda.jaula || "").trim().toUpperCase();
+                const area = j.startsWith("L-") ? "lactancia" : j.startsWith("G-") ? "gestacion" : "";
+                const q = new URLSearchParams({ cerda: String(cerda.id) });
+                if (area) {
+                  q.set("area", area);
+                  q.set("jaula", j);
+                }
+                router.push(`/jaula?${q.toString()}`);
+              }}
+              className="flex w-full items-center justify-between rounded-md bg-gray-100 p-1 text-left active:bg-gray-200"
+            >
               <div className="flex items-center gap-2">
                 <span className="text-gray-500">🧱</span>
                 <div className="text-[11px] text-gray-600">Jaula</div>
               </div>
-              <div className="font-bold text-sm">{cerda.jaula || '-'}</div>
-            </div>
+              <div className="flex items-center gap-1 text-sm font-bold">
+                {cerda.jaula || "Ubicar"}
+                <span className="text-sky-700" aria-hidden="true">›</span>
+              </div>
+            </button>
             <div className="bg-gray-100 rounded-md p-1 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-pink-500">🐖</span>
