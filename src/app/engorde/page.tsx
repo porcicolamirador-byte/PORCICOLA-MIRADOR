@@ -171,7 +171,7 @@ export default function EngordePage() {
                           </span>
                         </span>
                         <span className={`shrink-0 text-xs font-semibold tabular-nums ${dias < 0 ? "text-rose-600" : dias <= 15 ? "text-amber-600" : "text-sky-700"}`}>
-                          {dias < 0 ? `Pasó hace ${-dias} d` : dias === 0 ? "Hoy" : `En ${dias} d`}
+                          {dias < 0 ? `+${-dias} d` : dias === 0 ? "Hoy" : `En ${dias} d`}
                         </span>
                       </button>
                     </li>
