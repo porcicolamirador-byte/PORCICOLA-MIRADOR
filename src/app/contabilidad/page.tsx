@@ -39,6 +39,7 @@ const CATEGORIAS: Record<Movimiento["tipo"], string[]> = {
     "Mantenimiento",
     "Transporte",
     "Otros gastos",
+    "Pérdidas",
   ],
 };
 

@@ -14,6 +14,9 @@ import { confirmar } from "@/components/Dialogo";
 import { CONFIRMACIONES_GESTACION } from "@/utils/pendingTasks";
 import {
   confirmarGestacion,
+  DIAS_VENCE_GENETICA,
+  sumarDias,
+  type GeneticaPerdida,
   eliminarLotesDePartos,
   formatoPesos,
   guardarMovimientos,
@@ -113,6 +116,7 @@ function decodificar(valor: string): string {
 const TIPOS_HISTORIAL = [
   "Inseminación",
   "Compra de genética",
+  "Genética no usada",
   "Confirmación de Gestación",
   "Celo",
   "Parto",
@@ -129,6 +133,8 @@ function infoTipo(tipo: string): { icono: string; fondo: string; borde: string; 
   switch (tipo) {
     case "Compra de genética":
       return { icono: "🧬", fondo: "bg-violet-100", borde: "border-violet-100", texto: "text-violet-800" };
+    case "Genética no usada":
+      return { icono: "🧬", fondo: "bg-rose-100", borde: "border-rose-100", texto: "text-rose-700" };
     case "Inseminación":
       return { icono: "🧬", fondo: "bg-sky-100", borde: "border-sky-100", texto: "text-sky-800" };
     case "Confirmación de Gestación":
@@ -245,6 +251,7 @@ export default function CerdaDetalle() {
   /* Genética comprada antes de la inseminación (por ejemplo al destetar): queda en la cerda
      y se junta con la inseminación cuando se registre */
   const pendiente = (cerda?.geneticaPendiente ?? null) as { genetica: string; valor: number; fecha: string; movimientoId?: string } | null;
+  const totalRegistros = registros.length + (pendiente ? 1 : 0) + (Array.isArray(cerda?.geneticasPerdidas) ? cerda.geneticasPerdidas.length : 0);
   function guardarPendiente(valor: typeof pendiente) {
     const lista = JSON.parse(localStorage.getItem("cerdas") || "[]");
     const nuevas = lista.map((c: any) => {
@@ -1094,12 +1101,37 @@ export default function CerdaDetalle() {
         {/* HISTORIAL: línea de tiempo agrupada por mes, del más reciente al más antiguo */}
         {(() => {
           // La compra de genética pendiente se muestra como un registro más (idx -1: se edita con el lápiz)
-          const compraVirtual = pendiente
-            ? [{ r: { tipo: "Compra de genética", fecha: pendiente.fecha, genetica: pendiente.genetica, valorGenetica: pendiente.valor, mensaje: "Se junta al registrar la inseminación", compra: true } as any, idx: -1 }]
-            : [];
+          const compraVirtual = [
+            ...(pendiente
+              ? [
+                  {
+                    r: {
+                      tipo: "Compra de genética",
+                      fecha: pendiente.fecha,
+                      genetica: pendiente.genetica,
+                      valorGenetica: pendiente.valor,
+                      mensaje: `Se junta al registrar la inseminación · se daña el ${formatearFechaCorta(sumarDias(pendiente.fecha, DIAS_VENCE_GENETICA))}`,
+                      compra: true,
+                    } as any,
+                    idx: -1,
+                  },
+                ]
+              : []),
+            // Genética que se dañó sin usarse (pasó a Pérdidas en Contabilidad)
+            ...((Array.isArray(cerda?.geneticasPerdidas) ? cerda.geneticasPerdidas : []) as GeneticaPerdida[]).map((g, k) => ({
+              r: {
+                tipo: "Genética no usada",
+                fecha: g.vencio,
+                genetica: g.genetica,
+                valorGenetica: g.valor,
+                mensaje: `Comprada ${formatearFechaCorta(g.fecha)} · se dañó a los ${DIAS_VENCE_GENETICA} días · pasó a Pérdidas`,
+              } as any,
+              idx: -2 - k,
+            })),
+          ];
           const ordenados = [...registros.map((r, idx) => ({ r, idx })), ...compraVirtual]
             .sort((a, b) => String(b.r.fecha || "").localeCompare(String(a.r.fecha || "")) || a.idx - b.idx);
-          const tiposPresentes = TIPOS_HISTORIAL.filter((t) => registros.some((r) => r.tipo === t) || (t === "Compra de genética" && Boolean(pendiente)));
+          const tiposPresentes = TIPOS_HISTORIAL.filter((t) => registros.some((r) => r.tipo === t) || compraVirtual.some((v) => v.r.tipo === t));
           const visibles = ordenados.filter(({ r }) => filtro === "Todos" || r.tipo === filtro);
           const grupos: { clave: string; titulo: string; items: typeof visibles }[] = [];
           for (const item of visibles) {
@@ -1217,7 +1249,7 @@ export default function CerdaDetalle() {
                 <div className="min-w-0">
                   <h3 className="text-[15px] font-bold text-slate-900">Historial</h3>
                   <p className="text-xs text-slate-500">
-                    {registros.length + (pendiente ? 1 : 0) === 1 ? "1 registro" : `${registros.length + (pendiente ? 1 : 0)} registros`} · más recientes primero
+                    {totalRegistros === 1 ? "1 registro" : `${totalRegistros} registros`} · más recientes primero
                   </p>
                 </div>
                 <button
@@ -1229,7 +1261,7 @@ export default function CerdaDetalle() {
               </div>
 
               {/* Filtro por tipo de registro (lista con el estilo de la app) */}
-              {(registros.length > 0 || pendiente) && (
+              {totalRegistros > 0 && (
                 <div className="mt-3 flex items-center gap-2 px-4">
                   <span className="shrink-0 text-xs font-medium text-slate-500">Ver</span>
                   <SelectorApp
@@ -1251,7 +1283,7 @@ export default function CerdaDetalle() {
               )}
 
               <div className="px-4 pb-4 pt-3" onClick={() => setSwipedIndex(null)}>
-                {registros.length === 0 && !pendiente ? (
+                {totalRegistros === 0 ? (
                   <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-slate-200 px-6 py-10 text-center">
                     <span className="text-3xl" aria-hidden="true">📋</span>
                     <p className="mt-1 text-sm font-semibold text-slate-800">Sin registros todavía</p>

@@ -848,6 +848,59 @@ const fmtNum = (n: number) => n.toLocaleString("es-CO", { maximumFractionDigits:
  * cada artículo se vuelve un producto y su existencia queda como
  * "saldo inicial". Se ejecuta una sola vez.
  */
+/* ───────────── Genética comprada que no se usó ───────────── */
+
+/** Días que dura la genética comprada: después pasa sola a Pérdidas en Contabilidad */
+export const DIAS_VENCE_GENETICA = 10;
+
+export interface GeneticaPerdida {
+  genetica: string;
+  valor: number;
+  /** Fecha de compra */
+  fecha: string;
+  /** Día en que pasó a pérdida */
+  vencio: string;
+  movimientoId?: string;
+}
+
+/**
+ * Genética comprada sin inseminación después de DIAS_VENCE_GENETICA días: se daña.
+ * El gasto pasa a la categoría "Pérdidas" (deja de ser costo de la cerda) y en la
+ * cerda queda el registro "Genética no usada". Devuelve cuántas vencieron.
+ */
+export function vencerGeneticasPendientes(): number {
+  const cerdas = leerCerdas();
+  const hoyIso = hoy();
+  const vencidas = cerdas.filter((c) => {
+    const g = (c as { geneticaPendiente?: { fecha?: string } }).geneticaPendiente;
+    return g?.fecha && diasEntre(g.fecha, hoyIso) >= DIAS_VENCE_GENETICA;
+  });
+  if (vencidas.length === 0) return 0;
+  const movs = leerMovimientos();
+  let cambioMovs = false;
+  const nuevas = cerdas.map((c) => {
+    const g = (c as { geneticaPendiente?: { genetica: string; valor: number; fecha: string; movimientoId?: string } }).geneticaPendiente;
+    if (!g?.fecha || diasEntre(g.fecha, hoyIso) < DIAS_VENCE_GENETICA) return c;
+    const vencio = sumarDias(g.fecha, DIAS_VENCE_GENETICA);
+    if (g.movimientoId) {
+      const m = movs.find((x) => x.id === g.movimientoId);
+      if (m) {
+        m.categoria = "Pérdidas";
+        m.descripcion = `Genética ${g.genetica} no usada (se dañó) · cerda ${c.id}`;
+        delete m.cerdaId;
+        cambioMovs = true;
+      }
+    }
+    const { geneticaPendiente: _g, ...resto } = c as Record<string, unknown>;
+    const previas = (c as unknown as { geneticasPerdidas?: unknown }).geneticasPerdidas;
+    const perdidas = Array.isArray(previas) ? (previas as GeneticaPerdida[]) : [];
+    return { ...resto, geneticasPerdidas: [...perdidas, { genetica: g.genetica, valor: g.valor, fecha: g.fecha, vencio, movimientoId: g.movimientoId }] } as unknown as CerdaDatos;
+  });
+  if (cambioMovs) guardarMovimientos(movs);
+  guardarCerdas(nuevas);
+  return vencidas.length;
+}
+
 /* ───────────── Préstamos de bultos entre granjas ───────────── */
 
 export interface DevolucionPrestamo {

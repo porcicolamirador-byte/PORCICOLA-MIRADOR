@@ -1,6 +1,7 @@
 "use client";
 
 import { aplicarDescuentoCerdas } from "@/lib/consumoCerdas";
+import { vencerGeneticasPendientes } from "@/lib/datos";
 import { useVersionDatos } from "@/lib/datos";
 import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
@@ -84,7 +85,11 @@ export default function PuertaAcceso({ children }: { children: ReactNode }) {
   const versionDatos = useVersionDatos();
   useEffect(() => {
     if (!abierta) return;
-    const t = setTimeout(aplicarDescuentoCerdas, 800);
+    const t = setTimeout(() => {
+      aplicarDescuentoCerdas();
+      // La genética comprada que lleva 10 días sin usarse pasa a Pérdidas
+      vencerGeneticasPendientes();
+    }, 800);
     return () => clearTimeout(t);
   }, [abierta, versionDatos]);
 
