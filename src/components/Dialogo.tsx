@@ -134,7 +134,7 @@ export default function DialogoHost() {
       />
       {/* Mismo estilo que las ventanas de la app: encabezado azul, texto y botones redondeados */}
       <div className="dialogo-caja relative w-full max-w-sm overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-black/5">
-        <div className={`flex items-center gap-3 px-5 py-4 ${destructivo ? "bg-rose-700" : "bg-sky-900"}`}>
+        <div className={`flex items-center gap-3 px-5 py-4 bg-sky-900`}>
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-xl" aria-hidden="true">
             {destructivo ? "🗑️" : cancelar === null ? "ℹ️" : "❔"}
           </span>
