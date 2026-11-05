@@ -208,8 +208,6 @@ export default function ContabilidadPage() {
 
       <FacturasCredito version={version} />
 
-      <Perdidas version={version} />
-
       <ContabilidadLotes version={version} />
 
       {datos && datos.porCategoria.length > 0 && (
@@ -409,50 +407,6 @@ function cuentasLote(l: Lote, movimientos = leerMovimientos()) {
 type ItemCredito =
   | { clase: "factura"; id: string; fecha: string; titulo: string; detalle?: string; total: number; saldo: number }
   | { clase: "gasto"; id: string; fecha: string; titulo: string; detalle?: string; total: number; saldo: number };
-
-/** Pérdidas (por ejemplo genética comprada que se dañó sin usarse), de todos los meses */
-function Perdidas({ version }: { version: number }) {
-  const items = useMemo(() => {
-    if (version < 0) return [];
-    const contado = leerMovimientos()
-      .filter((m) => m.tipo === "gasto" && m.categoria === "Pérdidas")
-      .map((m) => ({ id: m.id, fecha: m.fecha, descripcion: m.descripcion || "Pérdida", valor: Number(m.monto) || 0, credito: false }));
-    const credito = leerCuentasPorPagar()
-      .filter((c) => c.categoria === "Pérdidas")
-      .map((c) => ({ id: c.id, fecha: c.fecha, descripcion: c.descripcion, valor: Number(c.total) || 0, credito: true }));
-    return [...contado, ...credito].sort((a, b) => b.fecha.localeCompare(a.fecha));
-  }, [version]);
-  if (items.length === 0) return null;
-  const anio = hoy().slice(0, 4);
-  const delAnio = items.filter((i) => i.fecha.startsWith(anio)).reduce((t, i) => t + i.valor, 0);
-  return (
-    <section>
-      <h2 className="mb-1.5 flex items-baseline justify-between gap-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-        <span>Pérdidas {anio}</span>
-        <span className="normal-case tracking-normal font-semibold text-rose-600">{formatoPesos(delAnio)}</span>
-      </h2>
-      <SeccionDesplegable titulo="Genética no usada y otras pérdidas" cantidad={items.length}>
-        <ul className="divide-y divide-slate-100 bg-white">
-          {items.map((i) => (
-            <li key={i.id} className="flex items-center gap-2.5 px-3 py-2">
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold text-slate-900">{i.descripcion}</span>
-                <span className="block truncate text-[11px] text-slate-500">
-                  Compra {formatoFecha(i.fecha, true)}
-                  {i.credito ? " · a crédito" : " · contado"}
-                </span>
-              </span>
-              <span className="shrink-0 text-sm font-bold tabular-nums text-rose-600">{formatoPesos(i.valor)}</span>
-            </li>
-          ))}
-        </ul>
-        <p className="bg-white px-3 pb-2.5 pt-1 text-[11px] leading-snug text-slate-500">
-          Cada pérdida resta en el balance del mes en que se compró (el dinero salió ese día).
-        </p>
-      </SeccionDesplegable>
-    </section>
-  );
-}
 
 function FacturasCredito({ version }: { version: number }) {
   const items = useMemo<ItemCredito[]>(() => {
