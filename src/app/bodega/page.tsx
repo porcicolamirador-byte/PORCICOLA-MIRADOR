@@ -1026,7 +1026,7 @@ function AvisosPrestamos() {
   // Solo la granja que prestó puede regalar lo que le deben
   const gratificar = async (id: string, clase: "alimento" | "medicamento", que: string, granja: string) => {
     if (!puede("bodega")) return void avisarSinPermisoBodega();
-    const ok = await confirmar({ titulo: "Gratificar préstamo", mensaje: `${granja} ya no deberá ${que}. Se toma como un regalo: no vuelve el producto ni se cobra.`, aceptar: "Gratificar" });
+    const ok = await confirmar({ titulo: "Gratificar préstamo", mensaje: `${granja} ya no deberá ${que}. Se toma como un regalo: no vuelve el producto ni se cobra, y su valor queda en Contabilidad como Gastos generales de esta granja.`, aceptar: "Gratificar" });
     if (ok) gratificarPrestamo(id, clase);
   };
   if (!datos || (datos.debo.length === 0 && datos.meDeben.length === 0 && datos.medDebo.length === 0 && datos.medMeDeben.length === 0)) return null;

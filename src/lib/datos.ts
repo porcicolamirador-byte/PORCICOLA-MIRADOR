@@ -1283,9 +1283,14 @@ export function devolverPrestamo(prestamoId: string, cantidad: number, modo: "pr
   return null;
 }
 
-/** La granja que prestó regala lo que falta (ya no se debe) */
+/**
+ * La granja que prestó regala lo que falta (ya no se debe). Su valor pasa a
+ * "Gastos generales" de esa granja; para no contarlo dos veces (ya se pagó al
+ * comprarlo), el mismo valor sale del costo del producto como abono.
+ */
 export function gratificarPrestamo(prestamoId: string, clase: "alimento" | "medicamento"): boolean {
   const g = granjaActual();
+  let datos: { falta: number; valorUnitario: number; nombre: string; unidad: string; aNombre: string; producto: { productoCodigo?: string; gastoId?: string }; categoria: string } | null = null;
   if (clase === "alimento") {
     const lista = leerPrestamos();
     const pr = lista.find((p) => p.id === prestamoId);
@@ -1293,14 +1298,25 @@ export function gratificarPrestamo(prestamoId: string, clase: "alimento" | "medi
     const falta = pendientePrestamo(pr);
     if (falta <= 0) return false;
     guardarPrestamos(lista.map((p) => (p.id === prestamoId ? { ...p, devoluciones: [...(p.devoluciones ?? []), { id: nuevoId(), fecha: hoy(), hora: horaActual(), cantidad: falta, tipo: "regalo" as const }] } : p)));
-    return true;
+    datos = { falta, valorUnitario: Number(pr.valorUnitario) || 0, nombre: pr.nombre, unidad: pr.unidad, aNombre: pr.aNombre, producto: { productoCodigo: pr.codigo }, categoria: "Alimento" };
+  } else {
+    const lista = leerPrestamosMedicamento();
+    const pr = lista.find((p) => p.id === prestamoId);
+    if (!pr || pr.de !== g) return false;
+    const falta = pendientePrestamoMed(pr);
+    if (falta <= 0) return false;
+    guardarPrestamosMedicamento(lista.map((p) => (p.id === prestamoId ? { ...p, devoluciones: [...(p.devoluciones ?? []), { id: nuevoId(), fecha: hoy(), hora: horaActual(), cantidad: falta, fuente: "", tipo: "regalo" as const }] } : p)));
+    datos = { falta, valorUnitario: Number(pr.valorUnitario) || 0, nombre: pr.nombre, unidad: pr.unidad, aNombre: pr.aNombre, producto: { gastoId: pr.gastoId }, categoria: "Medicamentos y vacunas" };
   }
-  const lista = leerPrestamosMedicamento();
-  const pr = lista.find((p) => p.id === prestamoId);
-  if (!pr || pr.de !== g) return false;
-  const falta = pendientePrestamoMed(pr);
-  if (falta <= 0) return false;
-  guardarPrestamosMedicamento(lista.map((p) => (p.id === prestamoId ? { ...p, devoluciones: [...(p.devoluciones ?? []), { id: nuevoId(), fecha: hoy(), hora: horaActual(), cantidad: falta, fuente: "", tipo: "regalo" as const }] } : p)));
+  const valor = Math.round(datos.falta * datos.valorUnitario);
+  if (valor > 0) {
+    const que = `${datos.nombre} (${fmtNum(datos.falta)} ${datos.unidad})`;
+    guardarMovimientos([
+      ...leerMovimientos(),
+      { id: nuevoId(), fecha: hoy(), tipo: "gasto", categoria: "Gastos generales", descripcion: `Gratificación a ${datos.aNombre} · ${que}`, monto: valor },
+      { id: nuevoId(), fecha: hoy(), tipo: "ingreso", categoria: datos.categoria, descripcion: `Abono a ${datos.nombre} · gratificado a ${datos.aNombre}`, monto: valor, ...datos.producto } as Movimiento,
+    ]);
+  }
   return true;
 }
 
