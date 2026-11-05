@@ -176,6 +176,10 @@ export interface Movimiento {
   loteId?: string;
   /** "produccion": registrado desde Bodega → Gastos de producción */
   origen?: "produccion";
+  /** Gastos de producción: unidad de medida (ml, Dosis, Litro), cantidad en número y valor por unidad */
+  unidad?: string;
+  cantidadNum?: number;
+  valorUnitario?: number;
   /** Cantidad escrita libremente (gastos de producción), p. ej. "3 frascos" */
   cantidad?: string;
   /** Cerda a la que corresponde el gasto (p. ej. la genética de una inseminación) */
@@ -1269,7 +1273,19 @@ export function editarConsumoLote(
 }
 
 /** Categorías para Bodega → Gastos de producción */
-export const CATEGORIAS_GASTO_PRODUCCION = ["Insumos", "Medicamentos y vacunas", "Mantenimiento", "Transporte", "Mano de obra", "Servicios (agua, luz)", "Otros gastos"];
+/** Categorías de Gastos de producción (texto en pantalla → categoría en Contabilidad) */
+export const CATEGORIAS_GASTO_PRODUCCION = [
+  { texto: "Vacunas/Medicamentos", categoria: "Medicamentos y vacunas" },
+  { texto: "Bioseguridad", categoria: "Bioseguridad" },
+  { texto: "Insumos", categoria: "Insumos" },
+  { texto: "Servicios", categoria: "Servicios (agua, luz)" },
+  { texto: "Mano de obra", categoria: "Mano de obra" },
+  { texto: "Transporte", categoria: "Transporte" },
+  { texto: "Otro gasto", categoria: "Otros gastos" },
+];
+/** Unidades para vacunas y medicamentos (el valor se divide por unidad para el plan vacunal) */
+export const UNIDADES_VACUNA = ["ml", "Dosis", "Litro"] as const;
+export const textoCategoriaProduccion = (c: string) => CATEGORIAS_GASTO_PRODUCCION.find((x) => x.categoria === c)?.texto ?? c;
 
 /** Gastos registrados desde Bodega → Gastos de producción (más recientes primero) */
 export const leerGastosProduccion = () =>
@@ -1278,10 +1294,12 @@ export const leerGastosProduccion = () =>
     .sort((a, b) => b.fecha.localeCompare(a.fecha));
 
 /** Registra un gasto de producción: queda como gasto en la contabilidad general */
-export function registrarGastoProduccion(datos: { descripcion: string; cantidad?: string; valor: number; categoria: string; fecha: string }) {
+export function registrarGastoProduccion(datos: { descripcion: string; cantidad?: string; unidad?: string; valor: number; categoria: string; fecha: string }) {
   const descripcion = datos.descripcion.trim().slice(0, 80);
   if (!descripcion || !(datos.valor > 0)) return false;
-  const cantidad = datos.cantidad?.trim().slice(0, 40) || undefined;
+  const cantidadNum = Number(String(datos.cantidad ?? "").replace(",", ".")) || 0;
+  const unidad = datos.unidad?.trim() || undefined;
+  const cantidad = cantidadNum > 0 ? `${fmtNum(cantidadNum)}${unidad ? ` ${unidad}` : ""}` : datos.cantidad?.trim().slice(0, 40) || undefined;
   guardarMovimientos([
     ...leerMovimientos(),
     {
@@ -1293,6 +1311,8 @@ export function registrarGastoProduccion(datos: { descripcion: string; cantidad?
       monto: Math.round(datos.valor),
       origen: "produccion",
       ...(cantidad ? { cantidad } : {}),
+      ...(cantidadNum > 0 ? { cantidadNum, valorUnitario: Math.round((datos.valor / cantidadNum) * 100) / 100 } : {}),
+      ...(unidad ? { unidad } : {}),
     },
   ]);
   return true;

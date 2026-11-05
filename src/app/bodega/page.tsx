@@ -58,6 +58,8 @@ import {
   leerGastosProduccion,
   registrarGastoProduccion,
   CATEGORIAS_GASTO_PRODUCCION,
+  UNIDADES_VACUNA,
+  textoCategoriaProduccion,
 } from "@/lib/datos";
 const avisarSinPermisoBodega = () =>
   avisar({ titulo: "Sin permiso", mensaje: "Tu usuario no tiene permiso para cargar facturas ni registrar salidas de bodega. Pídeselo al administrador." });
@@ -1336,8 +1338,11 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
   const [descripcion, setDescripcion] = useState("");
   const [cantidad, setCantidad] = useState("");
   const [valor, setValor] = useState("");
-  const [categoria, setCategoria] = useState(CATEGORIAS_GASTO_PRODUCCION[0]);
+  const [categoria, setCategoria] = useState("");
+  const [unidad, setUnidad] = useState("");
   const [fecha, setFecha] = useState(hoy());
+  const esVacuna = categoria === "Medicamentos y vacunas";
+  const cantidadNum = Number(cantidad.replace(",", ".")) || 0;
   const gastos = version < 0 ? [] : leerGastosProduccion();
   const total = gastos.reduce((s, g) => s + g.monto, 0);
   const monto = Number(valor.replace(/\D/g, "")) || 0;
@@ -1349,11 +1354,14 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
 
   const guardar = (e: FormEvent) => {
     e.preventDefault();
-    if (!registrarGastoProduccion({ descripcion, cantidad, valor: monto, categoria, fecha })) return;
+    if (!categoria) return;
+    if (esVacuna && (!unidad || !(cantidadNum > 0))) return;
+    if (!registrarGastoProduccion({ descripcion, cantidad, unidad: esVacuna ? unidad : undefined, valor: monto, categoria, fecha })) return;
     setDescripcion("");
     setCantidad("");
     setValor("");
-    setCategoria(CATEGORIAS_GASTO_PRODUCCION[0]);
+    setCategoria("");
+    setUnidad("");
     setFecha(hoy());
     setNuevo(false);
   };
@@ -1374,31 +1382,62 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
     >
       {nuevo ? (
         <form onSubmit={guardar} className="flex flex-col gap-3.5">
-          <Campo etiqueta="Producto o servicio">
+          <Campo etiqueta="Categoría *">
+            <Selector
+              value={categoria}
+              onChange={(v) => {
+                setCategoria(v);
+                if (v !== "Medicamentos y vacunas") setUnidad("");
+              }}
+              titulo="Categoría"
+              placeholder="Elige la categoría"
+              opciones={CATEGORIAS_GASTO_PRODUCCION.map((c) => ({ valor: c.categoria, texto: c.texto }))}
+            />
+          </Campo>
+          <Campo etiqueta="Producto o servicio *">
             <Entrada value={descripcion} onChange={(v) => setDescripcion(v.slice(0, 80))} required />
           </Campo>
-          <div className="grid grid-cols-2 gap-3">
-            <Campo etiqueta="Cantidad">
-              <Entrada value={cantidad} onChange={(v) => setCantidad(v.slice(0, 40))} />
+          {esVacuna && (
+            <Campo etiqueta="Unidad *">
+              <div className="grid grid-cols-3 gap-1 rounded-2xl bg-slate-100 p-1" role="radiogroup" aria-label="Unidad">
+                {UNIDADES_VACUNA.map((u) => (
+                  <button
+                    key={u}
+                    type="button"
+                    role="radio"
+                    aria-checked={unidad === u}
+                    onClick={() => setUnidad(u)}
+                    className={`rounded-xl py-2 text-sm font-semibold transition ${unidad === u ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+                  >
+                    {u}
+                  </button>
+                ))}
+              </div>
             </Campo>
-            <Campo etiqueta="Valor total">
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <Campo etiqueta={esVacuna ? `Cantidad${unidad ? ` (${unidad})` : ""} *` : "Cantidad"}>
+              <Entrada type="number" inputMode="decimal" value={cantidad} onChange={(v) => setCantidad(v.slice(0, 10))} />
+            </Campo>
+            <Campo etiqueta="Valor total *">
               <EntradaPesos value={valor} onChange={setValor} required />
             </Campo>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Campo etiqueta="Categoría">
-              <Selector value={categoria} onChange={setCategoria} opciones={CATEGORIAS_GASTO_PRODUCCION.map((c) => ({ valor: c, texto: c }))} />
-            </Campo>
-            <Campo etiqueta="Fecha">
-              <Entrada type="date" value={fecha} onChange={setFecha} required />
-            </Campo>
-          </div>
+          {cantidadNum > 0 && monto > 0 && (
+            <div className="flex items-center justify-between rounded-2xl bg-sky-50 px-4 py-2.5 ring-1 ring-sky-100">
+              <span className="text-sm text-sky-900">Valor por {esVacuna && unidad ? unidad : "unidad"}</span>
+              <span className="text-base font-bold tabular-nums text-sky-900">{formatoPesos(Math.round((monto / cantidadNum) * 100) / 100)}</span>
+            </div>
+          )}
+          <Campo etiqueta="Fecha">
+            <Entrada type="date" value={fecha} onChange={setFecha} required />
+          </Campo>
           <p className="text-xs text-slate-500">Se suma como gasto en la contabilidad general de la granja.</p>
           <div className="grid grid-cols-2 gap-2">
             <Boton variante="secundario" onClick={() => setNuevo(false)}>
               Cancelar
             </Boton>
-            <Boton type="submit" disabled={!descripcion.trim() || monto <= 0}>
+            <Boton type="submit" disabled={!categoria || !descripcion.trim() || monto <= 0 || (esVacuna && (!unidad || !(cantidadNum > 0)))}>
               Guardar
             </Boton>
           </div>
@@ -1422,7 +1461,8 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[13px] font-semibold text-slate-900">{g.descripcion}</p>
                     <p className="truncate text-[11px] text-slate-500">
-                      {g.categoria} · {formatoFecha(g.fecha)}
+                      {textoCategoriaProduccion(g.categoria)} · {formatoFecha(g.fecha)}
+                      {g.valorUnitario && g.cantidadNum ? ` · ${formatoPesos(g.valorUnitario)} por ${g.unidad ?? "unidad"}` : ""}
                     </p>
                   </div>
                   <span className="shrink-0 text-[13px] font-semibold tabular-nums text-slate-900">{formatoPesos(g.monto)}</span>

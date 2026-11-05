@@ -38,6 +38,7 @@ const CATEGORIAS: Record<Movimiento["tipo"], string[]> = {
     "Servicios (agua, luz)",
     "Mantenimiento",
     "Transporte",
+    "Bioseguridad",
     "Otros gastos",
     "Pérdidas",
   ],
