@@ -623,6 +623,12 @@ export interface CuentaPorPagar {
   categoria: string;
   total: number;
   abonos: AbonoFactura[];
+  /** Compra de Gastos de producción a crédito (Bodega) */
+  origen?: "produccion";
+  cantidad?: string;
+  unidad?: string;
+  cantidadNum?: number;
+  valorUnitario?: number;
 }
 export const leerCuentasPorPagar = () =>
   leer<CuentaPorPagar[]>(CLAVES.cuentasPagar, []).map((c) => ({ ...c, abonos: Array.isArray(c.abonos) ? c.abonos : [] }));
@@ -1328,18 +1334,62 @@ export function medicamentosRegistrados() {
 }
 
 /** Gastos registrados desde Bodega → Gastos de producción (más recientes primero) */
-export const leerGastosProduccion = () =>
-  leerMovimientos()
-    .filter((m) => m.origen === "produccion")
-    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+export interface GastoProduccion {
+  id: string;
+  fecha: string;
+  categoria: string;
+  descripcion: string;
+  monto: number;
+  cantidad?: string;
+  unidad?: string;
+  cantidadNum?: number;
+  valorUnitario?: number;
+  pago: "contado" | "credito";
+  /** Solo a crédito: lo que falta por pagar */
+  saldo?: number;
+}
+export const leerGastosProduccion = (): GastoProduccion[] =>
+  [
+    ...leerMovimientos()
+      .filter((m) => m.origen === "produccion")
+      .map((m) => ({ id: m.id, fecha: m.fecha, categoria: m.categoria, descripcion: m.descripcion, monto: m.monto, cantidad: m.cantidad, unidad: m.unidad, cantidadNum: m.cantidadNum, valorUnitario: m.valorUnitario, pago: "contado" as const })),
+    ...leerCuentasPorPagar()
+      .filter((c) => c.origen === "produccion")
+      .map((c) => ({ id: c.id, fecha: c.fecha, categoria: c.categoria, descripcion: c.descripcion, monto: c.total, cantidad: c.cantidad, unidad: c.unidad, cantidadNum: c.cantidadNum, valorUnitario: c.valorUnitario, pago: "credito" as const, saldo: saldoCuenta(c) })),
+  ].sort((a, b) => b.fecha.localeCompare(a.fecha));
+
+/** Elimina un gasto de producción (de contado o a crédito con sus abonos) */
+export function eliminarGastoProduccion(id: string) {
+  const cuenta = leerCuentasPorPagar().find((c) => c.id === id);
+  if (cuenta) {
+    const quitar = new Set(cuenta.abonos.map((a) => a.movimientoId).filter(Boolean));
+    if (quitar.size) guardarMovimientos(leerMovimientos().filter((m) => !quitar.has(m.id)));
+    guardarCuentasPorPagar(leerCuentasPorPagar().filter((c) => c.id !== id));
+    return;
+  }
+  guardarMovimientos(leerMovimientos().filter((m) => m.id !== id));
+}
 
 /** Registra un gasto de producción: queda como gasto en la contabilidad general */
-export function registrarGastoProduccion(datos: { descripcion: string; cantidad?: string; unidad?: string; valor: number; categoria: string; fecha: string }) {
+export function registrarGastoProduccion(datos: { descripcion: string; cantidad?: string; unidad?: string; valor: number; categoria: string; fecha: string; pago: "contado" | "credito" }) {
   const descripcion = datos.descripcion.trim().slice(0, 80);
   if (!descripcion || !(datos.valor > 0)) return false;
   const cantidadNum = Number(String(datos.cantidad ?? "").replace(",", ".")) || 0;
   const unidad = datos.unidad?.trim() || undefined;
   const cantidad = cantidadNum > 0 ? `${fmtNum(cantidadNum)}${unidad ? ` ${unidad}` : ""}` : datos.cantidad?.trim().slice(0, 40) || undefined;
+  const extra = {
+    ...(cantidad ? { cantidad } : {}),
+    ...(cantidadNum > 0 ? { cantidadNum, valorUnitario: Math.round((datos.valor / cantidadNum) * 100) / 100 } : {}),
+    ...(unidad ? { unidad } : {}),
+  };
+  // A crédito: queda en "Por pagar a crédito" y entra al balance cuando se abona o paga
+  if (datos.pago === "credito") {
+    guardarCuentasPorPagar([
+      ...leerCuentasPorPagar(),
+      { id: nuevoId(), fecha: datos.fecha, descripcion: cantidad ? `${descripcion} (${cantidad})` : descripcion, categoria: datos.categoria, total: Math.round(datos.valor), abonos: [], origen: "produccion", ...extra },
+    ]);
+    return true;
+  }
   guardarMovimientos([
     ...leerMovimientos(),
     {

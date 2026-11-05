@@ -56,6 +56,7 @@ import {
   horaActual,
   nombreLote,
   leerGastosProduccion,
+  eliminarGastoProduccion,
   registrarGastoProduccion,
   CATEGORIAS_GASTO_PRODUCCION,
   UNIDADES_VACUNA,
@@ -506,6 +507,22 @@ function NuevaFactura({
           </Campo>
           <Campo etiqueta="Fecha">
             <Entrada type="date" value={fecha} onChange={setFecha} required />
+          </Campo>
+          <Campo etiqueta="Método de pago *">
+            <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1" role="radiogroup" aria-label="Método de pago">
+              {(["contado", "credito"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="radio"
+                  aria-checked={pago === m}
+                  onClick={() => setPago(m)}
+                  className={`rounded-xl py-2 text-sm font-semibold transition ${pago === m ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+                >
+                  {m === "contado" ? "Contado" : "Crédito"}
+                </button>
+              ))}
+            </div>
           </Campo>
         </div>
         <Campo etiqueta="Proveedor">
@@ -1340,6 +1357,7 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
   const [valor, setValor] = useState("");
   const [categoria, setCategoria] = useState("");
   const [unidad, setUnidad] = useState("");
+  const [pago, setPago] = useState<"" | "contado" | "credito">("");
   const [fecha, setFecha] = useState(hoy());
   const esVacuna = categoria === "Medicamentos y vacunas";
   const cantidadNum = Number(cantidad.replace(",", ".")) || 0;
@@ -1356,7 +1374,9 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
     e.preventDefault();
     if (!categoria) return;
     if (esVacuna && (!unidad || !(cantidadNum > 0))) return;
-    if (!registrarGastoProduccion({ descripcion, cantidad, unidad: esVacuna ? unidad : undefined, valor: monto, categoria, fecha })) return;
+    if (!pago) return;
+    if (!registrarGastoProduccion({ descripcion, cantidad, unidad: esVacuna ? unidad : undefined, valor: monto, categoria, fecha, pago })) return;
+    setPago("");
     setDescripcion("");
     setCantidad("");
     setValor("");
@@ -1368,7 +1388,7 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
 
   const eliminar = async (id: string, texto: string) => {
     if (!(await confirmar({ titulo: "Eliminar gasto", mensaje: `${texto}. También se quitará de Contabilidad.`, aceptar: "Eliminar", destructivo: true }))) return;
-    guardarMovimientos(leerMovimientos().filter((m) => m.id !== id));
+    eliminarGastoProduccion(id);
   };
 
   return (
@@ -1432,12 +1452,16 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
           <Campo etiqueta="Fecha">
             <Entrada type="date" value={fecha} onChange={setFecha} required />
           </Campo>
-          <p className="text-xs text-slate-500">Se suma como gasto en la contabilidad general de la granja.</p>
+          <p className="text-xs text-slate-500">
+            {pago === "credito"
+              ? "Queda en Contabilidad → Por pagar a crédito; entra al balance cuando se abone o se pague."
+              : "Se suma como gasto en la contabilidad general de la granja."}
+          </p>
           <div className="grid grid-cols-2 gap-2">
             <Boton variante="secundario" onClick={() => setNuevo(false)}>
               Cancelar
             </Boton>
-            <Boton type="submit" disabled={!categoria || !descripcion.trim() || monto <= 0 || (esVacuna && (!unidad || !(cantidadNum > 0)))}>
+            <Boton type="submit" disabled={!pago || !categoria || !descripcion.trim() || monto <= 0 || (esVacuna && (!unidad || !(cantidadNum > 0)))}>
               Guardar
             </Boton>
           </div>
@@ -1463,6 +1487,7 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
                     <p className="truncate text-[11px] text-slate-500">
                       {textoCategoriaProduccion(g.categoria)} · {formatoFecha(g.fecha)}
                       {g.valorUnitario && g.cantidadNum ? ` · ${formatoPesos(g.valorUnitario)} por ${g.unidad ?? "unidad"}` : ""}
+                      {g.pago === "credito" ? <span className="font-semibold text-orange-600">{(g.saldo ?? 0) > 0 ? ` · crédito, debe ${formatoPesos(g.saldo ?? 0)}` : " · crédito pagado"}</span> : null}
                     </p>
                   </div>
                   <span className="shrink-0 text-[13px] font-semibold tabular-nums text-slate-900">{formatoPesos(g.monto)}</span>
