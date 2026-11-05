@@ -191,6 +191,7 @@ export interface Movimiento {
   unidad?: string;
   cantidadNum?: number;
   valorUnitario?: number;
+  marca?: string;
   /** Cantidad escrita libremente (gastos de producción), p. ej. "3 frascos" */
   cantidad?: string;
   /** Cerda a la que corresponde el gasto (p. ej. la genética de una inseminación) */
@@ -629,6 +630,7 @@ export interface CuentaPorPagar {
   unidad?: string;
   cantidadNum?: number;
   valorUnitario?: number;
+  marca?: string;
 }
 export const leerCuentasPorPagar = () =>
   leer<CuentaPorPagar[]>(CLAVES.cuentasPagar, []).map((c) => ({ ...c, abonos: Array.isArray(c.abonos) ? c.abonos : [] }));
@@ -1344,6 +1346,7 @@ export interface GastoProduccion {
   unidad?: string;
   cantidadNum?: number;
   valorUnitario?: number;
+  marca?: string;
   pago: "contado" | "credito";
   /** Solo a crédito: lo que falta por pagar */
   saldo?: number;
@@ -1352,10 +1355,10 @@ export const leerGastosProduccion = (): GastoProduccion[] =>
   [
     ...leerMovimientos()
       .filter((m) => m.origen === "produccion")
-      .map((m) => ({ id: m.id, fecha: m.fecha, categoria: m.categoria, descripcion: m.descripcion, monto: m.monto, cantidad: m.cantidad, unidad: m.unidad, cantidadNum: m.cantidadNum, valorUnitario: m.valorUnitario, pago: "contado" as const })),
+      .map((m) => ({ id: m.id, fecha: m.fecha, categoria: m.categoria, descripcion: m.descripcion, monto: m.monto, cantidad: m.cantidad, unidad: m.unidad, cantidadNum: m.cantidadNum, valorUnitario: m.valorUnitario, marca: m.marca, pago: "contado" as const })),
     ...leerCuentasPorPagar()
       .filter((c) => c.origen === "produccion")
-      .map((c) => ({ id: c.id, fecha: c.fecha, categoria: c.categoria, descripcion: c.descripcion, monto: c.total, cantidad: c.cantidad, unidad: c.unidad, cantidadNum: c.cantidadNum, valorUnitario: c.valorUnitario, pago: "credito" as const, saldo: saldoCuenta(c) })),
+      .map((c) => ({ id: c.id, fecha: c.fecha, categoria: c.categoria, descripcion: c.descripcion, monto: c.total, cantidad: c.cantidad, unidad: c.unidad, cantidadNum: c.cantidadNum, valorUnitario: c.valorUnitario, marca: c.marca, pago: "credito" as const, saldo: saldoCuenta(c) })),
   ].sort((a, b) => b.fecha.localeCompare(a.fecha));
 
 /** Elimina un gasto de producción (de contado o a crédito con sus abonos) */
@@ -1371,13 +1374,15 @@ export function eliminarGastoProduccion(id: string) {
 }
 
 /** Registra un gasto de producción: queda como gasto en la contabilidad general */
-export function registrarGastoProduccion(datos: { descripcion: string; cantidad?: string; unidad?: string; valor: number; categoria: string; fecha: string; pago: "contado" | "credito" }) {
+export function registrarGastoProduccion(datos: { descripcion: string; cantidad?: string; unidad?: string; marca?: string; valor: number; categoria: string; fecha: string; pago: "contado" | "credito" }) {
   const descripcion = datos.descripcion.trim().slice(0, 80);
   if (!descripcion || !(datos.valor > 0)) return false;
   const cantidadNum = Number(String(datos.cantidad ?? "").replace(",", ".")) || 0;
   const unidad = datos.unidad?.trim() || undefined;
   const cantidad = cantidadNum > 0 ? `${fmtNum(cantidadNum)}${unidad ? ` ${unidad}` : ""}` : datos.cantidad?.trim().slice(0, 40) || undefined;
+  const marca = datos.marca?.trim().slice(0, 40) || undefined;
   const extra = {
+    ...(marca ? { marca } : {}),
     ...(cantidad ? { cantidad } : {}),
     ...(cantidadNum > 0 ? { cantidadNum, valorUnitario: Math.round((datos.valor / cantidadNum) * 100) / 100 } : {}),
     ...(unidad ? { unidad } : {}),
@@ -1386,7 +1391,7 @@ export function registrarGastoProduccion(datos: { descripcion: string; cantidad?
   if (datos.pago === "credito") {
     guardarCuentasPorPagar([
       ...leerCuentasPorPagar(),
-      { id: nuevoId(), fecha: datos.fecha, descripcion: cantidad ? `${descripcion} (${cantidad})` : descripcion, categoria: datos.categoria, total: Math.round(datos.valor), abonos: [], origen: "produccion", ...extra },
+      { id: nuevoId(), fecha: datos.fecha, descripcion: `${descripcion}${marca ? ` · ${marca}` : ""}${cantidad ? ` (${cantidad})` : ""}`, categoria: datos.categoria, total: Math.round(datos.valor), abonos: [], origen: "produccion", ...extra },
     ]);
     return true;
   }
@@ -1397,12 +1402,10 @@ export function registrarGastoProduccion(datos: { descripcion: string; cantidad?
       fecha: datos.fecha,
       tipo: "gasto",
       categoria: datos.categoria,
-      descripcion: cantidad ? `${descripcion} (${cantidad})` : descripcion,
+      descripcion: `${descripcion}${marca ? ` · ${marca}` : ""}${cantidad ? ` (${cantidad})` : ""}`,
       monto: Math.round(datos.valor),
       origen: "produccion",
-      ...(cantidad ? { cantidad } : {}),
-      ...(cantidadNum > 0 ? { cantidadNum, valorUnitario: Math.round((datos.valor / cantidadNum) * 100) / 100 } : {}),
-      ...(unidad ? { unidad } : {}),
+      ...extra,
     },
   ]);
   return true;

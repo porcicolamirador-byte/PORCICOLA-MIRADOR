@@ -508,22 +508,6 @@ function NuevaFactura({
           <Campo etiqueta="Fecha">
             <Entrada type="date" value={fecha} onChange={setFecha} required />
           </Campo>
-          <Campo etiqueta="Método de pago *">
-            <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1" role="radiogroup" aria-label="Método de pago">
-              {(["contado", "credito"] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  role="radio"
-                  aria-checked={pago === m}
-                  onClick={() => setPago(m)}
-                  className={`rounded-xl py-2 text-sm font-semibold transition ${pago === m ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
-                >
-                  {m === "contado" ? "Contado" : "Crédito"}
-                </button>
-              ))}
-            </div>
-          </Campo>
         </div>
         <Campo etiqueta="Proveedor">
           <input
@@ -1358,6 +1342,7 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
   const [categoria, setCategoria] = useState("");
   const [unidad, setUnidad] = useState("");
   const [pago, setPago] = useState<"" | "contado" | "credito">("");
+  const [marca, setMarca] = useState("");
   const [fecha, setFecha] = useState(hoy());
   const esVacuna = categoria === "Medicamentos y vacunas";
   const cantidadNum = Number(cantidad.replace(",", ".")) || 0;
@@ -1375,8 +1360,9 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
     if (!categoria) return;
     if (esVacuna && (!unidad || !(cantidadNum > 0))) return;
     if (!pago) return;
-    if (!registrarGastoProduccion({ descripcion, cantidad, unidad: esVacuna ? unidad : undefined, valor: monto, categoria, fecha, pago })) return;
+    if (!registrarGastoProduccion({ descripcion, cantidad, unidad: esVacuna ? unidad : undefined, marca: esVacuna ? marca : undefined, valor: monto, categoria, fecha, pago })) return;
     setPago("");
+    setMarca("");
     setDescripcion("");
     setCantidad("");
     setValor("");
@@ -1407,7 +1393,10 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
               value={categoria}
               onChange={(v) => {
                 setCategoria(v);
-                if (v !== "Medicamentos y vacunas") setUnidad("");
+                if (v !== "Medicamentos y vacunas") {
+                  setUnidad("");
+                  setMarca("");
+                }
               }}
               titulo="Categoría"
               placeholder="Elige la categoría"
@@ -1418,22 +1407,14 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
             <Entrada value={descripcion} onChange={(v) => setDescripcion(v.slice(0, 80))} required />
           </Campo>
           {esVacuna && (
-            <Campo etiqueta="Unidad *">
-              <div className="grid grid-cols-3 gap-1 rounded-2xl bg-slate-100 p-1" role="radiogroup" aria-label="Unidad">
-                {UNIDADES_VACUNA.map((u) => (
-                  <button
-                    key={u}
-                    type="button"
-                    role="radio"
-                    aria-checked={unidad === u}
-                    onClick={() => setUnidad(u)}
-                    className={`rounded-xl py-2 text-sm font-semibold transition ${unidad === u ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
-                  >
-                    {u}
-                  </button>
-                ))}
-              </div>
-            </Campo>
+            <div className="grid grid-cols-2 gap-3">
+              <Campo etiqueta="Unidad *">
+                <Selector value={unidad} onChange={setUnidad} titulo="Unidad" placeholder="Elige" opciones={UNIDADES_VACUNA.map((u) => ({ valor: u, texto: u }))} />
+              </Campo>
+              <Campo etiqueta="Marca">
+                <Entrada value={marca} onChange={(v) => setMarca(v.slice(0, 40))} />
+              </Campo>
+            </div>
           )}
           <div className="grid grid-cols-2 gap-3">
             <Campo etiqueta={esVacuna ? `Cantidad${unidad ? ` (${unidad})` : ""} *` : "Cantidad"}>
@@ -1451,6 +1432,22 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
           )}
           <Campo etiqueta="Fecha">
             <Entrada type="date" value={fecha} onChange={setFecha} required />
+          </Campo>
+          <Campo etiqueta="Método de pago *">
+            <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1" role="radiogroup" aria-label="Método de pago">
+              {(["contado", "credito"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="radio"
+                  aria-checked={pago === m}
+                  onClick={() => setPago(m)}
+                  className={`rounded-xl py-2 text-sm font-semibold transition ${pago === m ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+                >
+                  {m === "contado" ? "Contado" : "Crédito"}
+                </button>
+              ))}
+            </div>
           </Campo>
           <p className="text-xs text-slate-500">
             {pago === "credito"
