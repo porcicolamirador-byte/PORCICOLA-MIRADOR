@@ -125,44 +125,50 @@ export default function DialogoHost() {
       aria-modal="true"
       aria-labelledby="dialogo-titulo"
       aria-describedby={mensaje ? "dialogo-mensaje" : undefined}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-6"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-5"
     >
       <div
         aria-hidden="true"
-        className="dialogo-fondo absolute inset-0 bg-slate-950/40"
+        className="dialogo-fondo absolute inset-0 bg-slate-950/50 backdrop-blur-[2px]"
         onClick={() => cancelar !== null && cerrar(false)}
       />
-      <div className="dialogo-caja relative w-full max-w-[290px] overflow-hidden rounded-[18px] bg-white/95 text-center shadow-2xl backdrop-blur-xl">
-        <div className="px-5 pb-4 pt-5">
-          <h2 id="dialogo-titulo" className="text-[17px] font-semibold leading-snug text-slate-900">
+      {/* Mismo estilo que las ventanas de la app: encabezado azul, texto y botones redondeados */}
+      <div className="dialogo-caja relative w-full max-w-sm overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-black/5">
+        <div className={`flex items-center gap-3 px-5 py-4 ${destructivo ? "bg-rose-700" : "bg-sky-900"}`}>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-xl" aria-hidden="true">
+            {destructivo ? "🗑️" : cancelar === null ? "ℹ️" : "❔"}
+          </span>
+          <h2 id="dialogo-titulo" className="min-w-0 text-[17px] font-bold leading-snug text-white">
             {titulo}
           </h2>
+        </div>
+        <div className="flex flex-col gap-4 px-5 pb-5 pt-4">
           {mensaje && (
-            <p id="dialogo-mensaje" className="mt-1.5 text-[13px] leading-snug text-slate-600">
+            <p id="dialogo-mensaje" className="text-[15px] leading-snug text-slate-600">
               {mensaje}
             </p>
           )}
-        </div>
-        <div className={`grid border-t border-slate-200 ${cancelar !== null ? "grid-cols-2 divide-x divide-slate-200" : "grid-cols-1"}`}>
-          {cancelar !== null && (
+          <div className={`grid gap-2 ${cancelar !== null ? "grid-cols-2" : "grid-cols-1"}`}>
+            {cancelar !== null && (
+              <button
+                type="button"
+                onClick={() => cerrar(false)}
+                className="rounded-2xl py-3 text-[15px] font-semibold text-slate-700 ring-1 ring-slate-300 transition active:bg-slate-100"
+              >
+                {cancelar}
+              </button>
+            )}
             <button
+              ref={botonPrincipal}
               type="button"
-              onClick={() => cerrar(false)}
-              className="py-3 text-[17px] text-sky-700 transition active:bg-slate-100"
+              onClick={() => cerrar(true)}
+              className={`rounded-2xl py-3 text-[15px] font-semibold text-white transition focus-visible:outline-none ${
+                destructivo ? "bg-rose-600 active:bg-rose-700" : "bg-sky-900 active:bg-sky-950"
+              }`}
             >
-              {cancelar}
+              {aceptar}
             </button>
-          )}
-          <button
-            ref={botonPrincipal}
-            type="button"
-            onClick={() => cerrar(true)}
-            className={`py-3 text-[17px] font-semibold transition active:bg-slate-100 focus-visible:outline-none ${
-              destructivo ? "text-red-600" : "text-sky-700"
-            }`}
-          >
-            {aceptar}
-          </button>
+          </div>
         </div>
       </div>
 
@@ -170,7 +176,7 @@ export default function DialogoHost() {
         .dialogo-fondo { animation: dialogo-fade 160ms ease-out both; }
         .dialogo-caja { animation: dialogo-entrar 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
         @keyframes dialogo-fade { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes dialogo-entrar { from { transform: scale(1.12); opacity: 0 } to { transform: none; opacity: 1 } }
+        @keyframes dialogo-entrar { from { transform: translateY(12px) scale(0.97); opacity: 0 } to { transform: none; opacity: 1 } }
         @media (prefers-reduced-motion: reduce) { .dialogo-fondo, .dialogo-caja { animation: none; } }
       `}</style>
     </div>
