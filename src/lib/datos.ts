@@ -815,7 +815,7 @@ export function calcularInventario(opciones: { incluirInactivos?: boolean; exclu
       origen: p,
       precioBase: !presto && pr.valorUnitario > 0 ? pr.valorUnitario / factorKg(p) : undefined,
     });
-    for (const d of pr.devoluciones ?? []) {
+    for (const d of (pr.devoluciones ?? []).filter(esEnProducto)) {
       const c = Number(d.cantidad) || 0;
       agregar(p, {
         fecha: d.fecha,
@@ -991,7 +991,15 @@ export interface DevolucionPrestamo {
   fecha: string;
   hora?: string;
   cantidad: number;
+  /** producto (vuelve a la otra bodega), pago (se paga de contado) o regalo (la granja que presta lo gratifica) */
+  tipo?: "producto" | "pago" | "regalo";
+  /** Pago de contado: valor pagado */
+  monto?: number;
+  /** Ingreso ya registrado en la contabilidad de la granja que prestó */
+  ingresoId?: string;
 }
+/** Solo las devoluciones en producto mueven inventario */
+const esEnProducto = (d: { tipo?: string }) => !d.tipo || d.tipo === "producto";
 /** Préstamo de una bodega a otra (común a todas las granjas) */
 export interface PrestamoBodega {
   id: string;
@@ -1103,7 +1111,7 @@ export interface PrestamoMedicamento {
   fecha: string;
   hora?: string;
   /** "fuente": de qué compra de la granja que debe salió lo devuelto (o el mismo préstamo) */
-  devoluciones: { id: string; fecha: string; hora?: string; cantidad: number; fuente: string }[];
+  devoluciones: { id: string; fecha: string; hora?: string; cantidad: number; fuente: string; tipo?: "producto" | "pago" | "regalo"; monto?: number; ingresoId?: string }[];
 }
 export function leerPrestamosMedicamento(): PrestamoMedicamento[] {
   const v = leer<PrestamoMedicamento[]>(CLAVE_PRESTAMOS, []);
@@ -1133,12 +1141,24 @@ export function prestarMedicamento(gastoId: string, aGranja: string, cantidad: n
 }
 
 /** Devuelve un medicamento prestado: sale de una compra de esta granja (o de lo prestado sin usar) */
-export function devolverMedicamento(prestamoId: string, cantidad: number, fuente: string): string | null {
+export function devolverMedicamento(prestamoId: string, cantidad: number, fuente: string, modo: "producto" | "pago" = "producto"): string | null {
   const lista = leerPrestamosMedicamento();
   const pr = lista.find((p) => p.id === prestamoId);
   if (!pr || pr.a !== granjaActual()) return "Préstamo no encontrado";
   if (!(cantidad > 0)) return "Escribe una cantidad mayor que cero";
   if (cantidad > pendientePrestamoMed(pr) + 1e-9) return `Solo se deben ${fmtNum(pendientePrestamoMed(pr))} ${pr.unidad}`;
+  if (modo === "pago") {
+    const monto = Math.round(cantidad * (Number(pr.valorUnitario) || 0));
+    if (!(monto > 0)) return "Este préstamo no tiene valor para pagarlo";
+    guardarMovimientos([
+      ...leerMovimientos(),
+      { id: nuevoId(), fecha: hoy(), tipo: "gasto", categoria: "Medicamentos y vacunas", descripcion: `Pago de préstamo a ${pr.deNombre} · ${pr.nombre} (${fmtNum(cantidad)} ${pr.unidad})`, monto },
+    ]);
+    guardarPrestamosMedicamento(
+      lista.map((p) => (p.id === prestamoId ? { ...p, devoluciones: [...(p.devoluciones ?? []), { id: nuevoId(), fecha: hoy(), hora: horaActual(), cantidad, fuente: "", tipo: "pago" as const, monto }] } : p))
+    );
+    return null;
+  }
   const f = medicamentosRegistrados().find((m) => m.id === fuente);
   if (!f) return "Elige de dónde sale lo que devuelves";
   const enUnidad = convertirUnidad(cantidad, pr.unidad, f.unidad);
@@ -1185,19 +1205,78 @@ export function prestarProducto(productoId: string, aGranja: string, cantidad: n
 }
 
 /** Devuelve (todo o parte) de un préstamo recibido, según lo que haya en esta bodega */
-export function devolverPrestamo(prestamoId: string, cantidad: number): string | null {
+export function devolverPrestamo(prestamoId: string, cantidad: number, modo: "producto" | "pago" = "producto"): string | null {
   const lista = leerPrestamos();
   const pr = lista.find((p) => p.id === prestamoId);
   if (!pr || pr.a !== granjaActual()) return "Préstamo no encontrado";
   const falta = pendientePrestamo(pr);
   if (!(cantidad > 0)) return "Escribe una cantidad mayor que cero";
   if (cantidad > falta + 1e-9) return `Solo se deben ${fmtNum(falta)} ${pr.unidad}`;
-  const item = calcularInventario().find((i) => codigoDe(i.producto) === pr.codigo && !i.subproducto);
-  if (!item || cantidad > item.disponible + 1e-9) return `No hay suficiente ${pr.nombre} en bodega para devolver`;
+  let monto: number | undefined;
+  if (modo === "producto") {
+    const item = calcularInventario().find((i) => codigoDe(i.producto) === pr.codigo && !i.subproducto);
+    if (!item || cantidad > item.disponible + 1e-9) return `No hay suficiente ${pr.nombre} en bodega para devolver`;
+  } else {
+    monto = Math.round(cantidad * (Number(pr.valorUnitario) || 0));
+    if (!(monto > 0)) return "Este préstamo no tiene valor de referencia para pagarlo";
+    // Gasto de contado en esta granja (lo que se queda se paga)
+    guardarMovimientos([
+      ...leerMovimientos(),
+      { id: nuevoId(), fecha: hoy(), tipo: "gasto", categoria: "Alimento", descripcion: `Pago de préstamo a ${pr.deNombre} · ${pr.nombre} (${fmtNum(cantidad)} ${pr.unidad})`, monto },
+    ]);
+  }
   guardarPrestamos(
-    lista.map((p) => (p.id === prestamoId ? { ...p, devoluciones: [...(p.devoluciones ?? []), { id: nuevoId(), fecha: hoy(), hora: horaActual(), cantidad }] } : p))
+    lista.map((p) =>
+      p.id === prestamoId ? { ...p, devoluciones: [...(p.devoluciones ?? []), { id: nuevoId(), fecha: hoy(), hora: horaActual(), cantidad, tipo: modo, ...(monto ? { monto } : {}) }] } : p
+    )
   );
   return null;
+}
+
+/** La granja que prestó regala lo que falta (ya no se debe) */
+export function gratificarPrestamo(prestamoId: string, clase: "alimento" | "medicamento"): boolean {
+  const g = granjaActual();
+  if (clase === "alimento") {
+    const lista = leerPrestamos();
+    const pr = lista.find((p) => p.id === prestamoId);
+    if (!pr || pr.de !== g) return false;
+    const falta = pendientePrestamo(pr);
+    if (falta <= 0) return false;
+    guardarPrestamos(lista.map((p) => (p.id === prestamoId ? { ...p, devoluciones: [...(p.devoluciones ?? []), { id: nuevoId(), fecha: hoy(), hora: horaActual(), cantidad: falta, tipo: "regalo" as const }] } : p)));
+    return true;
+  }
+  const lista = leerPrestamosMedicamento();
+  const pr = lista.find((p) => p.id === prestamoId);
+  if (!pr || pr.de !== g) return false;
+  const falta = pendientePrestamoMed(pr);
+  if (falta <= 0) return false;
+  guardarPrestamosMedicamento(lista.map((p) => (p.id === prestamoId ? { ...p, devoluciones: [...(p.devoluciones ?? []), { id: nuevoId(), fecha: hoy(), hora: horaActual(), cantidad: falta, fuente: "", tipo: "regalo" as const }] } : p)));
+  return true;
+}
+
+/** En la granja que prestó: registra como ingreso los pagos de contado que le hicieron */
+export function registrarPagosPrestamos() {
+  const g = granjaActual();
+  const nuevos: Movimiento[] = [];
+  const marcar = new Map<string, string>();
+  const revisar = (pr: { id: string; de: string; aNombre: string; nombre: string; unidad: string; devoluciones?: { id: string; tipo?: string; monto?: number; ingresoId?: string; cantidad: number; fecha: string }[] }, categoria: string) => {
+    if (pr.de !== g) return;
+    for (const d of pr.devoluciones ?? []) {
+      if (d.tipo !== "pago" || d.ingresoId || !(Number(d.monto) > 0)) continue;
+      const id = nuevoId();
+      nuevos.push({ id, fecha: d.fecha, tipo: "ingreso", categoria, descripcion: `Pago de préstamo de ${pr.aNombre} · ${pr.nombre} (${fmtNum(d.cantidad)} ${pr.unidad})`, monto: Math.round(Number(d.monto)) });
+      marcar.set(d.id, id);
+    }
+  };
+  for (const pr of leerPrestamos()) revisar(pr, "Otros ingresos");
+  for (const pr of leerPrestamosMedicamento()) revisar(pr, "Otros ingresos");
+  if (!nuevos.length) return;
+  guardarMovimientos([...leerMovimientos(), ...nuevos]);
+  const todos = leer<{ devoluciones?: { id: string; ingresoId?: string }[] }[]>(CLAVE_PRESTAMOS, []);
+  escribir(
+    CLAVE_PRESTAMOS,
+    (Array.isArray(todos) ? todos : []).map((p) => ({ ...p, devoluciones: (p.devoluciones ?? []).map((d) => (marcar.has(d.id) ? { ...d, ingresoId: marcar.get(d.id) } : d)) }))
+  );
 }
 
 /** Kilos que trae cada bulto de alimento */
@@ -1459,9 +1538,9 @@ export function medicamentosRegistrados() {
   const prestamos = leerPrestamosMedicamento();
   for (const pr of prestamos) {
     // Lo que se prestó sale de la compra; lo que devuelven vuelve a ella
-    if (pr.de === g) sumar(pr.gastoId, (Number(pr.cantidad) || 0) - (pr.devoluciones ?? []).reduce((t, d) => t + (Number(d.cantidad) || 0), 0));
-    // Lo que esta granja devolvió sale de la compra (o del préstamo) que eligió
-    if (pr.a === g) for (const d of pr.devoluciones ?? []) sumar(d.fuente, Number(d.cantidad) || 0);
+    if (pr.de === g) sumar(pr.gastoId, (Number(pr.cantidad) || 0) - (pr.devoluciones ?? []).filter(esEnProducto).reduce((t, d) => t + (Number(d.cantidad) || 0), 0));
+    // Lo que esta granja devolvió en producto sale de la compra (o del préstamo) que eligió
+    if (pr.a === g) for (const d of (pr.devoluciones ?? []).filter(esEnProducto)) if (d.fuente) sumar(d.fuente, Number(d.cantidad) || 0);
   }
   const propios = leerGastosProduccion()
     .filter((m) => m.categoria === "Medicamentos y vacunas" && m.unidad && (m.cantidadNum ?? 0) > 0 && (m.valorUnitario ?? 0) > 0)

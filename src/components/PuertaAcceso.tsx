@@ -1,7 +1,7 @@
 "use client";
 
 import { aplicarDescuentoCerdas } from "@/lib/consumoCerdas";
-import { publicarExistencias, vencerGeneticasPendientes } from "@/lib/datos";
+import { publicarExistencias, registrarPagosPrestamos, vencerGeneticasPendientes } from "@/lib/datos";
 import { useVersionDatos } from "@/lib/datos";
 import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
@@ -91,6 +91,8 @@ export default function PuertaAcceso({ children }: { children: ReactNode }) {
       vencerGeneticasPendientes();
       // Lo que tiene esta granja, para que las otras puedan tomar prestado
       publicarExistencias();
+      // Pagos de contado de préstamos que hicieron a esta granja → ingreso
+      registrarPagosPrestamos();
     }, 800);
     return () => clearTimeout(t);
   }, [abierta, versionDatos]);

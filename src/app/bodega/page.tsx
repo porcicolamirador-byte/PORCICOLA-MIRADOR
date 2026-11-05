@@ -23,6 +23,7 @@ import {
   devolverMedicamento,
   leerExistenciasGranjas,
   tomarPrestado,
+  gratificarPrestamo,
   type ExistenciasGranja,
   leerPrestamos,
   leerPrestamosMedicamento,
@@ -989,6 +990,12 @@ function AvisosPrestamos() {
     };
   }, [version]);
   const [devolverMed, setDevolverMed] = useState<PrestamoMedicamento | null>(null);
+  // Solo la granja que prestó puede regalar lo que le deben
+  const gratificar = async (id: string, clase: "alimento" | "medicamento", que: string, granja: string) => {
+    if (!puede("bodega")) return void avisarSinPermisoBodega();
+    const ok = await confirmar({ titulo: "Gratificar préstamo", mensaje: `${granja} ya no deberá ${que}. Se toma como un regalo: no vuelve el producto ni se cobra.`, aceptar: "Gratificar" });
+    if (ok) gratificarPrestamo(id, clase);
+  };
   if (!datos || (datos.debo.length === 0 && datos.meDeben.length === 0 && datos.medDebo.length === 0 && datos.medMeDeben.length === 0)) return null;
   return (
     <div className="flex flex-col gap-2">
@@ -1000,12 +1007,11 @@ function AvisosPrestamos() {
             </p>
             <p className="text-xs text-orange-700">
               Préstamo de {p.deNombre} · {formatoFecha(p.fecha, true)}
-              {hay <= 0 ? " · sin existencia para devolver" : ""}
+              {hay <= 0 ? " · sin existencia (puedes pagarlo)" : ""}
             </p>
           </div>
           <button
             type="button"
-            disabled={hay <= 0}
             onClick={() => (puede("bodega") ? setDevolver(p) : void avisarSinPermisoBodega())}
             className="shrink-0 rounded-full bg-orange-600 px-3.5 py-2 text-xs font-semibold text-white transition active:scale-95 disabled:opacity-40"
           >
@@ -1014,11 +1020,20 @@ function AvisosPrestamos() {
         </div>
       ))}
       {datos.meDeben.map((p) => (
-        <div key={p.id} className="rounded-2xl bg-orange-50/60 px-3.5 py-2.5 ring-1 ring-orange-100">
-          <p className="text-sm font-semibold text-orange-700">
-            {p.aNombre} te debe {fmt(pendientePrestamo(p))} {p.unidad} de {p.nombre}
-          </p>
-          <p className="text-xs text-orange-600">Prestado el {formatoFecha(p.fecha, true)}</p>
+        <div key={p.id} className="flex items-center gap-3 rounded-2xl bg-orange-50/60 px-3.5 py-2.5 ring-1 ring-orange-100">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-orange-700">
+              {p.aNombre} te debe {fmt(pendientePrestamo(p))} {p.unidad} de {p.nombre}
+            </p>
+            <p className="text-xs text-orange-600">Prestado el {formatoFecha(p.fecha, true)}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void gratificar(p.id, "alimento", `${fmt(pendientePrestamo(p))} ${p.unidad} de ${p.nombre}`, p.aNombre)}
+            className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold text-orange-700 ring-1 ring-orange-300 transition active:bg-orange-100"
+          >
+            Gratificar
+          </button>
         </div>
       ))}
       {datos.medDebo.map((p) => (
@@ -1041,11 +1056,20 @@ function AvisosPrestamos() {
         </div>
       ))}
       {datos.medMeDeben.map((p) => (
-        <div key={p.id} className="rounded-2xl bg-orange-50/60 px-3.5 py-2.5 ring-1 ring-orange-100">
-          <p className="text-sm font-semibold text-orange-700">
-            {p.aNombre} te debe {fmt(pendientePrestamoMed(p))} {p.unidad} de {p.nombre}
-          </p>
-          <p className="text-xs text-orange-600">Prestado el {formatoFecha(p.fecha, true)}</p>
+        <div key={p.id} className="flex items-center gap-3 rounded-2xl bg-orange-50/60 px-3.5 py-2.5 ring-1 ring-orange-100">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-orange-700">
+              {p.aNombre} te debe {fmt(pendientePrestamoMed(p))} {p.unidad} de {p.nombre}
+            </p>
+            <p className="text-xs text-orange-600">Prestado el {formatoFecha(p.fecha, true)}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void gratificar(p.id, "medicamento", `${fmt(pendientePrestamoMed(p))} ${p.unidad} de ${p.nombre}`, p.aNombre)}
+            className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold text-orange-700 ring-1 ring-orange-300 transition active:bg-orange-100"
+          >
+            Gratificar
+          </button>
         </div>
       ))}
       {devolver && <DevolverPrestamo prestamo={devolver} onCerrar={() => setDevolver(null)} />}
@@ -1104,17 +1128,39 @@ function DevolverMedicamento({ prestamo: p, onCerrar }: { prestamo: PrestamoMedi
   const [fuente, setFuente] = useState(fuentes.find((m) => m.id === `pr:${p.id}`)?.id ?? fuentes[0]?.id ?? "");
   const [cantidad, setCantidad] = useState(String(Math.floor(falta * 100) / 100).replace(".", ","));
   const [error, setError] = useState("");
+  const [modo, setModo] = useState<"producto" | "pago">(fuentes.length ? "producto" : "pago");
   const guardar = async (e: FormEvent) => {
     e.preventDefault();
     const n = num(cantidad);
-    const r = devolverMedicamento(p.id, n, fuente);
+    const r = devolverMedicamento(p.id, n, fuente, modo);
     if (r) return setError(r);
     onCerrar();
-    await avisar({ titulo: "Devolución registrada", mensaje: `Se devolvieron ${fmt(n)} ${p.unidad} de ${p.nombre} a ${p.deNombre}.` });
+    await avisar({
+      titulo: modo === "pago" ? "Pago registrado" : "Devolución registrada",
+      mensaje:
+        modo === "pago"
+          ? `Se pagaron ${formatoPesos(Math.round(n * (p.valorUnitario || 0)))} a ${p.deNombre} por ${fmt(n)} ${p.unidad} de ${p.nombre}. Quedó como gasto de contado en Contabilidad.`
+          : `Se devolvieron ${fmt(n)} ${p.unidad} de ${p.nombre} a ${p.deNombre}.`,
+    });
   };
   return (
     <Modal abierta etiqueta={p.nombre} titulo={`Devolver a ${p.deNombre}`} subtitulo={`Debes ${fmt(falta)} ${p.unidad}`} onCerrar={onCerrar}>
       <form onSubmit={guardar} className="flex flex-col gap-3.5">
+        <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1" role="radiogroup" aria-label="Cómo devolver">
+          {(["producto", "pago"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              role="radio"
+              aria-checked={modo === m}
+              onClick={() => setModo(m)}
+              className={`rounded-xl py-2 text-sm font-semibold transition ${modo === m ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+            >
+              {m === "producto" ? "En producto" : "Pagar de contado"}
+            </button>
+          ))}
+        </div>
+        {modo === "producto" && (
         <Campo etiqueta="Sale de *">
           {fuentes.length ? (
             <SelectorApp
@@ -1129,16 +1175,23 @@ function DevolverMedicamento({ prestamo: p, onCerrar }: { prestamo: PrestamoMedi
             <p className="rounded-xl bg-slate-50 px-3.5 py-2.5 text-sm text-slate-500">No hay existencia para devolver. Ingresa la compra en Gastos de producción.</p>
           )}
         </Campo>
-        <Campo etiqueta={`Cantidad a devolver (${p.unidad}) *`}>
+        )}
+        <Campo etiqueta={`Cantidad ${modo === "pago" ? "a pagar" : "a devolver"} (${p.unidad}) *`}>
           <Entrada type="number" inputMode="decimal" value={cantidad} onChange={setCantidad} />
         </Campo>
+        {modo === "pago" && (
+          <div className="flex items-center justify-between rounded-2xl bg-sky-50 px-4 py-2.5 ring-1 ring-sky-100">
+            <span className="text-sm text-sky-900">Valor a pagar ({formatoPesos(p.valorUnitario)} por {p.unidad.replace(/s$/, "")})</span>
+            <span className="text-base font-bold tabular-nums text-sky-900">{formatoPesos(Math.round(num(cantidad) * (p.valorUnitario || 0)))}</span>
+          </div>
+        )}
         {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
         <div className="grid grid-cols-2 gap-2">
           <Boton variante="secundario" onClick={onCerrar}>
             Cancelar
           </Boton>
-          <Boton type="submit" disabled={!fuente || !(num(cantidad) > 0)}>
-            Devolver
+          <Boton type="submit" disabled={(modo === "producto" && !fuente) || !(num(cantidad) > 0)}>
+            {modo === "pago" ? "Pagar" : "Devolver"}
           </Boton>
         </div>
       </form>
@@ -1149,33 +1202,64 @@ function DevolverMedicamento({ prestamo: p, onCerrar }: { prestamo: PrestamoMedi
 function DevolverPrestamo({ prestamo: p, onCerrar }: { prestamo: PrestamoBodega; onCerrar: () => void }) {
   const falta = pendientePrestamo(p);
   const hay = calcularInventario().find((i) => codigoDe(i.producto) === p.codigo && !i.subproducto)?.disponible ?? 0;
-  const maximo = Math.max(0, Math.min(falta, hay));
-  const [cantidad, setCantidad] = useState(String(Math.floor(maximo * 100) / 100).replace(".", ","));
+  const [modo, setModo] = useState<"producto" | "pago">(hay > 0 ? "producto" : "pago");
+  const maximo = modo === "pago" ? falta : Math.max(0, Math.min(falta, hay));
+  const [cantidad, setCantidad] = useState(String(Math.floor((hay > 0 ? Math.min(falta, hay) : falta) * 100) / 100).replace(".", ","));
   const [error, setError] = useState("");
   const guardar = async (e: FormEvent) => {
     e.preventDefault();
     const n = num(cantidad);
-    const r = devolverPrestamo(p.id, n);
+    const r = devolverPrestamo(p.id, n, modo);
     if (r) return setError(r);
     onCerrar();
-    await avisar({ titulo: "Devolución registrada", mensaje: `Se devolvieron ${fmt(n)} ${p.unidad} de ${p.nombre} a ${p.deNombre}.` });
+    await avisar({
+      titulo: modo === "pago" ? "Pago registrado" : "Devolución registrada",
+      mensaje:
+        modo === "pago"
+          ? `Se pagaron ${formatoPesos(Math.round(n * (p.valorUnitario || 0)))} a ${p.deNombre} por ${fmt(n)} ${p.unidad} de ${p.nombre}. Quedó como gasto de contado en Contabilidad.`
+          : `Se devolvieron ${fmt(n)} ${p.unidad} de ${p.nombre} a ${p.deNombre}.`,
+    });
   };
   return (
     <Modal abierta etiqueta={p.nombre} titulo={`Devolver a ${p.deNombre}`} subtitulo={`Debes ${fmt(falta)} ${p.unidad} · hay ${fmt(hay)} en bodega`} onCerrar={onCerrar}>
       <form onSubmit={guardar} className="flex flex-col gap-3.5">
-        <Campo etiqueta={`Cantidad a devolver (${p.unidad}) *`}>
+        <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1" role="radiogroup" aria-label="Cómo devolver">
+          {(["producto", "pago"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              role="radio"
+              aria-checked={modo === m}
+              onClick={() => setModo(m)}
+              className={`rounded-xl py-2 text-sm font-semibold transition ${modo === m ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+            >
+              {m === "producto" ? "En producto" : "Pagar de contado"}
+            </button>
+          ))}
+        </div>
+        <Campo etiqueta={`Cantidad ${modo === "pago" ? "a pagar" : "a devolver"} (${p.unidad}) *`}>
           <Entrada type="number" inputMode="decimal" value={cantidad} onChange={setCantidad} />
         </Campo>
+        {modo === "pago" && (
+          <div className="flex items-center justify-between rounded-2xl bg-sky-50 px-4 py-2.5 ring-1 ring-sky-100">
+            <span className="text-sm text-sky-900">Valor a pagar ({formatoPesos(p.valorUnitario)} por {p.unidad.replace(/s$/, "")})</span>
+            <span className="text-base font-bold tabular-nums text-sky-900">{formatoPesos(Math.round(num(cantidad) * (p.valorUnitario || 0)))}</span>
+          </div>
+        )}
         {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
         <div className="grid grid-cols-2 gap-2">
           <Boton variante="secundario" onClick={onCerrar}>
             Cancelar
           </Boton>
           <Boton type="submit" disabled={!(num(cantidad) > 0) || num(cantidad) > maximo + 1e-9}>
-            Devolver
+            {modo === "pago" ? "Pagar" : "Devolver"}
           </Boton>
         </div>
-        <p className="text-xs leading-snug text-slate-500">Sale de esta bodega y vuelve a la de {p.deNombre}. Puedes devolver por partes.</p>
+        <p className="text-xs leading-snug text-slate-500">
+          {modo === "pago"
+            ? `Se registra como gasto de contado aquí y como ingreso en ${p.deNombre}. El producto se queda en esta bodega.`
+            : `Sale de esta bodega y vuelve a la de ${p.deNombre}. Puedes devolver por partes.`}
+        </p>
       </form>
     </Modal>
   );
