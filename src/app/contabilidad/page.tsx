@@ -611,6 +611,18 @@ function DetalleCuentasLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => vo
       v: g.valor,
       ingreso: false,
     })),
+    // Medicamentos aplicados (hierro, tratamientos): su costo se suma al lote
+    ...(lote.aplicaciones ?? [])
+      .filter((a) => (Number(a.costo) || 0) > 0)
+      .map((a) => ({
+        k: a.id,
+        f: a.fecha,
+        h: a.hora ?? "",
+        t: `${a.tipo === "Hierro" ? "Aplicación de hierro" : a.tipo}${a.nota ? ` · ${a.nota.replace(/ · \$ ?[\d.]+$/, "")}` : ""}`,
+        tipo: "Medicamentos y vacunas",
+        v: Number(a.costo) || 0,
+        ingreso: false,
+      })),
     ...c.ingresosLote.map((m) => ({
       k: m.id,
       f: m.fecha,
