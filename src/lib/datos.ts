@@ -101,6 +101,9 @@ export interface AplicacionLote {
   hora?: string;
   tipo: "Hierro" | string;
   nota?: string;
+  /** Medicamento aplicado desde Tratamientos: su costo se suma al lote */
+  costo?: number;
+  tratamientoId?: string;
 }
 /** Otro gasto de un lote (medicamento, vacuna, insumo…); se registra también en Contabilidad */
 export interface GastoLote {
@@ -154,6 +157,14 @@ export interface Tratamiento {
   dias: number;
   retiroDias: number;
   motivo?: string;
+  /** Medicamento de Gastos de producción (id del gasto) y su costo */
+  gastoId?: string;
+  cantidadAnimal?: number;
+  unidadDosis?: string;
+  animales?: number;
+  /** Cantidad usada en la unidad de compra (para saber cuánto queda) */
+  cantidadUsada?: number;
+  costo?: number;
 }
 
 export interface Visita {
@@ -1287,6 +1298,35 @@ export const CATEGORIAS_GASTO_PRODUCCION = [
 export const UNIDADES_VACUNA = ["ml", "Dosis", "Litro"] as const;
 export const textoCategoriaProduccion = (c: string) => CATEGORIAS_GASTO_PRODUCCION.find((x) => x.categoria === c)?.texto ?? c;
 
+/** Convierte una cantidad entre ml y Litro (las dosis no se convierten) */
+export function convertirUnidad(cantidad: number, de: string, a: string): number {
+  if (de === a) return cantidad;
+  if (de === "ml" && a === "Litro") return cantidad / 1000;
+  if (de === "Litro" && a === "ml") return cantidad * 1000;
+  return NaN;
+}
+
+/** Medicamentos y vacunas comprados en Gastos de producción, con su valor por unidad y lo que queda */
+export function medicamentosRegistrados() {
+  const usados = new Map<string, number>();
+  for (const t of leerTratamientos()) if (t.gastoId) usados.set(t.gastoId, (usados.get(t.gastoId) ?? 0) + (Number(t.cantidadUsada) || 0));
+  return leerGastosProduccion()
+    .filter((m) => m.categoria === "Medicamentos y vacunas" && m.unidad && (m.cantidadNum ?? 0) > 0 && (m.valorUnitario ?? 0) > 0)
+    .map((m) => {
+      const usado = usados.get(m.id) ?? 0;
+      return {
+        id: m.id,
+        nombre: (m.descripcion || "").replace(/\s*\([^)]*\)\s*$/, "") || m.descripcion,
+        fecha: m.fecha,
+        unidad: m.unidad as string,
+        cantidad: m.cantidadNum as number,
+        valorUnitario: m.valorUnitario as number,
+        usado,
+        restante: Math.max(0, (m.cantidadNum as number) - usado),
+      };
+    });
+}
+
 /** Gastos registrados desde Bodega → Gastos de producción (más recientes primero) */
 export const leerGastosProduccion = () =>
   leerMovimientos()
@@ -1611,6 +1651,17 @@ export function registrarHierro(loteId: string): boolean {
   const aplicacion: AplicacionLote = { id: nuevoId(), fecha: hoy(), hora: horaActual(), tipo: "Hierro" };
   guardarLotes(leerLotes().map((l) => (l.id === loteId ? { ...l, aplicaciones: [...(l.aplicaciones ?? []), aplicacion] } : l)));
   return true;
+}
+
+/** Agrega al lote un medicamento aplicado (desde Tratamientos), con su costo */
+export function agregarAplicacionLote(loteId: string, aplicacion: AplicacionLote) {
+  guardarLotes(leerLotes().map((l) => (l.id === loteId ? { ...l, aplicaciones: [...(l.aplicaciones ?? []), aplicacion] } : l)));
+}
+/** Quita del lote lo que se aplicó con un tratamiento */
+export function quitarAplicacionesDeTratamiento(tratamientoId: string) {
+  const lotes = leerLotes();
+  if (!lotes.some((l) => (l.aplicaciones ?? []).some((a) => a.tratamientoId === tratamientoId))) return;
+  guardarLotes(lotes.map((l) => ({ ...l, aplicaciones: (l.aplicaciones ?? []).filter((a) => a.tratamientoId !== tratamientoId) })));
 }
 
 /** Cambia la fecha (y hora) de una aplicación del lote */

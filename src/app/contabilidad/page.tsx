@@ -397,7 +397,7 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
 function cuentasLote(l: Lote, movimientos = leerMovimientos()) {
   const alimento = l.alimento.reduce((s, a) => s + (Number(a.costo) || 0), 0);
   const sinPrecio = l.alimento.filter((a) => !(Number(a.costo) > 0)).length;
-  const otros = (l.gastos ?? []).reduce((s, g) => s + (Number(g.valor) || 0), 0);
+  const otros = (l.gastos ?? []).reduce((s, g) => s + (Number(g.valor) || 0), 0) + (l.aplicaciones ?? []).reduce((s, a) => s + (Number(a.costo) || 0), 0);
   const total = alimento + otros;
   const ingresosLote = movimientos.filter((m) => m.tipo === "ingreso" && m.loteId === l.id);
   const ingresos = ingresosLote.reduce((s, m) => s + m.monto, 0);

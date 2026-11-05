@@ -21,7 +21,15 @@ import {
   type Tratamiento,
   type TipoTratamiento,
   nombreLote,
+  agregarAplicacionLote,
+  convertirUnidad,
+  formatoPesos,
+  horaActual,
+  medicamentosRegistrados,
+  quitarAplicacionesDeTratamiento,
 } from "@/lib/datos";
+import SelectorApp from "@/components/SelectorApp";
+import { CLASE_SELECTOR } from "@/components/ui";
 import { confirmar } from "@/components/Dialogo";
 
 const COLOR_TIPO: Record<TipoTratamiento, string> = {
@@ -64,6 +72,8 @@ export default function TratamientosPage() {
   const eliminar = async (id: string) => {
     if (!(await confirmar({ titulo: "Eliminar registro", mensaje: "El tratamiento se borrará de la lista.", aceptar: "Eliminar", destructivo: true }))) return;
     guardarTratamientos(leerTratamientos().filter((t) => t.id !== id));
+    // Si se cargó a un lote, también se quita de sus costos
+    quitarAplicacionesDeTratamiento(id);
   };
 
   return (
@@ -148,6 +158,10 @@ function NuevoTratamiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: (
   const [objetivoId, setObjetivoId] = useState("");
   const [medicamento, setMedicamento] = useState("");
   const [dosis, setDosis] = useState("");
+  // Medicamento de Gastos de producción (vacunas/medicamentos con su valor por unidad)
+  const [medId, setMedId] = useState("");
+  const [porAnimal, setPorAnimal] = useState("");
+  const [unidadDosis, setUnidadDosis] = useState("");
   const [fecha, setFecha] = useState(hoy());
   const [dias, setDias] = useState("1");
   const [retiro, setRetiro] = useState("0");
@@ -167,25 +181,53 @@ function NuevoTratamiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: (
     };
   }, [abierta]);
   const lista = objetivo === "cerda" ? opciones.cerdas : opciones.lotes;
+  const meds = useMemo(() => (abierta ? medicamentosRegistrados() : []), [abierta]);
+  const med = meds.find((m) => m.id === medId);
+  const unidadesDosis = med ? (med.unidad === "Dosis" ? ["Dosis"] : ["ml", "Litro"]) : [];
+  const uDosis = unidadDosis && unidadesDosis.includes(unidadDosis) ? unidadDosis : med?.unidad ?? "";
+  const destinoActual = objetivoId || lista[0]?.valor || "";
+  const animales = objetivo === "lote" ? leerLotes().find((l) => l.id === destinoActual)?.vivos ?? 0 : 1;
+  const nDias = Math.max(1, Number(dias) || 1);
+  const cantAnimal = Number(porAnimal.replace(",", ".")) || 0;
+  // Total usado en la unidad de compra y su costo (cantidad por animal × animales × días)
+  const usadoCompra = med && cantAnimal > 0 ? convertirUnidad(cantAnimal * animales * nDias, uDosis, med.unidad) : 0;
+  const costo = med && usadoCompra > 0 ? Math.round(usadoCompra * med.valorUnitario) : 0;
+  const fmtN = (n: number) => (Math.round(n * 100) / 100).toLocaleString("es-CO");
 
   const guardar = (e: FormEvent) => {
     e.preventDefault();
     const destino = objetivoId || lista[0]?.valor;
     if (!destino) return setError(objetivo === "cerda" ? "No hay cerdas registradas." : "No hay lotes activos.");
-    if (!medicamento.trim()) return setError("Escribe el medicamento o la vacuna.");
+    if (!medId) return setError("Elige el medicamento o la vacuna.");
+    if (medId === "OTRO" && !medicamento.trim()) return setError("Escribe el medicamento o la vacuna.");
+    if (med && !(cantAnimal > 0)) return setError("Escribe la cantidad aplicada por animal.");
+    if (med && objetivo === "lote" && animales <= 0) return setError("El lote no tiene animales vivos.");
     const t: Tratamiento = {
       id: nuevoId(),
       tipo,
       fecha,
       objetivo,
       objetivoId: destino,
-      medicamento: medicamento.trim(),
-      dosis: dosis.trim(),
+      medicamento: med ? med.nombre : medicamento.trim(),
+      dosis: med ? `${fmtN(cantAnimal)} ${uDosis} por animal${objetivo === "lote" ? ` × ${animales}` : ""}${nDias > 1 ? ` × ${nDias} días` : ""}` : dosis.trim(),
+      ...(med ? { gastoId: med.id, cantidadAnimal: cantAnimal, unidadDosis: uDosis, animales, cantidadUsada: usadoCompra, costo } : {}),
       dias: Math.max(1, Number(dias) || 1),
       retiroDias: Math.max(0, Number(retiro) || 0),
       motivo: motivo.trim() || undefined,
     };
     guardarTratamientos([...leerTratamientos(), t]);
+    // En un lote, el costo del medicamento se suma a sus costos (ya está en Contabilidad desde la compra)
+    if (objetivo === "lote" && med && costo > 0) {
+      agregarAplicacionLote(destino, {
+        id: nuevoId(),
+        fecha,
+        hora: horaActual(),
+        tipo: med.nombre,
+        nota: `${fmtN(cantAnimal)} ${uDosis} × ${animales} animales${nDias > 1 ? ` × ${nDias} días` : ""} · ${formatoPesos(costo)}`,
+        costo,
+        tratamientoId: t.id,
+      });
+    }
     // En la cerda también queda en su historial (lo usan las tareas del dashboard)
     if (objetivo === "cerda") {
       agregarEvento(destino, {
@@ -196,6 +238,9 @@ function NuevoTratamiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: (
     }
     setMedicamento("");
     setDosis("");
+    setMedId("");
+    setPorAnimal("");
+    setUnidadDosis("");
     setMotivo("");
     setDias("1");
     setRetiro("0");
@@ -241,14 +286,84 @@ function NuevoTratamiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: (
             </p>
           )}
         </Campo>
-        <div className="grid grid-cols-2 gap-3">
-          <Campo etiqueta="Medicamento / vacuna *">
-            <Entrada value={medicamento} onChange={setMedicamento} placeholder="Ej. Ivermectina" required />
-          </Campo>
-          <Campo etiqueta="Dosis">
-            <Entrada value={dosis} onChange={setDosis} placeholder="Ej. 2 ml IM" />
-          </Campo>
-        </div>
+        <Campo etiqueta="Medicamento / vacuna *">
+          <SelectorApp
+            valor={medId}
+            onCambiar={(v) => {
+              setMedId(v);
+              setUnidadDosis("");
+            }}
+            titulo="Medicamento / vacuna"
+            placeholder={meds.length ? "Elige el medicamento" : "Sin medicamentos en Gastos de producción"}
+            opciones={[
+              ...meds.map((m) => ({
+                valor: m.id,
+                texto: `${m.nombre} · ${formatoPesos(m.valorUnitario)}/${m.unidad}`,
+                detalle: `quedan ${fmtN(m.restante)} ${m.unidad}`,
+              })),
+              { valor: "OTRO", texto: "Otro (sin costo)" },
+            ]}
+            className="w-full"
+            claseBoton={CLASE_SELECTOR}
+          />
+        </Campo>
+        {medId === "OTRO" && (
+          <div className="grid grid-cols-2 gap-3">
+            <Campo etiqueta="Nombre *">
+              <Entrada value={medicamento} onChange={setMedicamento} placeholder="Ej. Ivermectina" />
+            </Campo>
+            <Campo etiqueta="Dosis">
+              <Entrada value={dosis} onChange={setDosis} placeholder="Ej. 2 ml IM" />
+            </Campo>
+          </div>
+        )}
+        {med && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Campo etiqueta="Cantidad por animal *">
+                <Entrada type="number" inputMode="decimal" value={porAnimal} onChange={(v) => setPorAnimal(v.slice(0, 8))} />
+              </Campo>
+              <Campo etiqueta="Unidad">
+                <div className={`grid gap-1 rounded-2xl bg-slate-100 p-1 ${unidadesDosis.length > 1 ? "grid-cols-2" : "grid-cols-1"}`} role="radiogroup" aria-label="Unidad">
+                  {unidadesDosis.map((u) => (
+                    <button
+                      key={u}
+                      type="button"
+                      role="radio"
+                      aria-checked={uDosis === u}
+                      onClick={() => setUnidadDosis(u)}
+                      className={`rounded-xl py-2 text-sm font-semibold transition ${uDosis === u ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+                    >
+                      {u}
+                    </button>
+                  ))}
+                </div>
+              </Campo>
+            </div>
+            {cantAnimal > 0 && (
+              <div className="flex flex-col gap-1 rounded-2xl bg-sky-50 px-4 py-3 ring-1 ring-sky-100">
+                <div className="flex items-center justify-between text-sm text-sky-900">
+                  <span>
+                    {fmtN(cantAnimal)} {uDosis} × {animales} {animales === 1 ? "animal" : "animales"}
+                    {nDias > 1 ? ` × ${nDias} días` : ""}
+                  </span>
+                  <span className="font-semibold tabular-nums">
+                    {fmtN(usadoCompra)} {med.unidad}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-sky-900">{objetivo === "lote" ? "Costo que se suma al lote" : "Costo del medicamento"}</span>
+                  <span className="text-lg font-bold tabular-nums text-sky-900">{formatoPesos(costo)}</span>
+                </div>
+                {usadoCompra > med.restante + 1e-9 && (
+                  <p className="text-xs font-medium text-amber-700">
+                    Solo quedan {fmtN(med.restante)} {med.unidad} de esta compra.
+                  </p>
+                )}
+              </div>
+            )}
+          </>
+        )}
         <div className="grid grid-cols-3 gap-3">
           <Campo etiqueta="Inicio">
             <Entrada type="date" value={fecha} onChange={setFecha} required />

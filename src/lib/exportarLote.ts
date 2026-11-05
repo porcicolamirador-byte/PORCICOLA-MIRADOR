@@ -4,6 +4,7 @@
  */
 
 import {
+  leerTratamientos,
   calcularInventario,
   codigoDe,
   diasEntre,
@@ -40,6 +41,10 @@ export async function exportarContabilidadLote(lote: Lote, opciones: { incluirMa
   const movimientos = [
     ...agruparAlimento(conPrecio),
     ...agruparGastos(lote.gastos ?? []),
+    // Medicamentos y vacunas aplicados desde Tratamientos (costo según la cantidad usada)
+    ...(lote.aplicaciones ?? [])
+      .filter((a) => (a.costo ?? 0) > 0)
+      .map((a) => ({ fecha: a.fecha, concepto: `${a.tipo}${a.nota ? ` · ${a.nota}` : ""}`, categoria: "Medicamentos y vacunas", tipo: "costo" as const, valor: Math.round(a.costo ?? 0) })),
     ...ingresos.map((m) => ({
       fecha: m.fecha,
       concepto: m.descripcion.replace(` · ${nombreLote(lote)}`, "") || m.categoria,
@@ -210,6 +215,13 @@ function contabilidadMadre(lote: Lote): { movimientos: MovimientoLotePdf[]; nota
     const valor = Number(g.valor) || 0;
     if (valor > 0 && g.fecha && enPeriodo(g.fecha)) {
       movimientos.push({ fecha: g.fecha, concepto: `Genética perdida · ${g.genetica}`, categoria: "Madre · genética perdida", tipo: "costo", valor, alerta: true });
+    }
+  }
+
+  // Medicamentos aplicados a la cerda desde Tratamientos
+  for (const t of leerTratamientos()) {
+    if (t.objetivo === "cerda" && t.objetivoId === cerdaId && (t.costo ?? 0) > 0 && enPeriodo(t.fecha)) {
+      movimientos.push({ fecha: t.fecha, concepto: `${t.medicamento}${t.dosis ? ` · ${t.dosis}` : ""}`, categoria: "Madre · medicamentos", tipo: "costo", valor: Math.round(t.costo ?? 0) });
     }
   }
 
