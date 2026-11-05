@@ -21,6 +21,9 @@ import {
   codigoDe,
   devolverPrestamo,
   devolverMedicamento,
+  leerExistenciasGranjas,
+  tomarPrestado,
+  type ExistenciasGranja,
   leerPrestamos,
   leerPrestamosMedicamento,
   medicamentosRegistrados,
@@ -202,6 +205,7 @@ export default function BodegaPage() {
             onChange={setVista}
           />
 
+          {vista === "inventario" && !q && <BotonTomarPrestado />}
           {vista === "inventario" && !q && <AvisosPrestamos />}
           {vista === "inventario" && !q && <TarjetaGastosProduccion />}
           {vista === "inventario" && !q && <TarjetaConsumoCerdas />}
@@ -857,6 +861,109 @@ function PrestarProducto({ item, granjas, onCerrar }: { item: ExistenciaProducto
         </div>
         <p className="text-xs leading-snug text-slate-500">
           Sale de esta bodega y entra a la otra. En la otra granja quedará un aviso naranja de lo que debe, con la opción de devolver.
+        </p>
+      </form>
+    </Modal>
+  );
+}
+
+/** Tomar prestado de otra granja que lo permita (alimento o medicamentos) */
+function BotonTomarPrestado() {
+  const version = useVersionDatos();
+  const [abierto, setAbierto] = useState(false);
+  const otras = useMemo(() => (version < 0 ? [] : leerExistenciasGranjas().filter((e) => e.id !== granjaActual() && e.permite)), [version]);
+  if (otras.length === 0) return null;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => (puede("bodega") ? setAbierto(true) : void avisarSinPermisoBodega())}
+        className="flex w-full items-center justify-between rounded-2xl bg-white px-3.5 py-2.5 text-left text-sm font-medium text-slate-700 ring-1 ring-slate-200 active:bg-slate-50"
+      >
+        <span>⇄ Tomar prestado de otra granja</span>
+        <span className="text-sky-700" aria-hidden="true">›</span>
+      </button>
+      {abierto && <TomarPrestado granjas={otras} onCerrar={() => setAbierto(false)} />}
+    </>
+  );
+}
+
+function TomarPrestado({ granjas, onCerrar }: { granjas: ExistenciasGranja[]; onCerrar: () => void }) {
+  const [granja, setGranja] = useState(granjas[0]?.id ?? "");
+  const [clase, setClase] = useState<"alimento" | "medicamento">("alimento");
+  const [item, setItem] = useState("");
+  const [cantidad, setCantidad] = useState("");
+  const [error, setError] = useState("");
+  const g = granjas.find((x) => x.id === granja);
+  const opciones =
+    clase === "alimento"
+      ? (g?.alimentos ?? []).map((a) => ({ valor: a.codigo, texto: `${a.nombre}`, detalle: `hay ${fmt(a.disponible)} ${a.unidad}` }))
+      : (g?.medicamentos ?? []).map((m) => ({ valor: m.id, texto: `${m.nombre}`, detalle: `quedan ${fmt(m.restante)} ${m.unidad}` }));
+  const unidad = clase === "alimento" ? g?.alimentos.find((a) => a.codigo === item)?.unidad : g?.medicamentos.find((m) => m.id === item)?.unidad;
+  const guardar = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!item) return setError("Elige qué vas a tomar.");
+    const n = num(cantidad);
+    const r = tomarPrestado(granja, clase === "alimento" ? { tipo: "alimento", codigo: item } : { tipo: "medicamento", id: item }, n);
+    if (r) return setError(r);
+    const nombre = opciones.find((o) => o.valor === item)?.texto ?? "";
+    onCerrar();
+    await avisar({ titulo: "Préstamo registrado", mensaje: `Tomaste ${fmt(n)} ${unidad ?? ""} de ${nombre} de ${g?.nombre ?? ""}. Quedará como deuda hasta que lo devuelvas.` });
+  };
+  return (
+    <Modal abierta etiqueta="Bodega" titulo="Tomar prestado" subtitulo="De otra granja" onCerrar={onCerrar}>
+      <form onSubmit={guardar} className="flex flex-col gap-3.5">
+        <Campo etiqueta="Granja *">
+          <SelectorApp
+            valor={granja}
+            onCambiar={(v) => {
+              setGranja(v);
+              setItem("");
+            }}
+            titulo="Granja"
+            opciones={granjas.map((x) => ({ valor: x.id, texto: x.nombre }))}
+            className="w-full"
+            claseBoton={CLASE_SELECTOR}
+          />
+        </Campo>
+        <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1" role="radiogroup" aria-label="Qué tomar">
+          {(["alimento", "medicamento"] as const).map((c) => (
+            <button
+              key={c}
+              type="button"
+              role="radio"
+              aria-checked={clase === c}
+              onClick={() => {
+                setClase(c);
+                setItem("");
+              }}
+              className={`rounded-xl py-2 text-sm font-semibold transition ${clase === c ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+            >
+              {c === "alimento" ? "Alimento" : "Medicamentos"}
+            </button>
+          ))}
+        </div>
+        <Campo etiqueta={clase === "alimento" ? "Producto *" : "Medicamento *"}>
+          {opciones.length ? (
+            <SelectorApp valor={item} onCambiar={setItem} titulo={clase === "alimento" ? "Producto" : "Medicamento"} placeholder="Elige" opciones={opciones} className="w-full" claseBoton={CLASE_SELECTOR} />
+          ) : (
+            <p className="rounded-xl bg-slate-50 px-3.5 py-2.5 text-sm text-slate-500">{g?.nombre ?? "Esa granja"} no tiene existencia para prestar.</p>
+          )}
+        </Campo>
+        <Campo etiqueta={`Cantidad${unidad ? ` (${unidad})` : ""} *`}>
+          <Entrada type="number" inputMode="decimal" value={cantidad} onChange={setCantidad} />
+        </Campo>
+        {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
+        <div className="grid grid-cols-2 gap-2">
+          <Boton variante="secundario" onClick={onCerrar}>
+            Cancelar
+          </Boton>
+          <Boton type="submit" disabled={!item || !(num(cantidad) > 0)}>
+            Tomar prestado
+          </Boton>
+        </div>
+        <p className="text-xs leading-snug text-slate-500">
+          Las existencias de {g?.nombre ?? "la otra granja"} son las de su última actualización{g?.fecha ? ` (${formatoFecha(g.fecha.slice(0, 10), true)})` : ""}.
         </p>
       </form>
     </Modal>

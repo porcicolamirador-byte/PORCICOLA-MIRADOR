@@ -6,6 +6,7 @@ import { borrarTodoLocal } from "@/lib/sincronizar";
 import { actualizarPerfil, consumoNube, ErrorNube, guardarModulosGlobales, perfilGuardado, reiniciarBaseNube, type ConsumoNube } from "@/lib/nube";
 import { MODULOS_DASHBOARD } from "@/lib/modulos";
 import { guardarFormaJaulas, leerFormaJaulas } from "@/lib/jaulas";
+import { publicarExistencias } from "@/lib/datos";
 import Modal from "@/components/Modal";
 import { useEffect, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
@@ -209,6 +210,20 @@ export default function AjustesAvanzadosPage() {
               </span>
             </span>
             <Interruptor activo={config.permitirSinInventario} onCambiar={(v) => guardar({ permitirSinInventario: v })} />
+          </label>
+        </li>
+        <li>
+          <label className="flex w-full cursor-pointer items-center gap-3 px-4 py-3">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700" aria-hidden="true">
+              <IconoAjuste nombre="inventario" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-medium text-slate-900">Permitir que otras granjas tomen prestado</span>
+              <span className="block text-xs text-slate-500">
+                {config.permitirTomarPrestado ? "Activado: pueden tomar alimento y medicamentos de esta granja" : "Desactivado: solo esta granja presta"}
+              </span>
+            </span>
+            <Interruptor activo={config.permitirTomarPrestado} onCambiar={(v) => { guardar({ permitirTomarPrestado: v }); setTimeout(publicarExistencias, 50); }} />
           </label>
         </li>
         <Desplegable icono="productos" titulo="Productos de bodega" resumen={`${productos}`} abierto={abierto === "productos"} onAlternar={() => alternar("productos")}>

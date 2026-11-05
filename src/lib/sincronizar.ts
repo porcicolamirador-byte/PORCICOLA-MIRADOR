@@ -42,7 +42,9 @@ export const CLAVE_JAULAS = "jaulas-mapa";
 /** Claves comunes a todas las granjas (no se separan por granja) */
 /** Préstamos de bultos entre bodegas de distintas granjas */
 export const CLAVE_PRESTAMOS = "prestamos-bodega";
-const GLOBALES = new Set([CLAVE_GRANJAS, CLAVE_JAULAS, CLAVE_PRESTAMOS]);
+/** Existencias que cada granja publica para que las otras puedan tomar prestado */
+export const CLAVE_EXISTENCIAS = "existencias-granjas";
+const GLOBALES = new Set([CLAVE_GRANJAS, CLAVE_JAULAS, CLAVE_PRESTAMOS, CLAVE_EXISTENCIAS]);
 const ID_VALOR = "valor";
 
 const esHistorial = (clave: string) => clave.startsWith("historial-");
@@ -487,7 +489,7 @@ export function borrarTodoLocal(generacion: number) {
       const k = localStorage.key(i);
       if (k && k.startsWith("granja-guardada:")) borrar.push(k);
     }
-    for (const k of [...clavesLocales(), ...borrar, CLAVE_GRANJAS, CLAVE_JAULAS, CLAVE_PRESTAMOS, CLAVE_GRANJA_ACTUAL, CLAVE_COLA, "registro-actividad"]) localStorage.removeItem(k);
+    for (const k of [...clavesLocales(), ...borrar, CLAVE_GRANJAS, CLAVE_JAULAS, CLAVE_PRESTAMOS, CLAVE_EXISTENCIAS, CLAVE_GRANJA_ACTUAL, CLAVE_COLA, "registro-actividad"]) localStorage.removeItem(k);
   } finally {
     aplicandoRemoto = false;
   }

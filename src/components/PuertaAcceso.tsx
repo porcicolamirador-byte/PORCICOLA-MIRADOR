@@ -1,7 +1,7 @@
 "use client";
 
 import { aplicarDescuentoCerdas } from "@/lib/consumoCerdas";
-import { vencerGeneticasPendientes } from "@/lib/datos";
+import { publicarExistencias, vencerGeneticasPendientes } from "@/lib/datos";
 import { useVersionDatos } from "@/lib/datos";
 import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
@@ -89,6 +89,8 @@ export default function PuertaAcceso({ children }: { children: ReactNode }) {
       aplicarDescuentoCerdas();
       // La genética comprada que lleva 10 días sin usarse pasa a Pérdidas
       vencerGeneticasPendientes();
+      // Lo que tiene esta granja, para que las otras puedan tomar prestado
+      publicarExistencias();
     }, 800);
     return () => clearTimeout(t);
   }, [abierta, versionDatos]);

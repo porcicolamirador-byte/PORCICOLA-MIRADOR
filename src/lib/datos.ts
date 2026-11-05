@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from "react";
 import { guardarConRegistro, registrarLog, sinRegistro } from "@/lib/log";
 import type { Cerda, Registro } from "@/utils/pendingTasks";
-import { CLAVE_PRESTAMOS, granjaActual, leerGranjas } from "@/lib/sincronizar";
+import { CLAVE_EXISTENCIAS, CLAVE_PRESTAMOS, granjaActual, leerGranjas } from "@/lib/sincronizar";
+import { leerConfig as leerConfigGranja } from "@/lib/config";
 
 /* ═════════════════════ Claves de almacenamiento ═════════════════════
  * Todo se guarda en el navegador (localStorage). Las claves "cerdas",
@@ -1017,6 +1018,73 @@ const guardarPrestamos = (l: PrestamoBodega[]) => {
   const meds = leer<unknown[]>(CLAVE_PRESTAMOS, []).filter((p) => (p as { clase?: string })?.clase === "medicamento");
   escribir(CLAVE_PRESTAMOS, [...l, ...meds]);
 };
+
+/* ───────────── Tomar prestado (existencias publicadas por cada granja) ───────────── */
+
+export interface ExistenciasGranja {
+  id: string;
+  nombre: string;
+  /** La granja deja que las otras tomen prestado por su cuenta (Ajustes ocultos) */
+  permite: boolean;
+  fecha: string;
+  alimentos: { codigo: string; nombre: string; unidad: string; disponible: number; ultimoPrecio: number }[];
+  medicamentos: { id: string; nombre: string; unidad: string; restante: number; valorUnitario: number }[];
+}
+export function leerExistenciasGranjas(): ExistenciasGranja[] {
+  const v = leer<ExistenciasGranja[]>(CLAVE_EXISTENCIAS, []);
+  return Array.isArray(v) ? v.filter((e) => e && e.id) : [];
+}
+
+/** Publica lo que tiene esta granja (solo si cambió) para que las otras puedan tomar prestado */
+export function publicarExistencias() {
+  if (typeof window === "undefined") return;
+  const g = granjaActual();
+  const nombre = leerGranjas().find((x) => x.id === g)?.nombre ?? g;
+  const alimentos = calcularInventario()
+    .filter((i) => !i.subproducto && codigoDe(i.producto) && i.disponible > 0)
+    .map((i) => ({ codigo: codigoDe(i.producto), nombre: i.producto.nombre, unidad: i.producto.unidad, disponible: Math.round(i.disponible * 100) / 100, ultimoPrecio: i.ultimoPrecio || 0 }));
+  const medicamentos = medicamentosRegistrados()
+    .filter((m) => !m.prestado && m.restante > 0)
+    .map((m) => ({ id: m.id, nombre: m.nombre, unidad: m.unidad, restante: Math.round(m.restante * 100) / 100, valorUnitario: m.valorUnitario }));
+  const nuevo = { id: g, nombre, permite: leerConfigGranja().permitirTomarPrestado, alimentos, medicamentos };
+  const lista = leerExistenciasGranjas();
+  const actual = lista.find((e) => e.id === g);
+  if (actual) {
+    const { fecha: _f, ...resto } = actual;
+    if (JSON.stringify(resto) === JSON.stringify(nuevo)) return;
+  }
+  escribir(CLAVE_EXISTENCIAS, [...lista.filter((e) => e.id !== g), { ...nuevo, fecha: new Date().toISOString() }]);
+}
+
+/** Toma prestado de otra granja (que lo permita): alimento por código o un medicamento */
+export function tomarPrestado(deGranja: string, item: { tipo: "alimento"; codigo: string } | { tipo: "medicamento"; id: string }, cantidad: number): string | null {
+  const a = granjaActual();
+  const origen = leerExistenciasGranjas().find((e) => e.id === deGranja);
+  if (!origen || deGranja === a) return "Elige otra granja";
+  if (!origen.permite) return `${origen.nombre} no permite tomar prestado`;
+  if (!(cantidad > 0)) return "Escribe una cantidad mayor que cero";
+  const aNombre = leerGranjas().find((x) => x.id === a)?.nombre ?? a;
+  if (item.tipo === "alimento") {
+    const al = origen.alimentos.find((x) => x.codigo === item.codigo);
+    if (!al) return "Ese producto ya no está disponible";
+    if (cantidad > al.disponible + 1e-9) return `${origen.nombre} solo tiene ${fmtNum(al.disponible)} ${al.unidad}`;
+    if (!leerProductos().some((p) => codigoDe(p) === item.codigo)) return `Esta granja no tiene el producto ${item.codigo} en Bodega`;
+    const lista = leer<unknown[]>(CLAVE_PRESTAMOS, []);
+    const pr: PrestamoBodega = { id: nuevoId(), de: deGranja, deNombre: origen.nombre, a, aNombre, codigo: al.codigo, nombre: al.nombre, unidad: al.unidad, cantidad, valorUnitario: al.ultimoPrecio, fecha: hoy(), hora: horaActual(), devoluciones: [] };
+    escribir(CLAVE_PRESTAMOS, [...(Array.isArray(lista) ? lista : []), pr]);
+    // Queda descontado en lo publicado hasta que la otra granja vuelva a abrir la app
+    escribir(CLAVE_EXISTENCIAS, leerExistenciasGranjas().map((e) => (e.id === deGranja ? { ...e, alimentos: e.alimentos.map((x) => (x.codigo === al.codigo ? { ...x, disponible: Math.max(0, x.disponible - cantidad) } : x)) } : e)));
+    return null;
+  }
+  const med = origen.medicamentos.find((x) => x.id === item.id);
+  if (!med) return "Ese medicamento ya no está disponible";
+  if (cantidad > med.restante + 1e-9) return `${origen.nombre} solo tiene ${fmtNum(med.restante)} ${med.unidad}`;
+  const lista = leer<unknown[]>(CLAVE_PRESTAMOS, []);
+  const pm: PrestamoMedicamento = { id: nuevoId(), clase: "medicamento", de: deGranja, deNombre: origen.nombre, a, aNombre, gastoId: med.id, nombre: med.nombre, unidad: med.unidad, cantidad, valorUnitario: med.valorUnitario, fecha: hoy(), hora: horaActual(), devoluciones: [] };
+  escribir(CLAVE_PRESTAMOS, [...(Array.isArray(lista) ? lista : []), pm]);
+  escribir(CLAVE_EXISTENCIAS, leerExistenciasGranjas().map((e) => (e.id === deGranja ? { ...e, medicamentos: e.medicamentos.map((x) => (x.id === med.id ? { ...x, restante: Math.max(0, x.restante - cantidad) } : x)) } : e)));
+  return null;
+}
 
 /** Préstamo de un medicamento o vacuna (Gastos de producción) a otra granja */
 export interface PrestamoMedicamento {

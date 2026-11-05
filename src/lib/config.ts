@@ -119,6 +119,8 @@ export interface ConfigGranja {
   consumoCerdas: ConsumoCerdas;
   /** Permite usar productos de bodega sin existencia (el inventario puede quedar negativo) */
   permitirSinInventario: boolean;
+  /** Otras granjas pueden tomar prestado alimento y medicamentos de esta granja por su cuenta */
+  permitirTomarPrestado: boolean;
   /** Jaulas del módulo Jaula: filas y jaulas por fila de cada área */
   jaulas: ConfigJaulas;
 }
@@ -161,6 +163,7 @@ export const CONFIG_POR_DEFECTO: ConfigGranja = {
   productosEtapa: PRODUCTOS_ETAPA_POR_DEFECTO,
   consumoCerdas: CONSUMO_CERDAS_POR_DEFECTO,
   permitirSinInventario: false,
+  permitirTomarPrestado: false,
   jaulas: JAULAS_POR_DEFECTO,
 };
 
@@ -221,6 +224,7 @@ export function leerConfig(): ConfigGranja {
       productosEtapa: leerProductosEtapa(c.productosEtapa),
       consumoCerdas: leerConsumoCerdas(c.consumoCerdas),
       permitirSinInventario: c.permitirSinInventario === true,
+      permitirTomarPrestado: c.permitirTomarPrestado === true,
       jaulas: leerJaulas(c.jaulas),
     };
   } catch {
