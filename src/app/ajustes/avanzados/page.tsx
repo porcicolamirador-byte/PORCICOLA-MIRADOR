@@ -239,6 +239,12 @@ export default function AjustesAvanzadosPage() {
         </Grupo>
       )}
 
+      <Grupo titulo="Este teléfono">
+        <Desplegable icono="inventario" titulo="Espacio que ocupa la app" resumen="Ver" abierto={abierto === "espacio"} onAlternar={() => alternar("espacio")}>
+          <EspacioTelefono />
+        </Desplegable>
+      </Grupo>
+
       <Grupo titulo="Datos">
         <li>
           <button type="button" onClick={() => router.push("/ajustes/registro")} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-50">
@@ -622,6 +628,93 @@ function Parideras({ actual, onGuardar }: { actual: number; onGuardar: (n: numbe
         </Boton>
       </form>
     </>
+  );
+}
+
+/** Cuánto ocupa la app en este teléfono: datos de la granja y copia para usar sin conexión */
+function EspacioTelefono() {
+  const [d, setD] = useState<{ datos: number; registros: number; app: number | null; total: number | null; cuota: number | null } | null>(null);
+
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      // Datos de la granja (guardados en el teléfono)
+      let datos = 0;
+      let registros = 0;
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i) ?? "";
+          const v = localStorage.getItem(k) ?? "";
+          datos += (k.length + v.length) * 2;
+          registros++;
+        }
+      } catch {
+        // sin acceso
+      }
+      // Copia de la app para usar sin conexión (pantallas, archivos, imágenes)
+      let app: number | null = null;
+      try {
+        if ("caches" in window) {
+          app = 0;
+          for (const nombre of await caches.keys()) {
+            if (!nombre.startsWith("mirador-")) continue;
+            const cache = await caches.open(nombre);
+            for (const req of await cache.keys()) {
+              const res = await cache.match(req);
+              if (!res) continue;
+              const largo = Number(res.headers.get("content-length"));
+              app += largo > 0 ? largo : (await res.clone().blob()).size;
+            }
+          }
+        }
+      } catch {
+        app = null;
+      }
+      let total: number | null = null;
+      let cuota: number | null = null;
+      try {
+        const e = await navigator.storage?.estimate?.();
+        if (e) {
+          total = e.usage ?? null;
+          cuota = e.quota ?? null;
+        }
+      } catch {
+        // el teléfono no lo informa
+      }
+      if (vivo) setD({ datos, registros, app, total, cuota });
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
+  const mb = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / (1024 * 1024)).toLocaleString("es-CO", { maximumFractionDigits: 1 })} MB`);
+  if (!d) return <p className="text-sm text-slate-500">Calculando…</p>;
+  const usado = d.total ?? d.datos + (d.app ?? 0);
+  const filas: [string, string, string][] = [
+    ["Datos de la granja", mb(d.datos), `${d.registros} grupos de registros`],
+    ["App guardada sin conexión", d.app === null ? "—" : mb(d.app), "Pantallas, imágenes y archivos"],
+  ];
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="rounded-2xl bg-sky-50 px-4 py-3 ring-1 ring-sky-100">
+        <p className="text-xs text-sky-800">Total que ocupa en este teléfono</p>
+        <p className="text-2xl font-bold tabular-nums text-sky-900">{mb(usado)}</p>
+        {d.cuota ? <p className="text-xs text-sky-700">de {mb(d.cuota)} disponibles para la app</p> : null}
+      </div>
+      <ul className="divide-y divide-slate-100 rounded-2xl bg-white ring-1 ring-slate-200">
+        {filas.map(([t, v, n]) => (
+          <li key={t} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-slate-900">{t}</span>
+              <span className="block text-xs text-slate-500">{n}</span>
+            </span>
+            <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">{v}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-xs leading-snug text-slate-500">Es lo que ocupa en este teléfono; cada teléfono tiene su propia copia. Los datos también están guardados en la nube.</p>
+    </div>
   );
 }
 
