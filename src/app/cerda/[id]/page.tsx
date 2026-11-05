@@ -80,7 +80,7 @@ function calcularEdadLlegada(fechaLlegada: string): string {
 function obtenerColorPorTipo(tipo: string): string {
   switch (tipo) {
     case "Compra de genética":
-      return { icono: "🧬", fondo: "bg-violet-100", borde: "border-violet-100", texto: "text-violet-800" };
+      return "bg-violet-500";
     case "Inseminación":
       return "bg-blue-500";
     case "Parto":
@@ -127,6 +127,8 @@ const TIPOS_HISTORIAL = [
 
 function infoTipo(tipo: string): { icono: string; fondo: string; borde: string; texto: string } {
   switch (tipo) {
+    case "Compra de genética":
+      return { icono: "🧬", fondo: "bg-violet-100", borde: "border-violet-100", texto: "text-violet-800" };
     case "Inseminación":
       return { icono: "🧬", fondo: "bg-sky-100", borde: "border-sky-100", texto: "text-sky-800" };
     case "Confirmación de Gestación":
