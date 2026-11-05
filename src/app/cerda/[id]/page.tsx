@@ -237,6 +237,77 @@ export default function CerdaDetalle() {
     guardarConRegistro(`historial-${id}`, nuevos);
   }
 
+  /* Genética comprada antes de la inseminación (por ejemplo al destetar): queda en la cerda
+     y se junta con la inseminación cuando se registre */
+  const pendiente = (cerda?.geneticaPendiente ?? null) as { genetica: string; valor: number; fecha: string; movimientoId?: string } | null;
+  const [compraGenetica, setCompraGenetica] = useState(false);
+  const [cgTipo, setCgTipo] = useState("");
+  const [cgOtra, setCgOtra] = useState("");
+  const [cgValor, setCgValor] = useState("");
+  const [cgFecha, setCgFecha] = useState("");
+  const [cgConta, setCgConta] = useState(true);
+
+  function guardarPendiente(valor: typeof pendiente) {
+    const lista = JSON.parse(localStorage.getItem("cerdas") || "[]");
+    const nuevas = lista.map((c: any) => {
+      if (c.id !== id) return c;
+      const { geneticaPendiente: _g, ...resto } = c;
+      return valor ? { ...resto, geneticaPendiente: valor } : resto;
+    });
+    guardarConRegistro("cerdas", nuevas);
+    setCerda(nuevas.find((c: any) => c.id === id));
+  }
+
+  function registrarCompraGenetica() {
+    const nombre = cgTipo === "OTRA" ? cgOtra.trim() : cgTipo;
+    const valor = Number(cgValor.replace(/\D/g, "")) || 0;
+    if (!nombre) return mostrarAviso(cgTipo === "OTRA" ? "Escribe cuál es la genética" : "Selecciona la genética");
+    if (valor <= 0) return mostrarAviso("Ingresa el valor de la genética");
+    const fechaCompra = cgFecha || fechaLocalISO(new Date());
+    let movimientoId: string | undefined;
+    if (cgConta) {
+      movimientoId = nuevoId();
+      guardarMovimientos([
+        ...leerMovimientos(),
+        { id: movimientoId, fecha: fechaCompra, tipo: "gasto", categoria: "Genética", descripcion: `Genética ${nombre} · cerda ${id} (para inseminación)`, monto: valor, cerdaId: String(id) },
+      ]);
+    }
+    guardarPendiente({ genetica: nombre, valor, fecha: fechaCompra, movimientoId });
+    setCompraGenetica(false);
+    setCgTipo("");
+    setCgOtra("");
+    setCgValor("");
+    setCgFecha("");
+    setCgConta(true);
+    mostrarAviso("Genética guardada en la cerda");
+  }
+
+  async function quitarPendiente() {
+    if (!pendiente) return;
+    const ok = await confirmar({
+      titulo: "Quitar genética comprada",
+      mensaje: `Se quitará la genética ${pendiente.genetica} (${formatoPesos(pendiente.valor)}) de esta cerda${pendiente.movimientoId ? " y su gasto de Contabilidad" : ""}.`,
+      aceptar: "Quitar",
+      destructivo: true,
+    });
+    if (!ok) return;
+    if (pendiente.movimientoId) guardarMovimientos(leerMovimientos().filter((m) => m.id !== pendiente.movimientoId));
+    guardarPendiente(null);
+  }
+
+  // Al abrir una inseminación, la genética comprada viene llena
+  useEffect(() => {
+    if (!mostrarForm || tipo !== "Inseminación" || !pendiente) return;
+    if (GENETICAS.includes(pendiente.genetica)) {
+      setTipoGenetica(pendiente.genetica);
+    } else {
+      setTipoGenetica("OTRA");
+      setOtraGenetica(pendiente.genetica);
+    }
+    setValorGenetica(String(pendiente.valor));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mostrarForm, tipo, pendiente?.genetica, pendiente?.valor]);
+
   useEffect(() => {
     if (!mensajeAviso) return;
     const timer = window.setTimeout(() => setMensajeAviso(""), 1700);
@@ -485,7 +556,15 @@ export default function CerdaDetalle() {
       // El valor queda siempre en la cerda; en Contabilidad solo si se marcó
       nuevo.valorGenetica = genetica;
       nuevo.genetica = nombreGenetica;
-      if (geneticaEnContabilidad) {
+      if (pendiente?.movimientoId) {
+        // Ya estaba en Contabilidad desde la compra: se usa ese mismo gasto (sin duplicarlo)
+        nuevo.movimientoId = pendiente.movimientoId;
+        guardarMovimientos(
+          leerMovimientos().map((m) =>
+            m.id === pendiente.movimientoId ? { ...m, monto: genetica, descripcion: `Genética ${nombreGenetica} · inseminación cerda ${id}` } : m
+          )
+        );
+      } else if (geneticaEnContabilidad) {
         const movimientoId = nuevoId();
         guardarMovimientos([
           ...leerMovimientos(),
@@ -532,6 +611,8 @@ export default function CerdaDetalle() {
     }
 
     guardar([nuevo, ...registros]);
+    // La genética comprada ya quedó en esta inseminación
+    if (tipo === "Inseminación" && pendiente) guardarPendiente(null);
     setMostrarForm(false);
     setFecha("");
     setDescripcion("");
@@ -1032,6 +1113,99 @@ export default function CerdaDetalle() {
                 </button>
               </div>
             )}
+            {pendiente ? (
+              <div className="mb-3 flex items-center gap-3 rounded-2xl bg-sky-50 px-3.5 py-3 ring-1 ring-sky-200">
+                <span className="text-xl" aria-hidden="true">🧬</span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-sky-900">
+                    Genética comprada · {pendiente.genetica} · {formatoPesos(pendiente.valor)}
+                  </p>
+                  <p className="text-xs text-sky-700">
+                    {formatearFechaCorta(pendiente.fecha)} · se suma a la próxima inseminación{pendiente.movimientoId ? " · en Contabilidad" : ""}
+                  </p>
+                </div>
+                <button type="button" onClick={() => void quitarPendiente()} className="shrink-0 text-xs font-semibold text-rose-600 active:opacity-70">
+                  Quitar
+                </button>
+              </div>
+            ) : (
+              registros[0]?.tipo !== "Inseminación" &&
+              registros[0]?.tipo !== "Parto" &&
+              registros[0]?.tipo !== "Baja" && (
+                <button
+                  type="button"
+                  onClick={() => setCompraGenetica(true)}
+                  className="mb-3 flex w-full items-center justify-between rounded-2xl bg-white px-3.5 py-2.5 text-left text-sm text-slate-600 ring-1 ring-slate-200 active:bg-slate-50"
+                >
+                  <span>🧬 Registrar genética comprada (antes de inseminar)</span>
+                  <span className="text-sky-700" aria-hidden="true">›</span>
+                </button>
+              )
+            )}
+            {compraGenetica && (
+              <Modal abierta etiqueta={`Cerda ${id}`} titulo="Genética comprada" subtitulo="Se juntará con la próxima inseminación" icono="🧬" onCerrar={() => setCompraGenetica(false)}>
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <p className="mb-1 text-sm font-medium text-slate-700">Genética *</p>
+                    <SelectorApp
+                      valor={cgTipo}
+                      onCambiar={setCgTipo}
+                      titulo="Genética"
+                      placeholder="Selecciona la genética"
+                      opciones={[...GENETICAS.map((g) => ({ valor: g, texto: g })), { valor: "OTRA", texto: "Otro…" }]}
+                      className="w-full"
+                      claseBoton="h-11 rounded-xl bg-slate-50 px-3.5 text-base text-slate-900 ring-1 ring-slate-200"
+                    />
+                    {cgTipo === "OTRA" && (
+                      <input
+                        type="text"
+                        value={cgOtra}
+                        onChange={(e) => setCgOtra(e.target.value.slice(0, 40))}
+                        placeholder="Escribe la genética"
+                        className="mt-2 h-11 w-full rounded-xl bg-slate-50 px-3.5 text-base text-slate-900 outline-none ring-1 ring-slate-200"
+                      />
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="flex min-w-0 flex-col gap-1">
+                      <span className="text-sm font-medium text-slate-700">Valor *</span>
+                      <span className="relative">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={cgValor ? Number(cgValor).toLocaleString("es-CO") : ""}
+                          onChange={(e) => setCgValor(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                          className="h-11 w-full rounded-xl bg-slate-50 pl-7 pr-3 text-base text-slate-900 outline-none ring-1 ring-slate-200"
+                        />
+                      </span>
+                    </label>
+                    <label className="flex min-w-0 flex-col gap-1">
+                      <span className="text-sm font-medium text-slate-700">Fecha de compra</span>
+                      <input
+                        type="date"
+                        value={cgFecha || fechaLocalISO(new Date())}
+                        max={fechaLocalISO(new Date())}
+                        onChange={(e) => setCgFecha(e.target.value)}
+                        className="h-11 w-full rounded-xl bg-slate-50 px-3 text-base text-slate-900 outline-none ring-1 ring-slate-200"
+                      />
+                    </label>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input type="checkbox" checked={cgConta} onChange={(e) => setCgConta(e.target.checked)} className="h-5 w-5 accent-sky-700" />
+                    Registrar como gasto en Contabilidad
+                  </label>
+                  <button
+                    type="button"
+                    onClick={registrarCompraGenetica}
+                    className="w-full rounded-2xl bg-sky-900 py-3 text-[15px] font-semibold text-white transition active:bg-sky-950"
+                  >
+                    Guardar
+                  </button>
+                  <p className="text-xs leading-snug text-slate-500">Al registrar la inseminación, la genética y su valor vendrán llenos y el gasto no se duplica.</p>
+                </div>
+              </Modal>
+            )}
             <section className="mb-3 overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
               <div className="flex items-center justify-between gap-3 px-4 pt-4">
                 <div className="min-w-0">
@@ -1296,6 +1470,13 @@ export default function CerdaDetalle() {
                         className="w-full pl-8 pr-4 py-2 rounded-2xl bg-gray-100 border border-gray-300 text-black outline-none box-border"
                       />
                     </div>
+                    {pendiente && (
+                      <p className="mt-2 text-xs text-sky-700">
+                        🧬 Genética comprada el {formatearFechaCorta(pendiente.fecha)}
+                        {pendiente.movimientoId ? " · ya está en Contabilidad" : ""}
+                      </p>
+                    )}
+                    {!pendiente?.movimientoId && (
                     <label className="mt-2 flex items-center gap-2 text-sm text-gray-700">
                       <input
                         type="checkbox"
@@ -1305,6 +1486,7 @@ export default function CerdaDetalle() {
                       />
                       Registrar como gasto en Contabilidad
                     </label>
+                    )}
                   </div>
                 )}
 
