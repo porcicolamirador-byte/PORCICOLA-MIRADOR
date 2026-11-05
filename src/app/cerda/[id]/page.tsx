@@ -14,8 +14,9 @@ import { confirmar } from "@/components/Dialogo";
 import { CONFIRMACIONES_GESTACION } from "@/utils/pendingTasks";
 import {
   confirmarGestacion,
-  DIAS_VENCE_GENETICA,
-  sumarDias,
+  actualizarGastoGenetica,
+  quitarGastoGenetica,
+  registrarGastoGenetica,
   type GeneticaPerdida,
   eliminarLotesDePartos,
   formatoPesos,
@@ -208,6 +209,7 @@ export default function CerdaDetalle() {
   const [descripcion, setDescripcion] = useState("");
   const [valorGenetica, setValorGenetica] = useState("");
   const [geneticaEnContabilidad, setGeneticaEnContabilidad] = useState(true);
+  const [pagoGenetica, setPagoGenetica] = useState<"contado" | "credito">("contado");
   const [tipoGenetica, setTipoGenetica] = useState("");
   const [otraGenetica, setOtraGenetica] = useState("");
   const [filtro, setFiltro] = useState("Todos");
@@ -250,7 +252,8 @@ export default function CerdaDetalle() {
 
   /* Genética comprada antes de la inseminación (por ejemplo al destetar): queda en la cerda
      y se junta con la inseminación cuando se registre */
-  const pendiente = (cerda?.geneticaPendiente ?? null) as { genetica: string; valor: number; fecha: string; movimientoId?: string } | null;
+  const pendiente = (cerda?.geneticaPendiente ?? null) as { genetica: string; valor: number; fecha: string; movimientoId?: string; cuentaId?: string; pago?: "contado" | "credito" } | null;
+  const pendienteEnConta = Boolean(pendiente?.movimientoId || pendiente?.cuentaId);
   const totalRegistros = registros.length + (pendiente ? 1 : 0) + (Array.isArray(cerda?.geneticasPerdidas) ? cerda.geneticasPerdidas.length : 0);
   function guardarPendiente(valor: typeof pendiente) {
     const lista = JSON.parse(localStorage.getItem("cerdas") || "[]");
@@ -267,12 +270,12 @@ export default function CerdaDetalle() {
     if (!pendiente) return;
     const ok = await confirmar({
       titulo: "Quitar genética comprada",
-      mensaje: `Se quitará la genética ${pendiente.genetica} (${formatoPesos(pendiente.valor)}) de esta cerda${pendiente.movimientoId ? " y su gasto de Contabilidad" : ""}.`,
+      mensaje: `Se quitará la genética ${pendiente.genetica} (${formatoPesos(pendiente.valor)}) de esta cerda${pendienteEnConta ? " y su gasto de Contabilidad" : ""}.`,
       aceptar: "Quitar",
       destructivo: true,
     });
     if (!ok) return;
-    if (pendiente.movimientoId) guardarMovimientos(leerMovimientos().filter((m) => m.id !== pendiente.movimientoId));
+    quitarGastoGenetica(pendiente);
     guardarPendiente(null);
   }
 
@@ -297,13 +300,7 @@ export default function CerdaDetalle() {
     const valor = Number(ecValor.replace(/\D/g, "")) || 0;
     if (!nombre) return mostrarAviso("Selecciona la genética");
     if (valor <= 0) return mostrarAviso("Ingresa el valor de la genética");
-    if (pendiente.movimientoId) {
-      guardarMovimientos(
-        leerMovimientos().map((m) =>
-          m.id === pendiente.movimientoId ? { ...m, fecha: ecFecha || m.fecha, monto: valor, descripcion: `Genética ${nombre} · cerda ${id} (para inseminación)` } : m
-        )
-      );
-    }
+    actualizarGastoGenetica(pendiente, { fecha: ecFecha || undefined, monto: valor, descripcion: `Genética ${nombre} · cerda ${id} (para inseminación)` });
     guardarPendiente({ ...pendiente, genetica: nombre, valor, fecha: ecFecha || pendiente.fecha });
     setEditCompra(false);
   }
@@ -335,6 +332,7 @@ export default function CerdaDetalle() {
       setDescripcion("");
       setValorGenetica("");
       setGeneticaEnContabilidad(true);
+      setPagoGenetica("contado");
       setTipoGenetica("");
       setOtraGenetica("");
     }
@@ -361,7 +359,7 @@ export default function CerdaDetalle() {
     const nuevos = registros.filter((_, i) => i !== index);
     guardar(nuevos);
     // El gasto de la genética se borra de Contabilidad con la inseminación
-    if (r?.movimientoId) guardarMovimientos(leerMovimientos().filter((m) => m.id !== r.movimientoId));
+    if (r?.movimientoId || r?.cuentaId) quitarGastoGenetica({ movimientoId: r.movimientoId, cuentaId: r.cuentaId });
     // El lote de engorde creado con ese parto se borra junto con el parto
     if (r?.tipo === "Parto" && r.codigoParto) eliminarLotesDePartos({ codigos: [String(r.codigoParto)] });
   }
@@ -373,7 +371,7 @@ export default function CerdaDetalle() {
     const lotes = r.tipo === "Parto" && r.codigoParto ? lotesDeParto(String(r.codigoParto)) : [];
     const base =
       (r.fecha ? `Se borrará el registro del ${formatearFechaCorta(r.fecha)}.` : "Se borrará este registro.") +
-      (r.movimientoId ? ` También se quitará de Contabilidad el gasto de la genética (${formatoPesos(Number(r.valorGenetica) || 0)}).` : "");
+      (r.movimientoId || r.cuentaId ? ` También se quitará de Contabilidad el gasto de la genética (${formatoPesos(Number(r.valorGenetica) || 0)}).` : "");
     const ok = await confirmar({
       titulo: `Eliminar ${String(r.tipo || "registro").toLowerCase()}`,
       mensaje: lotes.length
@@ -388,9 +386,8 @@ export default function CerdaDetalle() {
   async function eliminarHistorialCompleto() {
     setMostrarMenu(false);
     if (!(await confirmar({ titulo: "Eliminar historial", mensaje: "Se borrarán todos los registros de esta cerda y los lotes de Engorde creados con sus partos. Esta acción no se puede deshacer.", aceptar: "Eliminar", destructivo: true }))) return;
-    const conGasto = new Set(registros.map((r) => r.movimientoId).filter(Boolean));
     borrarConRegistro(`historial-${id}`);
-    if (conGasto.size) guardarMovimientos(leerMovimientos().filter((m) => !conGasto.has(m.id)));
+    for (const r of registros) if (r.movimientoId || r.cuentaId) quitarGastoGenetica({ movimientoId: r.movimientoId, cuentaId: r.cuentaId });
     eliminarLotesDePartos({ cerdaId: String(id) });
     setRegistros([]);
     setMostrarMenu(false);
@@ -571,15 +568,10 @@ export default function CerdaDetalle() {
     // Compra de genética: queda en el historial de la cerda hasta la inseminación (no cambia su estado)
     if (tipo === "Compra de genética") {
       const fechaCompra = fecha || fechaLocalISO(new Date());
-      let movimientoId: string | undefined;
-      if (geneticaEnContabilidad) {
-        movimientoId = nuevoId();
-        guardarMovimientos([
-          ...leerMovimientos(),
-          { id: movimientoId, fecha: fechaCompra, tipo: "gasto", categoria: "Genética", descripcion: `Genética ${nombreGenetica} · cerda ${id} (para inseminación)`, monto: genetica, cerdaId: String(id) },
-        ]);
-      }
-      guardarPendiente({ genetica: nombreGenetica, valor: genetica, fecha: fechaCompra, movimientoId });
+      const enlace = geneticaEnContabilidad
+        ? registrarGastoGenetica({ fecha: fechaCompra, descripcion: `Genética ${nombreGenetica} · cerda ${id} (para inseminación)`, monto: genetica, cerdaId: String(id), pago: pagoGenetica })
+        : {};
+      guardarPendiente({ genetica: nombreGenetica, valor: genetica, fecha: fechaCompra, ...enlace, pago: pagoGenetica });
       setMostrarForm(false);
       mostrarAviso("Compra de genética registrada");
       return;
@@ -592,21 +584,16 @@ export default function CerdaDetalle() {
       nuevo.valorGenetica = genetica;
       nuevo.genetica = nombreGenetica;
       if (pendiente) nuevo.compraGenetica = pendiente.fecha;
-      if (pendiente?.movimientoId) {
+      if (pendienteEnConta && pendiente) {
         // Ya estaba en Contabilidad desde la compra: se usa ese mismo gasto (sin duplicarlo)
-        nuevo.movimientoId = pendiente.movimientoId;
-        guardarMovimientos(
-          leerMovimientos().map((m) =>
-            m.id === pendiente.movimientoId ? { ...m, monto: genetica, descripcion: `Genética ${nombreGenetica} · inseminación cerda ${id}` } : m
-          )
-        );
+        if (pendiente.movimientoId) nuevo.movimientoId = pendiente.movimientoId;
+        if (pendiente.cuentaId) nuevo.cuentaId = pendiente.cuentaId;
+        nuevo.pago = pendiente.pago;
+        actualizarGastoGenetica(pendiente, { monto: genetica, descripcion: `Genética ${nombreGenetica} · inseminación cerda ${id}` });
       } else if (geneticaEnContabilidad) {
-        const movimientoId = nuevoId();
-        guardarMovimientos([
-          ...leerMovimientos(),
-          { id: movimientoId, fecha, tipo: "gasto", categoria: "Genética", descripcion: `Genética ${nombreGenetica} · inseminación cerda ${id}`, monto: genetica, cerdaId: String(id) },
-        ]);
-        nuevo.movimientoId = movimientoId;
+        const enlace = registrarGastoGenetica({ fecha, descripcion: `Genética ${nombreGenetica} · inseminación cerda ${id}`, monto: genetica, cerdaId: String(id), pago: pagoGenetica });
+        Object.assign(nuevo, enlace);
+        nuevo.pago = pagoGenetica;
       }
       const partoEst = calcularParto(fecha);
       nuevo.partoEstimado = partoEst;
@@ -1110,7 +1097,6 @@ export default function CerdaDetalle() {
                       fecha: pendiente.fecha,
                       genetica: pendiente.genetica,
                       valorGenetica: pendiente.valor,
-                      mensaje: `Se junta al registrar la inseminación · se daña el ${formatearFechaCorta(sumarDias(pendiente.fecha, DIAS_VENCE_GENETICA))}`,
                       compra: true,
                     } as any,
                     idx: -1,
@@ -1124,7 +1110,7 @@ export default function CerdaDetalle() {
                 fecha: g.vencio,
                 genetica: g.genetica,
                 valorGenetica: g.valor,
-                mensaje: `Comprada ${formatearFechaCorta(g.fecha)} · se dañó a los ${DIAS_VENCE_GENETICA} días · pasó a Pérdidas`,
+                mensaje: `Comprada ${formatearFechaCorta(g.fecha)} · pasó a Pérdidas`,
               } as any,
               idx: -2 - k,
             })),
@@ -1529,10 +1515,10 @@ export default function CerdaDetalle() {
                     {pendiente && tipo === "Inseminación" && (
                       <p className="mt-2 text-xs text-sky-700">
                         🧬 Genética comprada el {formatearFechaCorta(pendiente.fecha)}
-                        {pendiente.movimientoId ? " · ya está en Contabilidad" : ""}
+                        {pendienteEnConta ? ` · ya está en Contabilidad (${pendiente.pago === "credito" ? "crédito" : "contado"})` : ""}
                       </p>
                     )}
-                    {(tipo === "Compra de genética" || !pendiente?.movimientoId) && (
+                    {(tipo === "Compra de genética" || !pendienteEnConta) && (
                     <label className="mt-2 flex items-center gap-2 text-sm text-gray-700">
                       <input
                         type="checkbox"
@@ -1542,6 +1528,22 @@ export default function CerdaDetalle() {
                       />
                       Registrar como gasto en Contabilidad
                     </label>
+                    )}
+                    {(tipo === "Compra de genética" || !pendienteEnConta) && geneticaEnContabilidad && (
+                      <div className="mt-2 grid w-full max-w-[320px] grid-cols-2 gap-1 rounded-2xl bg-gray-100 p-1" role="radiogroup" aria-label="Método de pago">
+                        {(["contado", "credito"] as const).map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            role="radio"
+                            aria-checked={pagoGenetica === m}
+                            onClick={() => setPagoGenetica(m)}
+                            className={`rounded-xl py-2 text-sm font-semibold transition ${pagoGenetica === m ? "bg-white text-black shadow-sm" : "text-gray-500"}`}
+                          >
+                            {m === "contado" ? "Contado" : "Crédito"}
+                          </button>
+                        ))}
+                      </div>
                     )}
                   </div>
                 )}

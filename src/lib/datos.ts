@@ -848,6 +848,62 @@ const fmtNum = (n: number) => n.toLocaleString("es-CO", { maximumFractionDigits:
  * cada artículo se vuelve un producto y su existencia queda como
  * "saldo inicial". Se ejecuta una sola vez.
  */
+/* ───────────── Gasto de genética (contado o crédito) ───────────── */
+
+/** Enlace del gasto de una genética con Contabilidad: movimiento (contado) o cuenta por pagar (crédito) */
+export interface GastoGenetica {
+  movimientoId?: string;
+  cuentaId?: string;
+}
+
+export function registrarGastoGenetica(d: { fecha: string; descripcion: string; monto: number; cerdaId: string; pago: "contado" | "credito" }): GastoGenetica {
+  if (d.pago === "credito") {
+    const cuentaId = nuevoId();
+    guardarCuentasPorPagar([...leerCuentasPorPagar(), { id: cuentaId, fecha: d.fecha, descripcion: d.descripcion, categoria: "Genética", total: d.monto, abonos: [] }]);
+    return { cuentaId };
+  }
+  const movimientoId = nuevoId();
+  guardarMovimientos([
+    ...leerMovimientos(),
+    { id: movimientoId, fecha: d.fecha, tipo: "gasto", categoria: "Genética", descripcion: d.descripcion, monto: d.monto, cerdaId: d.cerdaId },
+  ]);
+  return { movimientoId };
+}
+
+export function actualizarGastoGenetica(g: GastoGenetica, cambios: { monto?: number; descripcion?: string; fecha?: string; categoria?: string; sinCerda?: boolean }) {
+  if (g.movimientoId) {
+    guardarMovimientos(
+      leerMovimientos().map((m) => {
+        if (m.id !== g.movimientoId) return m;
+        const n = { ...m, ...(cambios.monto !== undefined ? { monto: cambios.monto } : {}), ...(cambios.descripcion ? { descripcion: cambios.descripcion } : {}), ...(cambios.fecha ? { fecha: cambios.fecha } : {}), ...(cambios.categoria ? { categoria: cambios.categoria } : {}) };
+        if (cambios.sinCerda) delete n.cerdaId;
+        return n;
+      })
+    );
+  }
+  if (g.cuentaId) {
+    guardarCuentasPorPagar(
+      leerCuentasPorPagar().map((c) =>
+        c.id === g.cuentaId
+          ? { ...c, ...(cambios.monto !== undefined ? { total: cambios.monto } : {}), ...(cambios.descripcion ? { descripcion: cambios.descripcion } : {}), ...(cambios.fecha ? { fecha: cambios.fecha } : {}), ...(cambios.categoria ? { categoria: cambios.categoria } : {}) }
+          : c
+      )
+    );
+  }
+}
+
+/** Quita el gasto de una genética de Contabilidad (y los abonos si era a crédito) */
+export function quitarGastoGenetica(g: GastoGenetica) {
+  const quitar = new Set<string>();
+  if (g.movimientoId) quitar.add(g.movimientoId);
+  if (g.cuentaId) {
+    const cuenta = leerCuentasPorPagar().find((c) => c.id === g.cuentaId);
+    for (const a of cuenta?.abonos ?? []) if (a.movimientoId) quitar.add(a.movimientoId);
+    guardarCuentasPorPagar(leerCuentasPorPagar().filter((c) => c.id !== g.cuentaId));
+  }
+  if (quitar.size) guardarMovimientos(leerMovimientos().filter((m) => !quitar.has(m.id)));
+}
+
 /* ───────────── Genética comprada que no se usó ───────────── */
 
 /** Días que dura la genética comprada: después pasa sola a Pérdidas en Contabilidad */
@@ -861,6 +917,7 @@ export interface GeneticaPerdida {
   /** Día en que pasó a pérdida */
   vencio: string;
   movimientoId?: string;
+  cuentaId?: string;
 }
 
 /**
@@ -891,10 +948,12 @@ export function vencerGeneticasPendientes(): number {
         cambioMovs = true;
       }
     }
+    const cuentaId = (g as { cuentaId?: string }).cuentaId;
+    if (cuentaId) actualizarGastoGenetica({ cuentaId }, { categoria: "Pérdidas", descripcion: `Genética ${g.genetica} no usada (se dañó) · cerda ${c.id}` });
     const { geneticaPendiente: _g, ...resto } = c as Record<string, unknown>;
     const previas = (c as unknown as { geneticasPerdidas?: unknown }).geneticasPerdidas;
     const perdidas = Array.isArray(previas) ? (previas as GeneticaPerdida[]) : [];
-    return { ...resto, geneticasPerdidas: [...perdidas, { genetica: g.genetica, valor: g.valor, fecha: g.fecha, vencio, movimientoId: g.movimientoId }] } as unknown as CerdaDatos;
+    return { ...resto, geneticasPerdidas: [...perdidas, { genetica: g.genetica, valor: g.valor, fecha: g.fecha, vencio, movimientoId: g.movimientoId, cuentaId }] } as unknown as CerdaDatos;
   });
   if (cambioMovs) guardarMovimientos(movs);
   guardarCerdas(nuevas);
