@@ -188,6 +188,8 @@ export interface Movimiento {
   loteId?: string;
   /** "produccion": registrado desde Bodega → Gastos de producción */
   origen?: "produccion";
+  /** Número de la factura de la compra (FEG-001… si es "General") */
+  factura?: string;
   /** Abono por préstamo pagado: producto al que corresponde */
   productoCodigo?: string;
   gastoId?: string;
@@ -628,6 +630,8 @@ export interface CuentaPorPagar {
   categoria: string;
   total: number;
   abonos: AbonoFactura[];
+  /** Número de la factura de la compra */
+  factura?: string;
   /** Compra de Gastos de producción a crédito (Bodega) */
   origen?: "produccion";
   cantidad?: string;
@@ -875,6 +879,48 @@ const fmtNum = (n: number) => n.toLocaleString("es-CO", { maximumFractionDigits:
  * cada artículo se vuelve un producto y su existencia queda como
  * "saldo inicial". Se ejecuta una sola vez.
  */
+/* ───────────── Facturas de gastos (producción y genética) ───────────── */
+
+/** Valor del campo de factura cuando se elige "General" (sin número todavía) */
+export const FACTURA_GENERAL = "__GENERAL__";
+
+/** Siguiente número de factura general de esta granja: FEG-001, FEG-002… */
+export function siguienteFacturaGeneral(): string {
+  let max = 0;
+  const revisar = (n?: string) => {
+    const m = /^FEG-(\d+)$/.exec(String(n ?? ""));
+    if (m) max = Math.max(max, Number(m[1]));
+  };
+  for (const m of leerMovimientos()) revisar(m.factura);
+  for (const c of leerCuentasPorPagar()) revisar(c.factura);
+  for (const f of leerFacturas()) revisar(f.numero);
+  return `FEG-${String(max + 1).padStart(3, "0")}`;
+}
+/** Convierte el valor del campo en el número que se guarda */
+export const numeroFactura = (v: string) => (v === FACTURA_GENERAL ? siguienteFacturaGeneral() : v.trim().toUpperCase().slice(0, 30));
+
+/** Facturas de gastos de producción y genética (se muestran en Bodega → Facturas) */
+export interface FacturaGasto {
+  id: string;
+  numero: string;
+  fecha: string;
+  descripcion: string;
+  categoria: string;
+  total: number;
+  pago: "contado" | "credito";
+  saldo: number;
+}
+export function facturasDeGastos(): FacturaGasto[] {
+  return [
+    ...leerMovimientos()
+      .filter((m) => m.tipo === "gasto" && m.factura)
+      .map((m) => ({ id: m.id, numero: m.factura as string, fecha: m.fecha, descripcion: m.descripcion, categoria: m.categoria, total: m.monto, pago: "contado" as const, saldo: 0 })),
+    ...leerCuentasPorPagar()
+      .filter((c) => c.factura)
+      .map((c) => ({ id: c.id, numero: c.factura as string, fecha: c.fecha, descripcion: c.descripcion, categoria: c.categoria, total: c.total, pago: "credito" as const, saldo: saldoCuenta(c) })),
+  ];
+}
+
 /* ───────────── Gasto de genética (contado o crédito) ───────────── */
 
 /** Enlace del gasto de una genética con Contabilidad: movimiento (contado) o cuenta por pagar (crédito) */
@@ -883,16 +929,17 @@ export interface GastoGenetica {
   cuentaId?: string;
 }
 
-export function registrarGastoGenetica(d: { fecha: string; descripcion: string; monto: number; cerdaId: string; pago: "contado" | "credito" }): GastoGenetica {
+export function registrarGastoGenetica(d: { fecha: string; descripcion: string; monto: number; cerdaId: string; pago: "contado" | "credito"; factura?: string }): GastoGenetica {
+  const factura = d.factura ? numeroFactura(d.factura) || undefined : undefined;
   if (d.pago === "credito") {
     const cuentaId = nuevoId();
-    guardarCuentasPorPagar([...leerCuentasPorPagar(), { id: cuentaId, fecha: d.fecha, descripcion: d.descripcion, categoria: "Genética", total: d.monto, abonos: [] }]);
+    guardarCuentasPorPagar([...leerCuentasPorPagar(), { id: cuentaId, fecha: d.fecha, descripcion: d.descripcion, categoria: "Genética", total: d.monto, abonos: [], ...(factura ? { factura } : {}) }]);
     return { cuentaId };
   }
   const movimientoId = nuevoId();
   guardarMovimientos([
     ...leerMovimientos(),
-    { id: movimientoId, fecha: d.fecha, tipo: "gasto", categoria: "Genética", descripcion: d.descripcion, monto: d.monto, cerdaId: d.cerdaId },
+    { id: movimientoId, fecha: d.fecha, tipo: "gasto", categoria: "Genética", descripcion: d.descripcion, monto: d.monto, cerdaId: d.cerdaId, ...(factura ? { factura } : {}) },
   ]);
   return { movimientoId };
 }
@@ -1673,14 +1720,16 @@ export function eliminarGastoProduccion(id: string) {
 }
 
 /** Registra un gasto de producción: queda como gasto en la contabilidad general */
-export function registrarGastoProduccion(datos: { descripcion: string; cantidad?: string; unidad?: string; marca?: string; valor: number; categoria: string; fecha: string; pago: "contado" | "credito" }) {
+export function registrarGastoProduccion(datos: { descripcion: string; cantidad?: string; unidad?: string; marca?: string; valor: number; categoria: string; fecha: string; pago: "contado" | "credito"; factura?: string }) {
   const descripcion = datos.descripcion.trim().slice(0, 80);
   if (!descripcion || !(datos.valor > 0)) return false;
   const cantidadNum = Number(String(datos.cantidad ?? "").replace(",", ".")) || 0;
   const unidad = datos.unidad?.trim() || undefined;
   const cantidad = cantidadNum > 0 ? `${fmtNum(cantidadNum)}${unidad ? ` ${unidad}` : ""}` : datos.cantidad?.trim().slice(0, 40) || undefined;
   const marca = datos.marca?.trim().slice(0, 40) || undefined;
+  const factura = datos.factura ? numeroFactura(datos.factura) || undefined : undefined;
   const extra = {
+    ...(factura ? { factura } : {}),
     ...(marca ? { marca } : {}),
     ...(cantidad ? { cantidad } : {}),
     ...(cantidadNum > 0 ? { cantidadNum, valorUnitario: Math.round((datos.valor / cantidadNum) * 100) / 100 } : {}),

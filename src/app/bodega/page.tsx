@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Boton, Campo, Chevron, Chips, Entrada, IconoMas, Insignia, SeccionDesplegable, Selector, Vacio, EntradaPesos, CLASE_SELECTOR } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
+import CampoFactura from "@/components/CampoFactura";
 import { puede } from "@/lib/nube";
 import DialogoClave from "@/components/DialogoClave";
 import { leerConfig } from "@/lib/config";
@@ -22,6 +23,7 @@ import {
   devolverPrestamo,
   devolverMedicamento,
   leerExistenciasGranjas,
+  facturasDeGastos,
   tomarPrestado,
   gratificarPrestamo,
   type ExistenciasGranja,
@@ -137,6 +139,10 @@ export default function BodegaPage() {
   const facturasVisibles = (datos?.facturas ?? []).filter(
     (f) => !q || f.numero.toLowerCase().includes(q) || (f.proveedor ?? "").toLowerCase().includes(q)
   );
+  // Facturas de gastos de producción y genética (no mueven inventario)
+  const otrasFacturas = (version < 0 ? [] : facturasDeGastos())
+    .filter((f) => !q || f.numero.toLowerCase().includes(q) || f.descripcion.toLowerCase().includes(q))
+    .sort((a, b) => b.fecha.localeCompare(a.fecha));
   const mesActual = hoy().slice(0, 7);
   const compradoMes = (datos?.facturas ?? []).filter((f) => f.fecha.slice(0, 7) === mesActual).reduce((s, f) => s + totalFactura(f), 0);
 
@@ -215,7 +221,7 @@ export default function BodegaPage() {
           {datos === null ? (
             <div className="h-40 animate-pulse rounded-3xl bg-slate-100" />
           ) : vista === "facturas" ? (
-            facturasVisibles.length === 0 ? (
+            facturasVisibles.length === 0 && otrasFacturas.length === 0 ? (
               <Vacio
                 titulo="Sin facturas"
                 texto="Ingresa la factura de cada compra para que las existencias se actualicen solas."
@@ -268,6 +274,35 @@ export default function BodegaPage() {
                   </li>
                 ))}
               </ul>
+              {otrasFacturas.length > 0 && (
+                <section>
+                  <h2 className="mb-1.5 mt-1 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Gastos de producción y genética · {otrasFacturas.length}</h2>
+                  <ul className="divide-y divide-slate-100 overflow-hidden rounded-3xl bg-white ring-1 ring-slate-200/80">
+                    {otrasFacturas.map((f) => (
+                      <li key={f.id} className="flex items-center gap-3 px-3.5 py-2.5">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-base" aria-hidden="true">
+                          {f.categoria === "Genética" ? "🧬" : "🧾"}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-slate-900">Factura {f.numero}</span>
+                          <span className="block truncate text-xs text-slate-500">
+                            {formatoFecha(f.fecha, true)} · {f.descripcion}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-right">
+                          <span className="block text-sm font-bold text-slate-900 tabular-nums">{formatoPesos(f.total)}</span>
+                          {f.pago === "credito" &&
+                            (f.saldo > 0 ? (
+                              <span className="block text-[10px] font-semibold text-orange-600 tabular-nums">Debe {formatoPesos(f.saldo)}</span>
+                            ) : (
+                              <span className="block text-[10px] font-semibold text-sky-700">Crédito pagado</span>
+                            ))}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
               </>
             )
           ) : inventarioVisible.length === 0 ? (
@@ -1648,6 +1683,7 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
   const [unidad, setUnidad] = useState("");
   const [pago, setPago] = useState<"" | "contado" | "credito">("");
   const [marca, setMarca] = useState("");
+  const [facturaG, setFacturaG] = useState("");
   const [prestarMed, setPrestarMed] = useState<string | null>(null);
   const hayOtras = leerGranjas().some((g) => g.id !== granjaActual());
   const [fecha, setFecha] = useState(hoy());
@@ -1666,9 +1702,10 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
     e.preventDefault();
     if (!categoria) return;
     if (esVacuna && (!unidad || !(cantidadNum > 0))) return;
-    if (!pago) return;
-    if (!registrarGastoProduccion({ descripcion, cantidad, unidad: esVacuna ? unidad : undefined, marca: esVacuna ? marca : undefined, valor: monto, categoria, fecha, pago })) return;
+    if (!pago || !facturaG.trim()) return;
+    if (!registrarGastoProduccion({ descripcion, cantidad, unidad: esVacuna ? unidad : undefined, marca: esVacuna ? marca : undefined, valor: monto, categoria, fecha, pago, factura: facturaG })) return;
     setPago("");
+    setFacturaG("");
     setMarca("");
     setDescripcion("");
     setCantidad("");
@@ -1710,6 +1747,7 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
               opciones={CATEGORIAS_GASTO_PRODUCCION.map((c) => ({ valor: c.categoria, texto: c.texto }))}
             />
           </Campo>
+          <CampoFactura valor={facturaG} onCambiar={setFacturaG} />
           <Campo etiqueta="Producto o servicio *">
             <Entrada value={descripcion} onChange={(v) => setDescripcion(v.slice(0, 80))} required />
           </Campo>
@@ -1765,7 +1803,7 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
             <Boton variante="secundario" onClick={() => setNuevo(false)}>
               Cancelar
             </Boton>
-            <Boton type="submit" disabled={!pago || !categoria || !descripcion.trim() || monto <= 0 || (esVacuna && (!unidad || !(cantidadNum > 0)))}>
+            <Boton type="submit" disabled={!pago || !facturaG.trim() || !categoria || !descripcion.trim() || monto <= 0 || (esVacuna && (!unidad || !(cantidadNum > 0)))}>
               Guardar
             </Boton>
           </div>

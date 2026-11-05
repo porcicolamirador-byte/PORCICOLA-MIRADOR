@@ -2,6 +2,7 @@
 
 import Emoji from "@/components/Emoji";
 import SelectorApp from "@/components/SelectorApp";
+import CampoFactura from "@/components/CampoFactura";
 import Modal from "@/components/Modal";
 import { generarPdfParto } from "@/lib/pdfParto";
 import { CLAVE_JAULAS, granjaActual, nombreGranjaActual } from "@/lib/sincronizar";
@@ -210,6 +211,7 @@ export default function CerdaDetalle() {
   const [valorGenetica, setValorGenetica] = useState("");
   const [geneticaEnContabilidad, setGeneticaEnContabilidad] = useState(true);
   const [pagoGenetica, setPagoGenetica] = useState<"contado" | "credito">("contado");
+  const [facturaGenetica, setFacturaGenetica] = useState("");
   const [tipoGenetica, setTipoGenetica] = useState("");
   const [otraGenetica, setOtraGenetica] = useState("");
   const [filtro, setFiltro] = useState("Todos");
@@ -353,6 +355,7 @@ export default function CerdaDetalle() {
       setValorGenetica("");
       setGeneticaEnContabilidad(true);
       setPagoGenetica("contado");
+      setFacturaGenetica("");
       setTipoGenetica("");
       setOtraGenetica("");
     }
@@ -584,12 +587,16 @@ export default function CerdaDetalle() {
       mostrarAviso("Ingresa el valor de la genética");
       return;
     }
+    if (conGenetica && geneticaEnContabilidad && !(tipo === "Inseminación" && pendienteEnConta) && !facturaGenetica.trim()) {
+      mostrarAviso("Ingresa el número de factura o elige General");
+      return;
+    }
 
     // Compra de genética: queda en el historial de la cerda hasta la inseminación (no cambia su estado)
     if (tipo === "Compra de genética") {
       const fechaCompra = fecha || fechaLocalISO(new Date());
       const enlace = geneticaEnContabilidad
-        ? registrarGastoGenetica({ fecha: fechaCompra, descripcion: `Genética ${nombreGenetica} · cerda ${id} (para inseminación)`, monto: genetica, cerdaId: String(id), pago: pagoGenetica })
+        ? registrarGastoGenetica({ fecha: fechaCompra, descripcion: `Genética ${nombreGenetica} · cerda ${id} (para inseminación)`, monto: genetica, cerdaId: String(id), pago: pagoGenetica, factura: facturaGenetica })
         : {};
       guardarPendiente({ genetica: nombreGenetica, valor: genetica, fecha: fechaCompra, ...enlace, pago: pagoGenetica });
       setMostrarForm(false);
@@ -610,7 +617,7 @@ export default function CerdaDetalle() {
         nuevo.pago = pendiente.pago;
         actualizarGastoGenetica(pendiente, { monto: genetica, descripcion: `Genética ${nombreGenetica} · inseminación cerda ${id}` });
       } else if (geneticaEnContabilidad) {
-        const enlace = registrarGastoGenetica({ fecha, descripcion: `Genética ${nombreGenetica} · inseminación cerda ${id}`, monto: genetica, cerdaId: String(id), pago: pagoGenetica });
+        const enlace = registrarGastoGenetica({ fecha, descripcion: `Genética ${nombreGenetica} · inseminación cerda ${id}`, monto: genetica, cerdaId: String(id), pago: pagoGenetica, factura: facturaGenetica });
         Object.assign(nuevo, enlace);
         nuevo.pago = pagoGenetica;
       }
@@ -1549,6 +1556,11 @@ export default function CerdaDetalle() {
                       />
                       Registrar como gasto en Contabilidad
                     </label>
+                    )}
+                    {(tipo === "Compra de genética" || !pendienteEnConta) && geneticaEnContabilidad && (
+                      <div className="mt-2 w-full max-w-[320px]">
+                        <CampoFactura valor={facturaGenetica} onCambiar={setFacturaGenetica} />
+                      </div>
                     )}
                     {(tipo === "Compra de genética" || !pendienteEnConta) && geneticaEnContabilidad && (
                       <div className="mt-2 grid w-full max-w-[320px] grid-cols-2 gap-1 rounded-2xl bg-gray-100 p-1" role="radiogroup" aria-label="Método de pago">
