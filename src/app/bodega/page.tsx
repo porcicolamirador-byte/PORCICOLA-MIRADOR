@@ -832,7 +832,6 @@ function PrestarProducto({ item, granjas, onCerrar }: { item: ExistenciaProducto
     if (r) return setError(r);
     const g = granjas.find((x) => x.id === destino)?.nombre ?? "";
     onCerrar();
-    await avisar({ titulo: "Préstamo registrado", mensaje: `Se prestaron ${fmt(n)} ${p.unidad} de ${p.nombre} a ${g}. Quedará como deuda en su bodega hasta que los devuelva.` });
   };
   return (
     <Modal abierta etiqueta={p.nombre} titulo="Prestar a otra granja" subtitulo={`Hay ${fmt(item.disponible)} ${p.unidad}`} onCerrar={onCerrar}>
@@ -909,7 +908,6 @@ function TomarPrestado({ granjas, onCerrar }: { granjas: ExistenciasGranja[]; on
     if (r) return setError(r);
     const nombre = opciones.find((o) => o.valor === item)?.texto ?? "";
     onCerrar();
-    await avisar({ titulo: "Préstamo registrado", mensaje: `Tomaste ${fmt(n)} ${unidad ?? ""} de ${nombre} de ${g?.nombre ?? ""}. Quedará como deuda hasta que lo devuelvas.` });
   };
   return (
     <Modal abierta etiqueta="Bodega" titulo="Tomar prestado" subtitulo="De otra granja" onCerrar={onCerrar}>
@@ -1093,7 +1091,6 @@ function PrestarMedicamento({ gastoId, onCerrar }: { gastoId: string; onCerrar: 
     const r = prestarMedicamento(gastoId, destino, n);
     if (r) return setError(r);
     onCerrar();
-    await avisar({ titulo: "Préstamo registrado", mensaje: `Se prestaron ${fmt(n)} ${med.unidad} de ${med.nombre} a ${granjas.find((g) => g.id === destino)?.nombre ?? ""}.` });
   };
   return (
     <Modal abierta etiqueta={med.nombre} titulo="Prestar a otra granja" subtitulo={`Quedan ${fmt(med.restante)} ${med.unidad}`} onCerrar={onCerrar}>
@@ -1135,13 +1132,6 @@ function DevolverMedicamento({ prestamo: p, onCerrar }: { prestamo: PrestamoMedi
     const r = devolverMedicamento(p.id, n, fuente, modo);
     if (r) return setError(r);
     onCerrar();
-    await avisar({
-      titulo: modo === "pago" ? "Pago registrado" : "Devolución registrada",
-      mensaje:
-        modo === "pago"
-          ? `Se pagaron ${formatoPesos(Math.round(n * (p.valorUnitario || 0)))} a ${p.deNombre} por ${fmt(n)} ${p.unidad} de ${p.nombre}. Quedó como gasto de contado en Contabilidad.`
-          : `Se devolvieron ${fmt(n)} ${p.unidad} de ${p.nombre} a ${p.deNombre}.`,
-    });
   };
   return (
     <Modal abierta etiqueta={p.nombre} titulo={`Devolver a ${p.deNombre}`} subtitulo={`Debes ${fmt(falta)} ${p.unidad}`} onCerrar={onCerrar}>
@@ -1212,13 +1202,6 @@ function DevolverPrestamo({ prestamo: p, onCerrar }: { prestamo: PrestamoBodega;
     const r = devolverPrestamo(p.id, n, modo);
     if (r) return setError(r);
     onCerrar();
-    await avisar({
-      titulo: modo === "pago" ? "Pago registrado" : "Devolución registrada",
-      mensaje:
-        modo === "pago"
-          ? `Se pagaron ${formatoPesos(Math.round(n * (p.valorUnitario || 0)))} a ${p.deNombre} por ${fmt(n)} ${p.unidad} de ${p.nombre}. Quedó como gasto de contado en Contabilidad.`
-          : `Se devolvieron ${fmt(n)} ${p.unidad} de ${p.nombre} a ${p.deNombre}.`,
-    });
   };
   return (
     <Modal abierta etiqueta={p.nombre} titulo={`Devolver a ${p.deNombre}`} subtitulo={`Debes ${fmt(falta)} ${p.unidad} · hay ${fmt(hay)} en bodega`} onCerrar={onCerrar}>
