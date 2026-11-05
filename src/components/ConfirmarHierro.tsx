@@ -5,12 +5,15 @@
  * hierro a una camada. Al confirmar queda registrada en el lote y lo muestra.
  */
 
+import { useState } from "react";
 import Modal from "@/components/Modal";
 import { Boton } from "@/components/ui";
-import { formatoFecha, formatoHora, hierroAplicado, leerLotes, nombreLote, registrarHierro } from "@/lib/datos";
+import CostoMedicamento, { type ResultadoMedicamento } from "@/components/CostoMedicamento";
+import { formatoFecha, formatoHora, hierroAplicado, leerLotes, nombreLote, registrarHierro, registrarTratamientoLote } from "@/lib/datos";
 
 export default function ConfirmarHierro({ loteId, onCerrar }: { loteId: string | null; onCerrar: () => void }) {
   const lote = loteId ? leerLotes().find((l) => l.id === loteId) : undefined;
+  const [med, setMed] = useState<ResultadoMedicamento | "otro" | null>(null);
   if (!loteId) return null;
   const aplicado = lote ? hierroAplicado(lote) : undefined;
   const cerrar = () => onCerrar();
@@ -46,10 +49,17 @@ export default function ConfirmarHierro({ loteId, onCerrar }: { loteId: string |
           <p className="text-sm text-slate-600">
             Confirma que hoy se aplicó el hierro a los <b>{lote.vivos}</b> lechones de este lote. Quedará registrado en el lote con la fecha y la hora.
           </p>
+          <CostoMedicamento key={lote.id} animales={lote.vivos} sugerir="hierro" onCambiar={setMed} />
           <Boton
+            disabled={!med}
             onClick={() => {
-              // Registra y cierra (sin mensaje adicional)
-              registrarHierro(lote.id);
+              // Con medicamento de Gastos de producción: su costo se suma al lote
+              if (med && med !== "otro") {
+                const tratamientoId = registrarTratamientoLote(lote.id, med, "Aplicación de hierro");
+                registrarHierro(lote.id, { costo: med.costo, nota: `${med.nombre} · ${med.texto}`, tratamientoId });
+              } else {
+                registrarHierro(lote.id);
+              }
               cerrar();
             }}
             className="w-full py-3"

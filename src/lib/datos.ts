@@ -1645,12 +1645,39 @@ export const loteDelParto = (codigoParto: string) => leerLotes().find((l) => l.o
 /** ¿Ya se aplicó el hierro a la camada de ese lote? */
 export const hierroAplicado = (l: Lote) => (l.aplicaciones ?? []).find((a) => a.tipo === "Hierro");
 /** Registra en el lote la aplicación de hierro (una sola vez) */
-export function registrarHierro(loteId: string): boolean {
+export function registrarHierro(loteId: string, extra?: { costo?: number; nota?: string; tratamientoId?: string }): boolean {
   const lote = leerLotes().find((l) => l.id === loteId);
   if (!lote || hierroAplicado(lote)) return false;
-  const aplicacion: AplicacionLote = { id: nuevoId(), fecha: hoy(), hora: horaActual(), tipo: "Hierro" };
+  const aplicacion: AplicacionLote = { id: nuevoId(), fecha: hoy(), hora: horaActual(), tipo: "Hierro", ...(extra ?? {}) };
   guardarLotes(leerLotes().map((l) => (l.id === loteId ? { ...l, aplicaciones: [...(l.aplicaciones ?? []), aplicacion] } : l)));
   return true;
+}
+
+/** Guarda en Tratamientos un medicamento aplicado a un lote (para saber cuánto queda y su retiro) */
+export function registrarTratamientoLote(loteId: string, r: { gastoId: string; nombre: string; cantidadAnimal: number; unidadDosis: string; animales: number; cantidadUsada: number; costo: number }, motivo?: string): string {
+  const id = nuevoId();
+  guardarTratamientos([
+    ...leerTratamientos(),
+    {
+      id,
+      tipo: "Tratamiento",
+      fecha: hoy(),
+      objetivo: "lote",
+      objetivoId: loteId,
+      medicamento: r.nombre,
+      dosis: `${(Math.round(r.cantidadAnimal * 100) / 100).toLocaleString("es-CO")} ${r.unidadDosis} por animal × ${r.animales}`,
+      dias: 1,
+      retiroDias: 0,
+      ...(motivo ? { motivo } : {}),
+      gastoId: r.gastoId,
+      cantidadAnimal: r.cantidadAnimal,
+      unidadDosis: r.unidadDosis,
+      animales: r.animales,
+      cantidadUsada: r.cantidadUsada,
+      costo: r.costo,
+    },
+  ]);
+  return id;
 }
 
 /** Agrega al lote un medicamento aplicado (desde Tratamientos), con su costo */
@@ -1674,6 +1701,9 @@ export function editarAplicacion(loteId: string, aplicacionId: string, cambios: 
 }
 /** Borra una aplicación del lote (si era el hierro, vuelve la alerta) */
 export function eliminarAplicacion(loteId: string, aplicacionId: string) {
+  // Si venía de un tratamiento con medicamento, ese registro también se quita (vuelve lo usado)
+  const ap = leerLotes().find((l) => l.id === loteId)?.aplicaciones?.find((a) => a.id === aplicacionId);
+  if (ap?.tratamientoId) guardarTratamientos(leerTratamientos().filter((t) => t.id !== ap.tratamientoId));
   guardarLotes(leerLotes().map((l) => (l.id === loteId ? { ...l, aplicaciones: (l.aplicaciones ?? []).filter((a) => a.id !== aplicacionId) } : l)));
 }
 
