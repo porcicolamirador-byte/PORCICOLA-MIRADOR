@@ -230,8 +230,10 @@ export default function BodegaPage() {
             ) : (
               <>
               {(() => {
-                const pendientes = (datos?.facturas ?? []).filter((f) => saldoFactura(f) > 0);
-                const deuda = pendientes.reduce((t, f) => t + saldoFactura(f), 0);
+                // Facturas de productos y de gastos (producción y genética) con saldo
+                const pendientesGasto = (version < 0 ? [] : facturasDeGastos()).filter((f) => f.saldo > 0);
+                const pendientes = [...(datos?.facturas ?? []).filter((f) => saldoFactura(f) > 0), ...pendientesGasto];
+                const deuda = (datos?.facturas ?? []).reduce((t, f) => t + saldoFactura(f), 0) + pendientesGasto.reduce((t, f) => t + f.saldo, 0);
                 return pendientes.length > 0 ? (
                   <div className="flex items-center justify-between rounded-2xl bg-orange-50 px-3.5 py-2.5 ring-1 ring-orange-100">
                     <span className="text-sm font-medium text-orange-800">
