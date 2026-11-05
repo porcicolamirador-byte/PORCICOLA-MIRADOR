@@ -31,6 +31,8 @@ export interface OpcionesDialogo {
 type Solicitud = { opciones: OpcionesDialogo; responder: (ok: boolean) => void };
 
 let abrirDialogo: ((s: Solicitud) => void) | null = null;
+/** Pedidos hechos antes de que el cuadro esté montado (nunca se usa el del navegador) */
+const enEspera: Solicitud[] = [];
 
 /** Pregunta y devuelve true si la persona acepta */
 export function confirmar(opciones: OpcionesDialogo): Promise<boolean> {
@@ -41,8 +43,8 @@ export function confirmar(opciones: OpcionesDialogo): Promise<boolean> {
   }
   return new Promise((responder) => {
     if (!abrirDialogo) {
-      // Respaldo por si el cuadro aún no está montado
-      responder(window.confirm(opciones.mensaje ? `${opciones.titulo}\n\n${opciones.mensaje}` : opciones.titulo));
+      // El cuadro aún no está montado: se muestra apenas lo esté
+      enEspera.push({ opciones, responder });
       return;
     }
     abrirDialogo({ opciones, responder });
@@ -62,9 +64,36 @@ export default function DialogoHost() {
 
   useEffect(() => {
     abrirDialogo = (s) => setCola((c) => [...c, s]);
+    if (enEspera.length) setCola((c) => [...c, ...enEspera.splice(0)]);
     return () => {
       abrirDialogo = null;
     };
+  }, []);
+
+  // Campos obligatorios: en lugar del globo del navegador ("Completa este campo")
+  // se muestra un aviso de la app con el nombre del campo
+  useEffect(() => {
+    let avisando = false;
+    const alInvalido = (e: Event) => {
+      e.preventDefault();
+      if (avisando) return;
+      avisando = true;
+      const campo = e.target as HTMLInputElement;
+      const etiqueta =
+        campo.closest("label")?.querySelector("span")?.textContent?.replace(/\*/g, "").trim() ||
+        campo.getAttribute("aria-label") ||
+        "";
+      void avisar({ titulo: "Falta un dato", mensaje: etiqueta ? `Completa "${etiqueta}".` : "Completa los campos marcados con *." }).then(() => {
+        avisando = false;
+        try {
+          campo.focus();
+        } catch {
+          // sin foco
+        }
+      });
+    };
+    document.addEventListener("invalid", alInvalido, true);
+    return () => document.removeEventListener("invalid", alInvalido, true);
   }, []);
 
   const cerrar = useCallback(
