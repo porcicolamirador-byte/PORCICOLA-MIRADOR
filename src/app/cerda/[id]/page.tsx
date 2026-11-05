@@ -297,7 +297,6 @@ export default function CerdaDetalle() {
     const nuevas = todas.map((c: any) => (c.id === id ? { ...c, geneticasPerdidas: (c.geneticasPerdidas ?? []).filter((_: unknown, i: number) => i !== k) } : c));
     guardarConRegistro("cerdas", nuevas);
     setCerda(nuevas.find((c: any) => c.id === id));
-    mostrarAviso("Genética no usada eliminada");
   }
 
   // Editar la compra de genética (lápiz en el historial)
@@ -594,7 +593,6 @@ export default function CerdaDetalle() {
         : {};
       guardarPendiente({ genetica: nombreGenetica, valor: genetica, fecha: fechaCompra, ...enlace, pago: pagoGenetica });
       setMostrarForm(false);
-      mostrarAviso("Compra de genética registrada");
       return;
     }
 
