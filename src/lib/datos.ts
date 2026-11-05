@@ -188,6 +188,9 @@ export interface Movimiento {
   loteId?: string;
   /** "produccion": registrado desde Bodega → Gastos de producción */
   origen?: "produccion";
+  /** Abono por préstamo pagado: producto al que corresponde */
+  productoCodigo?: string;
+  gastoId?: string;
   /** Gastos de producción: unidad de medida (ml, Dosis, Litro), cantidad en número y valor por unidad */
   unidad?: string;
   cantidadNum?: number;
@@ -1259,17 +1262,30 @@ export function registrarPagosPrestamos() {
   const g = granjaActual();
   const nuevos: Movimiento[] = [];
   const marcar = new Map<string, string>();
-  const revisar = (pr: { id: string; de: string; aNombre: string; nombre: string; unidad: string; devoluciones?: { id: string; tipo?: string; monto?: number; ingresoId?: string; cantidad: number; fecha: string }[] }, categoria: string) => {
+  // El dinero se abona al producto que se pagó: entra en la categoría de ese producto
+  const revisar = (
+    pr: { id: string; de: string; aNombre: string; nombre: string; unidad: string; devoluciones?: { id: string; tipo?: string; monto?: number; ingresoId?: string; cantidad: number; fecha: string }[] },
+    categoria: string,
+    producto: { productoCodigo?: string; gastoId?: string }
+  ) => {
     if (pr.de !== g) return;
     for (const d of pr.devoluciones ?? []) {
       if (d.tipo !== "pago" || d.ingresoId || !(Number(d.monto) > 0)) continue;
       const id = nuevoId();
-      nuevos.push({ id, fecha: d.fecha, tipo: "ingreso", categoria, descripcion: `Pago de préstamo de ${pr.aNombre} · ${pr.nombre} (${fmtNum(d.cantidad)} ${pr.unidad})`, monto: Math.round(Number(d.monto)) });
+      nuevos.push({
+        id,
+        fecha: d.fecha,
+        tipo: "ingreso",
+        categoria,
+        descripcion: `Abono a ${pr.nombre} · pago de préstamo de ${pr.aNombre} (${fmtNum(d.cantidad)} ${pr.unidad})`,
+        monto: Math.round(Number(d.monto)),
+        ...producto,
+      } as Movimiento);
       marcar.set(d.id, id);
     }
   };
-  for (const pr of leerPrestamos()) revisar(pr, "Otros ingresos");
-  for (const pr of leerPrestamosMedicamento()) revisar(pr, "Otros ingresos");
+  for (const pr of leerPrestamos()) revisar(pr, "Alimento", { productoCodigo: pr.codigo });
+  for (const pr of leerPrestamosMedicamento()) revisar(pr, "Medicamentos y vacunas", { gastoId: pr.gastoId });
   if (!nuevos.length) return;
   guardarMovimientos([...leerMovimientos(), ...nuevos]);
   const todos = leer<{ devoluciones?: { id: string; ingresoId?: string }[] }[]>(CLAVE_PRESTAMOS, []);
