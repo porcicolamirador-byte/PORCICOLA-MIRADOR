@@ -79,6 +79,8 @@ function calcularEdadLlegada(fechaLlegada: string): string {
 
 function obtenerColorPorTipo(tipo: string): string {
   switch (tipo) {
+    case "Compra de genética":
+      return { icono: "🧬", fondo: "bg-violet-100", borde: "border-violet-100", texto: "text-violet-800" };
     case "Inseminación":
       return "bg-blue-500";
     case "Parto":
@@ -110,6 +112,7 @@ function decodificar(valor: string): string {
 
 const TIPOS_HISTORIAL = [
   "Inseminación",
+  "Compra de genética",
   "Confirmación de Gestación",
   "Celo",
   "Parto",
@@ -262,6 +265,38 @@ export default function CerdaDetalle() {
     if (!ok) return;
     if (pendiente.movimientoId) guardarMovimientos(leerMovimientos().filter((m) => m.id !== pendiente.movimientoId));
     guardarPendiente(null);
+  }
+
+  // Editar la compra de genética (lápiz en el historial)
+  const [editCompra, setEditCompra] = useState(false);
+  const [ecTipo, setEcTipo] = useState("");
+  const [ecOtra, setEcOtra] = useState("");
+  const [ecValor, setEcValor] = useState("");
+  const [ecFecha, setEcFecha] = useState("");
+  function abrirEdicionCompra() {
+    if (!pendiente) return;
+    const conocida = GENETICAS.includes(pendiente.genetica);
+    setEcTipo(conocida ? pendiente.genetica : "OTRA");
+    setEcOtra(conocida ? "" : pendiente.genetica);
+    setEcValor(String(pendiente.valor));
+    setEcFecha(pendiente.fecha);
+    setEditCompra(true);
+  }
+  function guardarEdicionCompra() {
+    if (!pendiente) return;
+    const nombre = ecTipo === "OTRA" ? ecOtra.trim() : ecTipo;
+    const valor = Number(ecValor.replace(/\D/g, "")) || 0;
+    if (!nombre) return mostrarAviso("Selecciona la genética");
+    if (valor <= 0) return mostrarAviso("Ingresa el valor de la genética");
+    if (pendiente.movimientoId) {
+      guardarMovimientos(
+        leerMovimientos().map((m) =>
+          m.id === pendiente.movimientoId ? { ...m, fecha: ecFecha || m.fecha, monto: valor, descripcion: `Genética ${nombre} · cerda ${id} (para inseminación)` } : m
+        )
+      );
+    }
+    guardarPendiente({ ...pendiente, genetica: nombre, valor, fecha: ecFecha || pendiente.fecha });
+    setEditCompra(false);
   }
 
   // Al abrir una inseminación, la genética comprada viene llena
@@ -1056,10 +1091,13 @@ export default function CerdaDetalle() {
 
         {/* HISTORIAL: línea de tiempo agrupada por mes, del más reciente al más antiguo */}
         {(() => {
-          const ordenados = registros
-            .map((r, idx) => ({ r, idx }))
+          // La compra de genética pendiente se muestra como un registro más (idx -1: se edita con el lápiz)
+          const compraVirtual = pendiente
+            ? [{ r: { tipo: "Compra de genética", fecha: pendiente.fecha, genetica: pendiente.genetica, valorGenetica: pendiente.valor, mensaje: "Se junta al registrar la inseminación", compra: true } as any, idx: -1 }]
+            : [];
+          const ordenados = [...registros.map((r, idx) => ({ r, idx })), ...compraVirtual]
             .sort((a, b) => String(b.r.fecha || "").localeCompare(String(a.r.fecha || "")) || a.idx - b.idx);
-          const tiposPresentes = TIPOS_HISTORIAL.filter((t) => registros.some((r) => r.tipo === t));
+          const tiposPresentes = TIPOS_HISTORIAL.filter((t) => registros.some((r) => r.tipo === t) || (t === "Compra de genética" && Boolean(pendiente)));
           const visibles = ordenados.filter(({ r }) => filtro === "Todos" || r.tipo === filtro);
           const grupos: { clave: string; titulo: string; items: typeof visibles }[] = [];
           for (const item of visibles) {
@@ -1105,12 +1143,79 @@ export default function CerdaDetalle() {
                 </button>
               </div>
             )}
+            {editCompra && pendiente && (
+              <Modal abierta etiqueta={`Cerda ${id}`} titulo="Compra de genética" subtitulo="Editar o eliminar" icono="🧬" onCerrar={() => setEditCompra(false)}>
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <p className="mb-1 text-sm font-medium text-slate-700">Genética *</p>
+                    <SelectorApp
+                      valor={ecTipo}
+                      onCambiar={setEcTipo}
+                      titulo="Genética"
+                      placeholder="Selecciona la genética"
+                      opciones={[...GENETICAS.map((g) => ({ valor: g, texto: g })), { valor: "OTRA", texto: "Otro…" }]}
+                      className="w-full"
+                      claseBoton="h-11 rounded-xl bg-slate-50 px-3.5 text-base text-slate-900 ring-1 ring-slate-200"
+                    />
+                    {ecTipo === "OTRA" && (
+                      <input
+                        type="text"
+                        value={ecOtra}
+                        onChange={(e) => setEcOtra(e.target.value.slice(0, 40))}
+                        placeholder="Escribe la genética"
+                        className="mt-2 h-11 w-full rounded-xl bg-slate-50 px-3.5 text-base text-slate-900 outline-none ring-1 ring-slate-200"
+                      />
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="flex min-w-0 flex-col gap-1">
+                      <span className="text-sm font-medium text-slate-700">Valor *</span>
+                      <span className="relative">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={ecValor ? Number(ecValor).toLocaleString("es-CO") : ""}
+                          onChange={(e) => setEcValor(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                          className="h-11 w-full rounded-xl bg-slate-50 pl-7 pr-3 text-base text-slate-900 outline-none ring-1 ring-slate-200"
+                        />
+                      </span>
+                    </label>
+                    <label className="flex min-w-0 flex-col gap-1">
+                      <span className="text-sm font-medium text-slate-700">Fecha</span>
+                      <input
+                        type="date"
+                        value={ecFecha}
+                        max={fechaLocalISO(new Date())}
+                        onChange={(e) => setEcFecha(e.target.value)}
+                        className="h-11 w-full rounded-xl bg-slate-50 px-3 text-base text-slate-900 outline-none ring-1 ring-slate-200"
+                      />
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setEditCompra(false);
+                        await quitarPendiente();
+                      }}
+                      className="rounded-2xl py-3 text-[15px] font-semibold text-rose-600 ring-1 ring-rose-200 active:bg-rose-50"
+                    >
+                      Eliminar
+                    </button>
+                    <button type="button" onClick={guardarEdicionCompra} className="rounded-2xl bg-sky-900 py-3 text-[15px] font-semibold text-white active:bg-sky-950">
+                      Guardar
+                    </button>
+                  </div>
+                </div>
+              </Modal>
+            )}
             <section className="mb-3 overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
               <div className="flex items-center justify-between gap-3 px-4 pt-4">
                 <div className="min-w-0">
                   <h3 className="text-[15px] font-bold text-slate-900">Historial</h3>
                   <p className="text-xs text-slate-500">
-                    {registros.length === 1 ? "1 registro" : `${registros.length} registros`} · más recientes primero
+                    {registros.length + (pendiente ? 1 : 0) === 1 ? "1 registro" : `${registros.length + (pendiente ? 1 : 0)} registros`} · más recientes primero
                   </p>
                 </div>
                 <button
@@ -1121,24 +1226,8 @@ export default function CerdaDetalle() {
                 </button>
               </div>
 
-              {/* Compra de genética: queda en el historial hasta que se registre la inseminación */}
-              {pendiente && (filtro === "Todos" || filtro === "Inseminación") && (
-                <div className="mx-4 mt-3 flex items-center gap-3 rounded-2xl bg-sky-50 px-3.5 py-2.5 ring-1 ring-sky-200">
-                  <span className="text-lg" aria-hidden="true">🧬</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-sky-900">Compra de genética · {pendiente.genetica}</p>
-                    <p className="truncate text-xs text-sky-700">
-                      {formatearFechaCorta(pendiente.fecha)} · {formatoPesos(pendiente.valor)} · se junta al registrar la inseminación
-                    </p>
-                  </div>
-                  <button type="button" onClick={() => void quitarPendiente()} className="shrink-0 text-xs font-semibold text-rose-600 active:opacity-70">
-                    Quitar
-                  </button>
-                </div>
-              )}
-
               {/* Filtro por tipo de registro (lista con el estilo de la app) */}
-              {registros.length > 0 && (
+              {(registros.length > 0 || pendiente) && (
                 <div className="mt-3 flex items-center gap-2 px-4">
                   <span className="shrink-0 text-xs font-medium text-slate-500">Ver</span>
                   <SelectorApp
@@ -1160,7 +1249,7 @@ export default function CerdaDetalle() {
               )}
 
               <div className="px-4 pb-4 pt-3" onClick={() => setSwipedIndex(null)}>
-                {registros.length === 0 ? (
+                {registros.length === 0 && !pendiente ? (
                   <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-slate-200 px-6 py-10 text-center">
                     <span className="text-3xl" aria-hidden="true">📋</span>
                     <p className="mt-1 text-sm font-semibold text-slate-800">Sin registros todavía</p>
@@ -1218,9 +1307,9 @@ export default function CerdaDetalle() {
 
                                   <div
                                     className={`relative z-10 rounded-xl border bg-white px-3 py-2 ${info.borde}`}
-                                    onTouchStart={(e) => { handleTouchStart(e, idx); e.stopPropagation(); }}
-                                    onTouchMove={(e) => { handleTouchMove(e, idx); e.stopPropagation(); }}
-                                    onTouchEnd={(e) => { handleTouchEnd(e, idx); e.stopPropagation(); }}
+                                    onTouchStart={(e) => { if (idx < 0) return; handleTouchStart(e, idx); e.stopPropagation(); }}
+                                    onTouchMove={(e) => { if (idx < 0) return; handleTouchMove(e, idx); e.stopPropagation(); }}
+                                    onTouchEnd={(e) => { if (idx < 0) return; handleTouchEnd(e, idx); e.stopPropagation(); }}
                                     style={{
                                       transform: `translateX(${translateX}px)`,
                                       transition: isActiveMove ? "none" : "transform 200ms ease-out",
@@ -1228,9 +1317,27 @@ export default function CerdaDetalle() {
                                   >
                                     <div className="flex items-baseline justify-between gap-2">
                                       <p className={`min-w-0 truncate text-[13px] font-bold leading-snug ${info.texto}`}>{r.tipo}</p>
-                                      <p className="shrink-0 whitespace-nowrap text-[11px] text-slate-500">
-                                        <span className="font-semibold text-slate-700">{r.fecha ? formatearFechaCorta(r.fecha) : "–"}</span>
-                                        {relativo ? ` · ${relativo}` : ""}
+                                      <p className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[11px] text-slate-500">
+                                        <span>
+                                          <span className="font-semibold text-slate-700">{r.fecha ? formatearFechaCorta(r.fecha) : "–"}</span>
+                                          {relativo ? ` · ${relativo}` : ""}
+                                        </span>
+                                        {r.compra && (
+                                          <button
+                                            type="button"
+                                            data-swipe-ignore="true"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              abrirEdicionCompra();
+                                            }}
+                                            aria-label="Editar compra de genética"
+                                            className="-my-1 flex h-7 w-7 items-center justify-center rounded-full text-violet-700 active:bg-violet-50"
+                                          >
+                                            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                              <path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4" />
+                                            </svg>
+                                          </button>
+                                        )}
                                       </p>
                                     </div>
 
