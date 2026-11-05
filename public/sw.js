@@ -4,8 +4,8 @@
  * Permite abrir y usar la app sin internet ni servidor:
  *  - Al instalarse descarga todas las pantallas y sus archivos (JS, CSS,
  *    fuentes, imágenes) y los guarda en el teléfono.
- *  - Pantallas: primero intenta la red (para tener siempre la última versión)
- *    y, si no hay conexión o el servidor no responde, usa la copia guardada.
+ *  - Pantallas: si hay copia guardada se abren al instante y se actualizan en
+ *    segundo plano; si no hay copia, se piden a la red.
  *  - Archivos de /_next/static (tienen nombre único por versión): se sirven
  *    desde la copia guardada sin ir a la red.
  *  - Imágenes y datos de navegación entre pantallas: se muestran al instante
@@ -17,6 +17,8 @@
 const VERSION = new URL(self.location.href).searchParams.get("v") || "1";
 const CACHE = `mirador-${VERSION}`;
 const ESPERA_RED_MS = 3000;
+// Datos de navegación entre pantallas sin copia: con datos lentos no se espera más de esto
+const ESPERA_RSC_MS = 1200;
 // Archivos JS/CSS que no están guardados: se espera un poco más (pueden pesar)
 const ESPERA_ARCHIVO_MS = 10000;
 // Versiones guardadas: la actual y la anterior (para pantallas que ya estaban
@@ -213,8 +215,22 @@ async function plantillaCerda(cache, pathname) {
   return cache.match(ruta, { ignoreVary: true });
 }
 
-async function navegar(request, url) {
+async function navegar(event, request, url) {
   const cache = await caches.open(CACHE);
+  // Con copia guardada de esta versión: se abre al instante (los datos viven en el
+  // teléfono) y la pantalla se actualiza en segundo plano para la próxima vez.
+  const copia = await cache.match(url.pathname, { ignoreVary: true, ignoreSearch: true });
+  if (copia) {
+    if (!sinRed()) {
+      event.waitUntil(
+        fetch(request)
+          .then(limpia)
+          .then((res) => (res.ok ? cache.put(url.pathname, res.clone()) : undefined))
+          .catch(() => undefined)
+      );
+    }
+    return copia;
+  }
   try {
     if (sinRed()) throw new Error("sin red");
     const res = await limpia(await redConEspera(request));
@@ -261,8 +277,9 @@ async function guardadaYActualizar(event, request) {
   const cache = await caches.open(CACHE);
   const guardada = await cache.match(request, { ignoreVary: true });
   if (!guardada && sinRed()) return Response.error();
-  // Sin copia guardada, no se espera a una red lenta más de unos segundos
-  const red = (guardada ? fetch(request) : redConEspera(request))
+  // Sin copia guardada no se espera a una red lenta: si tarda, Next.js abre la
+  // pantalla completa, que sale al instante de la copia guardada
+  const red = (guardada ? fetch(request) : redConEspera(request, ESPERA_RSC_MS))
     .then((res) => {
       if (res.ok && res.type === "basic") return cache.put(request, res.clone()).then(() => res);
       return res;
@@ -308,7 +325,7 @@ self.addEventListener("fetch", (event) => {
     /\.(png|jpe?g|webp|svg|ico|woff2?)$/i.test(url.pathname);
 
   if (request.mode === "navigate") {
-    event.respondWith(navegar(request, url));
+    event.respondWith(navegar(event, request, url));
   } else if (url.pathname.startsWith("/_next/static/")) {
     event.respondWith(cachePrimero(request));
   } else if (esRsc || esImagen) {
