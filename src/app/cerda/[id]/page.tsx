@@ -279,6 +279,27 @@ export default function CerdaDetalle() {
     guardarPendiente(null);
   }
 
+  /** Elimina un registro de "Genética no usada" y su gasto en Contabilidad (Pérdidas) */
+  async function eliminarPerdida(k: number) {
+    const lista = Array.isArray(cerda?.geneticasPerdidas) ? (cerda.geneticasPerdidas as GeneticaPerdida[]) : [];
+    const g = lista[k];
+    if (!g) return;
+    const enConta = Boolean(g.movimientoId || g.cuentaId);
+    const ok = await confirmar({
+      titulo: "Eliminar genética no usada",
+      mensaje: `Se eliminará ${g.genetica} (${formatoPesos(g.valor)}), comprada el ${formatearFechaCorta(g.fecha)}${enConta ? ", y su pérdida en Contabilidad" : ""}.`,
+      aceptar: "Eliminar",
+      destructivo: true,
+    });
+    if (!ok) return;
+    quitarGastoGenetica({ movimientoId: g.movimientoId, cuentaId: g.cuentaId });
+    const todas = JSON.parse(localStorage.getItem("cerdas") || "[]");
+    const nuevas = todas.map((c: any) => (c.id === id ? { ...c, geneticasPerdidas: (c.geneticasPerdidas ?? []).filter((_: unknown, i: number) => i !== k) } : c));
+    guardarConRegistro("cerdas", nuevas);
+    setCerda(nuevas.find((c: any) => c.id === id));
+    mostrarAviso("Genética no usada eliminada");
+  }
+
   // Editar la compra de genética (lápiz en el historial)
   const [editCompra, setEditCompra] = useState(false);
   const [ecTipo, setEcTipo] = useState("");
@@ -1111,6 +1132,7 @@ export default function CerdaDetalle() {
                 genetica: g.genetica,
                 valorGenetica: g.valor,
                 mensaje: `Comprada ${formatearFechaCorta(g.fecha)} · pasó a Pérdidas`,
+                perdida: k,
               } as any,
               idx: -2 - k,
             })),
@@ -1342,16 +1364,17 @@ export default function CerdaDetalle() {
                                           <span className="font-semibold text-slate-700">{r.fecha ? formatearFechaCorta(r.fecha) : "–"}</span>
                                           {relativo ? ` · ${relativo}` : ""}
                                         </span>
-                                        {r.compra && (
+                                        {(r.compra || typeof r.perdida === "number") && (
                                           <button
                                             type="button"
                                             data-swipe-ignore="true"
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              abrirEdicionCompra();
+                                              if (r.compra) abrirEdicionCompra();
+                                              else void eliminarPerdida(r.perdida);
                                             }}
-                                            aria-label="Editar compra de genética"
-                                            className="-my-1 flex h-7 w-7 items-center justify-center rounded-full text-violet-700 active:bg-violet-50"
+                                            aria-label={r.compra ? "Editar compra de genética" : "Eliminar genética no usada"}
+                                            className={`-my-1 flex h-7 w-7 items-center justify-center rounded-full ${r.compra ? "text-violet-700 active:bg-violet-50" : "text-rose-600 active:bg-rose-50"}`}
                                           >
                                             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                               <path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4" />
