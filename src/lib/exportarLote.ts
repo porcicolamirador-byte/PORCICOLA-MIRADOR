@@ -151,14 +151,17 @@ function contabilidadMadre(lote: Lote): { movimientos: MovimientoLotePdf[]; nota
   const fechaParto = parto?.fecha ?? lote.fechaIngreso;
   const desteteAntes = historial.find((h) => h.tipo === "Destete" && h.fecha < fechaParto);
   const desteteDespues = [...historial].reverse().find((h) => h.tipo === "Destete" && h.fecha > fechaParto);
-  const cerda = leerCerdas().find((c) => c.id === cerdaId) as { fecha?: string } | undefined;
-  // Sin destete anterior (primer parto): desde la inseminación de esta camada, o desde
-  // la llegada de la cerda si llegó antes; nunca después del parto
+  const cerda = leerCerdas().find((c) => c.id === cerdaId) as { fecha?: string; geneticasPerdidas?: { genetica: string; valor: number; fecha: string }[] } | undefined;
+  const perdidas = Array.isArray(cerda?.geneticasPerdidas) ? cerda!.geneticasPerdidas! : [];
+  // Sin destete anterior (primer parto): desde lo primero que se sabe de este ciclo
+  // (llegada de la cerda, su primer registro o una genética comprada), nunca después del parto
   const ia = historial.find((h) => h.tipo === "Inseminación" && h.fecha <= fechaParto && (!desteteAntes || h.fecha >= desteteAntes.fecha));
   const primero = historial[historial.length - 1]?.fecha;
-  const inicioCiclo = ia?.fecha ?? primero ?? fechaParto;
-  const llegada = cerda?.fecha && cerda.fecha <= inicioCiclo ? cerda.fecha : undefined;
-  const desde = desteteAntes?.fecha ?? llegada ?? inicioCiclo;
+  const inicioCiclo = ia?.fecha ?? fechaParto;
+  const candidatos = [inicioCiclo, primero, cerda?.fecha, ...perdidas.map((g) => g.fecha)].filter(
+    (f): f is string => typeof f === "string" && /^\d{4}-\d{2}-\d{2}$/.test(f) && f <= inicioCiclo
+  );
+  const desde = desteteAntes?.fecha ?? candidatos.sort()[0] ?? inicioCiclo;
   const hasta = desteteDespues?.fecha ?? hoy();
   const enPeriodo = (f: string) => f >= desde && f <= hasta;
   const movimientos: MovimientoLotePdf[] = [];
@@ -203,8 +206,7 @@ function contabilidadMadre(lote: Lote): { movimientos: MovimientoLotePdf[]; nota
   }
 
   // Genética que se compró en el periodo y se perdió sin usarse: costo real de la camada (en rojo)
-  const perdidas = (leerCerdas().find((c) => c.id === cerdaId) as { geneticasPerdidas?: { genetica: string; valor: number; fecha: string }[] } | undefined)?.geneticasPerdidas;
-  for (const g of Array.isArray(perdidas) ? perdidas : []) {
+  for (const g of perdidas) {
     const valor = Number(g.valor) || 0;
     if (valor > 0 && g.fecha && enPeriodo(g.fecha)) {
       movimientos.push({ fecha: g.fecha, concepto: `Genética perdida · ${g.genetica}`, categoria: "Madre · genética perdida", tipo: "costo", valor, alerta: true });
