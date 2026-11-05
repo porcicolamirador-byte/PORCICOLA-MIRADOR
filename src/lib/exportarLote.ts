@@ -202,6 +202,15 @@ function contabilidadMadre(lote: Lote): { movimientos: MovimientoLotePdf[]; nota
     }
   }
 
+  // Genética que se compró en el periodo y se perdió sin usarse: costo real de la camada (en rojo)
+  const perdidas = (leerCerdas().find((c) => c.id === cerdaId) as { geneticasPerdidas?: { genetica: string; valor: number; fecha: string }[] } | undefined)?.geneticasPerdidas;
+  for (const g of Array.isArray(perdidas) ? perdidas : []) {
+    const valor = Number(g.valor) || 0;
+    if (valor > 0 && g.fecha && enPeriodo(g.fecha)) {
+      movimientos.push({ fecha: g.fecha, concepto: `Genética perdida · ${g.genetica}`, categoria: "Madre · genética perdida", tipo: "costo", valor, alerta: true });
+    }
+  }
+
   // Otros gastos de Contabilidad a nombre de la cerda (la genética ya va arriba)
   for (const m of leerMovimientos()) {
     if (m.tipo === "gasto" && m.cerdaId === cerdaId && m.categoria !== "Genética" && enPeriodo(m.fecha)) {

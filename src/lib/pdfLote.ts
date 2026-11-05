@@ -27,6 +27,8 @@ export interface MovimientoLotePdf {
   categoria: string;
   tipo: "ingreso" | "costo";
   valor: number;
+  /** Se muestra en rojo (por ejemplo, genética perdida de la madre) */
+  alerta?: boolean;
 }
 
 export interface DatosPdfLote {
@@ -222,7 +224,8 @@ export function generarPdfLote(d: DatosPdfLote): Blob {
   y += 3;
   fila("Costos de producción", "", { negrita: true, color: P900 });
   if (costosPorCat.length === 0) fila("Sin costos registrados", pesos(0), { sangria: 12, color: P500 });
-  for (const [cat, v] of costosPorCat) fila(cat, `(${pesos(v)})`, { sangria: 12 });
+  const catAlerta = new Set(costos.filter((m) => m.alerta).map((m) => m.categoria));
+  for (const [cat, v] of costosPorCat) fila(cat, `(${pesos(v)})`, catAlerta.has(cat) ? { sangria: 12, color: ROJO_TEXTO } : { sangria: 12 });
   fila("Total costos", `(${pesos(totalCostos)})`, { negrita: true, fondo: P100 });
   y += 6;
   L.linea(M, DER, y - 11, P900, 1);
@@ -294,10 +297,10 @@ export function generarPdfLote(d: DatosPdfLote): Blob {
     }
     const valor = m.tipo === "ingreso" ? pesos(m.valor) : `(${pesos(m.valor)})`;
     const f = m.fechaDesde && m.fechaDesde !== m.fecha ? `${fecha(m.fechaDesde).slice(0, 5)}–${fecha(m.fecha).slice(0, 5)}` : fecha(m.fecha);
-    L.texto(M + 8, y, f, 8.5, P500);
-    L.texto(M + 78, y, recortar(m.concepto, 212, 8.5), 8.5, P900);
-    L.texto(M + 300, y, recortar(m.categoria, DER - M - 300 - 100, 8.5), 8.5, P500);
-    der(L, DER - 8, y, valor, 8.5, m.tipo === "ingreso" ? AZUL_TEXTO : P900, true);
+    L.texto(M + 8, y, f, 8.5, m.alerta ? ROJO_TEXTO : P500);
+    L.texto(M + 78, y, recortar(m.concepto, 212, 8.5), 8.5, m.alerta ? ROJO_TEXTO : P900, Boolean(m.alerta));
+    L.texto(M + 300, y, recortar(m.categoria, DER - M - 300 - 100, 8.5), 8.5, m.alerta ? ROJO_TEXTO : P500);
+    der(L, DER - 8, y, valor, 8.5, m.alerta ? ROJO_TEXTO : m.tipo === "ingreso" ? AZUL_TEXTO : P900, true);
     L.linea(M, DER, y + 5, P100, 0.5);
     y += 15;
   }
