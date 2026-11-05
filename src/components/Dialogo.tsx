@@ -163,7 +163,7 @@ export default function DialogoHost() {
               type="button"
               onClick={() => cerrar(true)}
               className={`rounded-2xl py-3 text-[15px] font-semibold text-white transition focus-visible:outline-none ${
-                destructivo ? "bg-rose-600 active:bg-rose-700" : "bg-sky-900 active:bg-sky-950"
+                "bg-sky-900 active:bg-sky-950"
               }`}
             >
               {aceptar}
