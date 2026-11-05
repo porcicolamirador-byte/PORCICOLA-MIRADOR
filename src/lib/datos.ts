@@ -1257,12 +1257,22 @@ export function gratificarPrestamo(prestamoId: string, clase: "alimento" | "medi
   return true;
 }
 
-/** En la granja que prestó: registra como ingreso los pagos de contado que le hicieron */
+/**
+ * En la granja que prestó: el pago de contado se abona al gasto del producto que se prestó.
+ *  - Si esa compra fue a crédito y tiene saldo: se abona a esa factura o cuenta (baja lo que falta por pagar;
+ *    no crea gasto aquí porque ese dinero lo puso la otra granja).
+ *  - Si fue de contado (o lo que sobre): entra como ingreso ligado a ese producto ("recuperado").
+ */
 export function registrarPagosPrestamos() {
   const g = granjaActual();
   const nuevos: Movimiento[] = [];
   const marcar = new Map<string, string>();
-  // El dinero se abona al producto que se pagó: entra en la categoría de ese producto
+  let facturas = leerFacturas();
+  let cuentas = leerCuentasPorPagar();
+  let cambioFacturas = false;
+  let cambioCuentas = false;
+  const productosPorCodigo = (codigo: string) => new Set(leerProductos().filter((p) => codigoDe(p) === codigo).map((p) => p.id));
+
   const revisar = (
     pr: { id: string; de: string; aNombre: string; nombre: string; unidad: string; devoluciones?: { id: string; tipo?: string; monto?: number; ingresoId?: string; cantidad: number; fecha: string }[] },
     categoria: string,
@@ -1271,23 +1281,47 @@ export function registrarPagosPrestamos() {
     if (pr.de !== g) return;
     for (const d of pr.devoluciones ?? []) {
       if (d.tipo !== "pago" || d.ingresoId || !(Number(d.monto) > 0)) continue;
-      const id = nuevoId();
-      nuevos.push({
-        id,
-        fecha: d.fecha,
-        tipo: "ingreso",
-        categoria,
-        descripcion: `Abono a ${pr.nombre} · pago de préstamo de ${pr.aNombre} (${fmtNum(d.cantidad)} ${pr.unidad})`,
-        monto: Math.round(Number(d.monto)),
-        ...producto,
-      } as Movimiento);
+      let resto = Math.round(Number(d.monto));
+      const nota = `Pagado por ${pr.aNombre} (préstamo de ${fmtNum(d.cantidad)} ${pr.unidad} de ${pr.nombre})`;
+      // 1) Compra a crédito del medicamento prestado
+      if (producto.gastoId) {
+        const c = cuentas.find((x) => x.id === producto.gastoId);
+        if (c && saldoCuenta(c) > 0) {
+          const abono = Math.min(resto, saldoCuenta(c));
+          cuentas = cuentas.map((x) => (x.id === c.id ? { ...x, abonos: [...x.abonos, { id: nuevoId(), fecha: d.fecha, monto: abono, nota }] } : x));
+          cambioCuentas = true;
+          resto -= abono;
+        }
+      }
+      // 2) Facturas a crédito con ese alimento (la más reciente primero)
+      if (producto.productoCodigo && resto > 0) {
+        const ids = productosPorCodigo(producto.productoCodigo);
+        const conSaldo = facturas
+          .filter((f) => f.pago === "credito" && saldoFactura(f) > 0 && f.lineas.some((l) => ids.has(l.productoId)))
+          .sort((x, y) => y.fecha.localeCompare(x.fecha));
+        for (const f of conSaldo) {
+          if (resto <= 0) break;
+          const abono = Math.min(resto, saldoFactura(f));
+          facturas = facturas.map((x) => (x.id === f.id ? { ...x, abonos: [...(x.abonos ?? []), { id: nuevoId(), fecha: d.fecha, monto: abono, nota }] } : x));
+          cambioFacturas = true;
+          resto -= abono;
+        }
+      }
+      // 3) Lo que no se abonó a una deuda entra como ingreso de ese producto
+      let id = `abono-${d.id}`;
+      if (resto > 0) {
+        id = nuevoId();
+        nuevos.push({ id, fecha: d.fecha, tipo: "ingreso", categoria, descripcion: `Abono a ${pr.nombre} · ${nota}`, monto: resto, ...producto } as Movimiento);
+      }
       marcar.set(d.id, id);
     }
   };
   for (const pr of leerPrestamos()) revisar(pr, "Alimento", { productoCodigo: pr.codigo });
   for (const pr of leerPrestamosMedicamento()) revisar(pr, "Medicamentos y vacunas", { gastoId: pr.gastoId });
-  if (!nuevos.length) return;
-  guardarMovimientos([...leerMovimientos(), ...nuevos]);
+  if (!marcar.size) return;
+  if (cambioCuentas) guardarCuentasPorPagar(cuentas);
+  if (cambioFacturas) guardarFacturas(facturas);
+  if (nuevos.length) guardarMovimientos([...leerMovimientos(), ...nuevos]);
   const todos = leer<{ devoluciones?: { id: string; ingresoId?: string }[] }[]>(CLAVE_PRESTAMOS, []);
   escribir(
     CLAVE_PRESTAMOS,
@@ -1610,16 +1644,21 @@ export interface GastoProduccion {
   pago: "contado" | "credito";
   /** Solo a crédito: lo que falta por pagar */
   saldo?: number;
+  /** De contado: lo que otras granjas ya pagaron por préstamos de este producto */
+  recuperado?: number;
 }
-export const leerGastosProduccion = (): GastoProduccion[] =>
-  [
+export const leerGastosProduccion = (): GastoProduccion[] => {
+  const recuperado = new Map<string, number>();
+  for (const m of leerMovimientos()) if (m.tipo === "ingreso" && m.gastoId) recuperado.set(m.gastoId, (recuperado.get(m.gastoId) ?? 0) + (Number(m.monto) || 0));
+  return [
     ...leerMovimientos()
       .filter((m) => m.origen === "produccion")
-      .map((m) => ({ id: m.id, fecha: m.fecha, categoria: m.categoria, descripcion: m.descripcion, monto: m.monto, cantidad: m.cantidad, unidad: m.unidad, cantidadNum: m.cantidadNum, valorUnitario: m.valorUnitario, marca: m.marca, pago: "contado" as const })),
+      .map((m) => ({ id: m.id, fecha: m.fecha, categoria: m.categoria, descripcion: m.descripcion, monto: m.monto, cantidad: m.cantidad, unidad: m.unidad, cantidadNum: m.cantidadNum, valorUnitario: m.valorUnitario, marca: m.marca, pago: "contado" as const, recuperado: recuperado.get(m.id) })),
     ...leerCuentasPorPagar()
       .filter((c) => c.origen === "produccion")
       .map((c) => ({ id: c.id, fecha: c.fecha, categoria: c.categoria, descripcion: c.descripcion, monto: c.total, cantidad: c.cantidad, unidad: c.unidad, cantidadNum: c.cantidadNum, valorUnitario: c.valorUnitario, marca: c.marca, pago: "credito" as const, saldo: saldoCuenta(c) })),
   ].sort((a, b) => b.fecha.localeCompare(a.fecha));
+};
 
 /** Elimina un gasto de producción (de contado o a crédito con sus abonos) */
 export function eliminarGastoProduccion(id: string) {

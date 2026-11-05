@@ -1809,6 +1809,7 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
                       {textoCategoriaProduccion(g.categoria)} · {formatoFecha(g.fecha)}
                       {g.valorUnitario && g.cantidadNum ? ` · ${formatoPesos(g.valorUnitario)} por ${g.unidad ?? "unidad"}` : ""}
                       {g.pago === "credito" ? <span className="font-semibold text-orange-600">{(g.saldo ?? 0) > 0 ? ` · crédito, debe ${formatoPesos(g.saldo ?? 0)}` : " · crédito pagado"}</span> : null}
+                      {(g.recuperado ?? 0) > 0 ? <span className="font-semibold text-emerald-700">{` · abonado ${formatoPesos(g.recuperado ?? 0)}, queda ${formatoPesos(Math.max(0, g.monto - (g.recuperado ?? 0)))}`}</span> : null}
                     </p>
                   </div>
                   <span className="shrink-0 text-[13px] font-semibold tabular-nums text-slate-900">{formatoPesos(g.monto)}</span>
