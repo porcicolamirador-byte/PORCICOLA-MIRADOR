@@ -226,16 +226,32 @@ export function generarPdfLote(d: DatosPdfLote): Blob {
   if (costosPorCat.length === 0) fila("Sin costos registrados", pesos(0), { sangria: 12, color: P500 });
   const catAlerta = new Set(costos.filter((m) => m.alerta).map((m) => m.categoria));
   for (const [cat, v] of costosPorCat) fila(cat, `(${pesos(v)})`, catAlerta.has(cat) ? { sangria: 12, color: ROJO_TEXTO } : { sangria: 12 });
-  fila("Total costos", `(${pesos(totalCostos)})`, { negrita: true, fondo: P100 });
+  // Genética perdida de la madre: se muestran los totales con ella y sin ella
+  const perdida = costos.filter((m) => m.alerta).reduce((t, m) => t + m.valor, 0);
+  fila(perdida > 0 ? "Total costos (con genética perdida)" : "Total costos", `(${pesos(totalCostos)})`, { negrita: true, fondo: P100 });
+  if (perdida > 0) fila("Total costos sin genética perdida", `(${pesos(totalCostos - perdida)})`, { negrita: true, color: P500 });
   y += 6;
   L.linea(M, DER, y - 11, P900, 1);
-  fila(utilidad >= 0 ? "Utilidad neta del lote" : "Pérdida neta del lote", pesos(utilidad), {
-    negrita: true,
-    tam: 10.5,
-    color: utilidad >= 0 ? AZUL_TEXTO : ROJO_TEXTO,
-  });
+  fila(
+    perdida > 0 ? (utilidad >= 0 ? "Utilidad neta (con genética perdida)" : "Pérdida neta (con genética perdida)") : utilidad >= 0 ? "Utilidad neta del lote" : "Pérdida neta del lote",
+    pesos(utilidad),
+    {
+      negrita: true,
+      tam: 10.5,
+      color: utilidad >= 0 ? AZUL_TEXTO : ROJO_TEXTO,
+    }
+  );
   L.linea(M, DER, y - 10, P900, 1);
   L.linea(M, DER, y - 8, P900, 1);
+  if (perdida > 0) {
+    y += 8;
+    const sinPerdida = utilidad + perdida;
+    fila(sinPerdida >= 0 ? "Utilidad neta sin genética perdida" : "Pérdida neta sin genética perdida", pesos(sinPerdida), {
+      negrita: true,
+      color: sinPerdida >= 0 ? AZUL_TEXTO : ROJO_TEXTO,
+    });
+    fila("Diferencia por genética perdida", `(${pesos(perdida)})`, { sangria: 12, color: ROJO_TEXTO });
+  }
   y += 12;
 
   /* ── Indicadores financieros ── */
