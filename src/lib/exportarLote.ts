@@ -153,12 +153,12 @@ function contabilidadMadre(lote: Lote): { movimientos: MovimientoLotePdf[]; nota
   const desteteDespues = [...historial].reverse().find((h) => h.tipo === "Destete" && h.fecha > fechaParto);
   const cerda = leerCerdas().find((c) => c.id === cerdaId) as { fecha?: string; geneticasPerdidas?: { genetica: string; valor: number; fecha: string }[] } | undefined;
   const perdidas = Array.isArray(cerda?.geneticasPerdidas) ? cerda!.geneticasPerdidas! : [];
-  // Sin destete anterior (primer parto): desde lo primero que se sabe de este ciclo
-  // (llegada de la cerda, su primer registro o una genética comprada), nunca después del parto
+  // Sin destete anterior (primer parto): desde el primer registro de la cerda
+  // (la compra de una genética también cuenta como registro), nunca después del parto
   const ia = historial.find((h) => h.tipo === "Inseminación" && h.fecha <= fechaParto && (!desteteAntes || h.fecha >= desteteAntes.fecha));
   const primero = historial[historial.length - 1]?.fecha;
   const inicioCiclo = ia?.fecha ?? fechaParto;
-  const candidatos = [inicioCiclo, primero, cerda?.fecha, ...perdidas.map((g) => g.fecha)].filter(
+  const candidatos = [inicioCiclo, primero, ...perdidas.map((g) => g.fecha)].filter(
     (f): f is string => typeof f === "string" && /^\d{4}-\d{2}-\d{2}$/.test(f) && f <= inicioCiclo
   );
   const desde = desteteAntes?.fecha ?? candidatos.sort()[0] ?? inicioCiclo;
