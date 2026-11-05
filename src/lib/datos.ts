@@ -1010,9 +1010,77 @@ export interface PrestamoBodega {
 }
 export function leerPrestamos(): PrestamoBodega[] {
   const v = leer<PrestamoBodega[]>(CLAVE_PRESTAMOS, []);
-  return Array.isArray(v) ? v.filter((p) => p && p.id && p.de && p.a && p.codigo) : [];
+  return Array.isArray(v) ? v.filter((p) => p && p.id && p.de && p.a && p.codigo && (p as { clase?: string }).clase !== "medicamento") : [];
 }
-const guardarPrestamos = (l: PrestamoBodega[]) => escribir(CLAVE_PRESTAMOS, l);
+const guardarPrestamos = (l: PrestamoBodega[]) => {
+  // Conserva los préstamos de medicamentos (se guardan en la misma lista común)
+  const meds = leer<unknown[]>(CLAVE_PRESTAMOS, []).filter((p) => (p as { clase?: string })?.clase === "medicamento");
+  escribir(CLAVE_PRESTAMOS, [...l, ...meds]);
+};
+
+/** Préstamo de un medicamento o vacuna (Gastos de producción) a otra granja */
+export interface PrestamoMedicamento {
+  id: string;
+  clase: "medicamento";
+  de: string;
+  deNombre: string;
+  a: string;
+  aNombre: string;
+  /** Compra de la granja que presta */
+  gastoId: string;
+  nombre: string;
+  unidad: string;
+  cantidad: number;
+  valorUnitario: number;
+  fecha: string;
+  hora?: string;
+  /** "fuente": de qué compra de la granja que debe salió lo devuelto (o el mismo préstamo) */
+  devoluciones: { id: string; fecha: string; hora?: string; cantidad: number; fuente: string }[];
+}
+export function leerPrestamosMedicamento(): PrestamoMedicamento[] {
+  const v = leer<PrestamoMedicamento[]>(CLAVE_PRESTAMOS, []);
+  return Array.isArray(v) ? v.filter((p) => p && p.clase === "medicamento" && p.id && p.de && p.a) : [];
+}
+function guardarPrestamosMedicamento(l: PrestamoMedicamento[]) {
+  const otros = leer<unknown[]>(CLAVE_PRESTAMOS, []).filter((p) => (p as { clase?: string })?.clase !== "medicamento");
+  escribir(CLAVE_PRESTAMOS, [...otros, ...l]);
+}
+export const pendientePrestamoMed = (p: PrestamoMedicamento) =>
+  Math.max(0, (Number(p.cantidad) || 0) - (p.devoluciones ?? []).reduce((s, d) => s + (Number(d.cantidad) || 0), 0));
+
+/** Presta parte de un medicamento a otra granja */
+export function prestarMedicamento(gastoId: string, aGranja: string, cantidad: number): string | null {
+  const med = medicamentosRegistrados().find((m) => m.id === gastoId);
+  if (!med || med.prestado) return "Medicamento no encontrado";
+  if (!(cantidad > 0)) return "Escribe una cantidad mayor que cero";
+  if (cantidad > med.restante + 1e-9) return `Solo quedan ${fmtNum(med.restante)} ${med.unidad}`;
+  const de = granjaActual();
+  if (aGranja === de) return "Elige otra granja";
+  const nombre = (id: string) => leerGranjas().find((g) => g.id === id)?.nombre ?? id;
+  guardarPrestamosMedicamento([
+    ...leerPrestamosMedicamento(),
+    { id: nuevoId(), clase: "medicamento", de, deNombre: nombre(de), a: aGranja, aNombre: nombre(aGranja), gastoId, nombre: med.nombre, unidad: med.unidad, cantidad, valorUnitario: med.valorUnitario, fecha: hoy(), hora: horaActual(), devoluciones: [] },
+  ]);
+  return null;
+}
+
+/** Devuelve un medicamento prestado: sale de una compra de esta granja (o de lo prestado sin usar) */
+export function devolverMedicamento(prestamoId: string, cantidad: number, fuente: string): string | null {
+  const lista = leerPrestamosMedicamento();
+  const pr = lista.find((p) => p.id === prestamoId);
+  if (!pr || pr.a !== granjaActual()) return "Préstamo no encontrado";
+  if (!(cantidad > 0)) return "Escribe una cantidad mayor que cero";
+  if (cantidad > pendientePrestamoMed(pr) + 1e-9) return `Solo se deben ${fmtNum(pendientePrestamoMed(pr))} ${pr.unidad}`;
+  const f = medicamentosRegistrados().find((m) => m.id === fuente);
+  if (!f) return "Elige de dónde sale lo que devuelves";
+  const enUnidad = convertirUnidad(cantidad, pr.unidad, f.unidad);
+  if (!Number.isFinite(enUnidad)) return `Debe ser en ${pr.unidad}`;
+  if (enUnidad > f.restante + 1e-9) return `Solo quedan ${fmtNum(f.restante)} ${f.unidad} en esa compra`;
+  guardarPrestamosMedicamento(
+    lista.map((p) => (p.id === prestamoId ? { ...p, devoluciones: [...(p.devoluciones ?? []), { id: nuevoId(), fecha: hoy(), hora: horaActual(), cantidad, fuente }] } : p))
+  );
+  return null;
+}
 export const pendientePrestamo = (p: PrestamoBodega) =>
   Math.max(0, (Number(p.cantidad) || 0) - (p.devoluciones ?? []).reduce((s, d) => s + (Number(d.cantidad) || 0), 0));
 const nombreGranja = (id: string) => leerGranjas().find((g) => g.id === id)?.nombre ?? id;
@@ -1316,9 +1384,18 @@ export function convertirUnidad(cantidad: number, de: string, a: string): number
 
 /** Medicamentos y vacunas comprados en Gastos de producción, con su valor por unidad y lo que queda */
 export function medicamentosRegistrados() {
+  const g = granjaActual();
   const usados = new Map<string, number>();
-  for (const t of leerTratamientos()) if (t.gastoId) usados.set(t.gastoId, (usados.get(t.gastoId) ?? 0) + (Number(t.cantidadUsada) || 0));
-  return leerGastosProduccion()
+  const sumar = (id: string, n: number) => usados.set(id, (usados.get(id) ?? 0) + n);
+  for (const t of leerTratamientos()) if (t.gastoId) sumar(t.gastoId, Number(t.cantidadUsada) || 0);
+  const prestamos = leerPrestamosMedicamento();
+  for (const pr of prestamos) {
+    // Lo que se prestó sale de la compra; lo que devuelven vuelve a ella
+    if (pr.de === g) sumar(pr.gastoId, (Number(pr.cantidad) || 0) - (pr.devoluciones ?? []).reduce((t, d) => t + (Number(d.cantidad) || 0), 0));
+    // Lo que esta granja devolvió sale de la compra (o del préstamo) que eligió
+    if (pr.a === g) for (const d of pr.devoluciones ?? []) sumar(d.fuente, Number(d.cantidad) || 0);
+  }
+  const propios = leerGastosProduccion()
     .filter((m) => m.categoria === "Medicamentos y vacunas" && m.unidad && (m.cantidadNum ?? 0) > 0 && (m.valorUnitario ?? 0) > 0)
     .map((m) => {
       const usado = usados.get(m.id) ?? 0;
@@ -1331,8 +1408,28 @@ export function medicamentosRegistrados() {
         valorUnitario: m.valorUnitario as number,
         usado,
         restante: Math.max(0, (m.cantidadNum as number) - usado),
+        prestado: undefined as string | undefined,
       };
     });
+  // Medicamentos prestados por otras granjas: se pueden aplicar con su valor por unidad
+  const recibidos = prestamos
+    .filter((pr) => pr.a === g)
+    .map((pr) => {
+      const id = `pr:${pr.id}`;
+      const usado = usados.get(id) ?? 0;
+      return {
+        id,
+        nombre: `${pr.nombre} · prestado por ${pr.deNombre}`,
+        fecha: pr.fecha,
+        unidad: pr.unidad,
+        cantidad: pr.cantidad,
+        valorUnitario: pr.valorUnitario,
+        usado,
+        restante: Math.max(0, pr.cantidad - usado),
+        prestado: pr.deNombre as string | undefined,
+      };
+    });
+  return [...propios, ...recibidos];
 }
 
 /** Gastos registrados desde Bodega → Gastos de producción (más recientes primero) */

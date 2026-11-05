@@ -20,7 +20,14 @@ import {
   calcularInventario,
   codigoDe,
   devolverPrestamo,
+  devolverMedicamento,
   leerPrestamos,
+  leerPrestamosMedicamento,
+  medicamentosRegistrados,
+  pendientePrestamoMed,
+  prestarMedicamento,
+  convertirUnidad,
+  type PrestamoMedicamento,
   pendientePrestamo,
   prestarProducto,
   type PrestamoBodega,
@@ -866,12 +873,16 @@ function AvisosPrestamos() {
     const pendientes = leerPrestamos().filter((p) => pendientePrestamo(p) > 0);
     const inv = calcularInventario();
     const hay = (codigo: string) => inv.find((i) => codigoDe(i.producto) === codigo && !i.subproducto)?.disponible ?? 0;
+    const meds = leerPrestamosMedicamento().filter((p) => pendientePrestamoMed(p) > 0);
     return {
       debo: pendientes.filter((p) => p.a === g).map((p) => ({ p, hay: hay(p.codigo) })),
       meDeben: pendientes.filter((p) => p.de === g),
+      medDebo: meds.filter((p) => p.a === g),
+      medMeDeben: meds.filter((p) => p.de === g),
     };
   }, [version]);
-  if (!datos || (datos.debo.length === 0 && datos.meDeben.length === 0)) return null;
+  const [devolverMed, setDevolverMed] = useState<PrestamoMedicamento | null>(null);
+  if (!datos || (datos.debo.length === 0 && datos.meDeben.length === 0 && datos.medDebo.length === 0 && datos.medMeDeben.length === 0)) return null;
   return (
     <div className="flex flex-col gap-2">
       {datos.debo.map(({ p, hay }) => (
@@ -903,8 +914,128 @@ function AvisosPrestamos() {
           <p className="text-xs text-orange-600">Prestado el {formatoFecha(p.fecha, true)}</p>
         </div>
       ))}
+      {datos.medDebo.map((p) => (
+        <div key={p.id} className="flex items-center gap-3 rounded-2xl bg-orange-50 px-3.5 py-3 ring-1 ring-orange-200">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-orange-800">
+              Debes {fmt(pendientePrestamoMed(p))} {p.unidad} de {p.nombre}
+            </p>
+            <p className="text-xs text-orange-700">
+              Préstamo de {p.deNombre} · {formatoFecha(p.fecha, true)}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => (puede("bodega") ? setDevolverMed(p) : void avisarSinPermisoBodega())}
+            className="shrink-0 rounded-full bg-orange-600 px-3.5 py-2 text-xs font-semibold text-white transition active:scale-95"
+          >
+            Devolver
+          </button>
+        </div>
+      ))}
+      {datos.medMeDeben.map((p) => (
+        <div key={p.id} className="rounded-2xl bg-orange-50/60 px-3.5 py-2.5 ring-1 ring-orange-100">
+          <p className="text-sm font-semibold text-orange-700">
+            {p.aNombre} te debe {fmt(pendientePrestamoMed(p))} {p.unidad} de {p.nombre}
+          </p>
+          <p className="text-xs text-orange-600">Prestado el {formatoFecha(p.fecha, true)}</p>
+        </div>
+      ))}
       {devolver && <DevolverPrestamo prestamo={devolver} onCerrar={() => setDevolver(null)} />}
+      {devolverMed && <DevolverMedicamento prestamo={devolverMed} onCerrar={() => setDevolverMed(null)} />}
     </div>
+  );
+}
+
+/** Prestar parte de un medicamento o vacuna a otra granja */
+function PrestarMedicamento({ gastoId, onCerrar }: { gastoId: string; onCerrar: () => void }) {
+  const med = medicamentosRegistrados().find((m) => m.id === gastoId);
+  const granjas = leerGranjas().filter((g) => g.id !== granjaActual());
+  const [destino, setDestino] = useState("");
+  const [cantidad, setCantidad] = useState("");
+  const [error, setError] = useState("");
+  if (!med) return null;
+  const guardar = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!destino) return setError("Elige la granja que recibe.");
+    const n = num(cantidad);
+    const r = prestarMedicamento(gastoId, destino, n);
+    if (r) return setError(r);
+    onCerrar();
+    await avisar({ titulo: "Préstamo registrado", mensaje: `Se prestaron ${fmt(n)} ${med.unidad} de ${med.nombre} a ${granjas.find((g) => g.id === destino)?.nombre ?? ""}.` });
+  };
+  return (
+    <Modal abierta etiqueta={med.nombre} titulo="Prestar a otra granja" subtitulo={`Quedan ${fmt(med.restante)} ${med.unidad}`} onCerrar={onCerrar}>
+      <form onSubmit={guardar} className="flex flex-col gap-3.5">
+        <Campo etiqueta="Granja que recibe *">
+          <SelectorApp valor={destino} onCambiar={setDestino} titulo="Granja que recibe" placeholder="Elige la granja" opciones={granjas.map((g) => ({ valor: g.id, texto: g.nombre }))} className="w-full" claseBoton={CLASE_SELECTOR} />
+        </Campo>
+        <Campo etiqueta={`Cantidad (${med.unidad}) *`}>
+          <Entrada type="number" inputMode="decimal" value={cantidad} onChange={setCantidad} />
+        </Campo>
+        {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
+        <div className="grid grid-cols-2 gap-2">
+          <Boton variante="secundario" onClick={onCerrar}>
+            Cancelar
+          </Boton>
+          <Boton type="submit" disabled={!destino || !(num(cantidad) > 0)}>
+            Prestar
+          </Boton>
+        </div>
+        <p className="text-xs leading-snug text-slate-500">La otra granja lo podrá aplicar a sus lotes con este valor por {med.unidad}. Le quedará un aviso naranja hasta que lo devuelva.</p>
+      </form>
+    </Modal>
+  );
+}
+
+function DevolverMedicamento({ prestamo: p, onCerrar }: { prestamo: PrestamoMedicamento; onCerrar: () => void }) {
+  const falta = pendientePrestamoMed(p);
+  // De dónde sale: lo prestado sin usar o una compra propia en la misma unidad (ml/Litro o Dosis)
+  const fuentes = medicamentosRegistrados().filter(
+    (m) => m.restante > 0 && (m.id === `pr:${p.id}` || (!m.prestado && Number.isFinite(convertirUnidad(1, p.unidad, m.unidad))))
+  );
+  const [fuente, setFuente] = useState(fuentes.find((m) => m.id === `pr:${p.id}`)?.id ?? fuentes[0]?.id ?? "");
+  const [cantidad, setCantidad] = useState(String(Math.floor(falta * 100) / 100).replace(".", ","));
+  const [error, setError] = useState("");
+  const guardar = async (e: FormEvent) => {
+    e.preventDefault();
+    const n = num(cantidad);
+    const r = devolverMedicamento(p.id, n, fuente);
+    if (r) return setError(r);
+    onCerrar();
+    await avisar({ titulo: "Devolución registrada", mensaje: `Se devolvieron ${fmt(n)} ${p.unidad} de ${p.nombre} a ${p.deNombre}.` });
+  };
+  return (
+    <Modal abierta etiqueta={p.nombre} titulo={`Devolver a ${p.deNombre}`} subtitulo={`Debes ${fmt(falta)} ${p.unidad}`} onCerrar={onCerrar}>
+      <form onSubmit={guardar} className="flex flex-col gap-3.5">
+        <Campo etiqueta="Sale de *">
+          {fuentes.length ? (
+            <SelectorApp
+              valor={fuente}
+              onCambiar={setFuente}
+              titulo="Sale de"
+              opciones={fuentes.map((m) => ({ valor: m.id, texto: m.id === `pr:${p.id}` ? `Lo prestado sin usar · quedan ${fmt(m.restante)} ${m.unidad}` : `${m.nombre} · quedan ${fmt(m.restante)} ${m.unidad}` }))}
+              className="w-full"
+              claseBoton={CLASE_SELECTOR}
+            />
+          ) : (
+            <p className="rounded-xl bg-slate-50 px-3.5 py-2.5 text-sm text-slate-500">No hay existencia para devolver. Ingresa la compra en Gastos de producción.</p>
+          )}
+        </Campo>
+        <Campo etiqueta={`Cantidad a devolver (${p.unidad}) *`}>
+          <Entrada type="number" inputMode="decimal" value={cantidad} onChange={setCantidad} />
+        </Campo>
+        {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
+        <div className="grid grid-cols-2 gap-2">
+          <Boton variante="secundario" onClick={onCerrar}>
+            Cancelar
+          </Boton>
+          <Boton type="submit" disabled={!fuente || !(num(cantidad) > 0)}>
+            Devolver
+          </Boton>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -1343,6 +1474,8 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
   const [unidad, setUnidad] = useState("");
   const [pago, setPago] = useState<"" | "contado" | "credito">("");
   const [marca, setMarca] = useState("");
+  const [prestarMed, setPrestarMed] = useState<string | null>(null);
+  const hayOtras = leerGranjas().some((g) => g.id !== granjaActual());
   const [fecha, setFecha] = useState(hoy());
   const esVacuna = categoria === "Medicamentos y vacunas";
   const cantidadNum = Number(cantidad.replace(",", ".")) || 0;
@@ -1488,6 +1621,15 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
                     </p>
                   </div>
                   <span className="shrink-0 text-[13px] font-semibold tabular-nums text-slate-900">{formatoPesos(g.monto)}</span>
+                  {g.categoria === "Medicamentos y vacunas" && g.unidad && hayOtras && (
+                    <button
+                      type="button"
+                      onClick={() => (puede("bodega") ? setPrestarMed(g.id) : void avisarSinPermisoBodega())}
+                      className="shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold text-sky-700 ring-1 ring-sky-200 active:bg-sky-50"
+                    >
+                      ⇄ Prestar
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => void eliminar(g.id, g.descripcion)}
@@ -1505,6 +1647,7 @@ function HojaGastosProduccion({ onCerrar }: { onCerrar: () => void }) {
           )}
         </div>
       )}
+      {prestarMed && <PrestarMedicamento gastoId={prestarMed} onCerrar={() => setPrestarMed(null)} />}
     </Modal>
   );
 }
