@@ -14,7 +14,7 @@ import SelectorApp from "@/components/SelectorApp";
 import { generarPdfSalidas } from "@/lib/pdfSalidas";
 import { cargarLogoJpeg, entregarPdf } from "@/lib/pdfFicha";
 import { granjaActual, leerGranjas, nombreGranjaActual } from "@/lib/sincronizar";
-import PagoFactura from "@/components/PagoFactura";
+import PagoFactura, { PagoCredito } from "@/components/PagoFactura";
 import { calcularConsumoCerdas, type ConsumoAlimentoCerdas } from "@/lib/consumoCerdas";
 import { CATEGORIAS_BODEGA, IconoCategoria, RecuadroCategoria } from "@/components/CatalogoProductos";
 import {
@@ -45,6 +45,8 @@ import {
   hoy,
   leerFacturas,
   leerMovimientos,
+  leerCuentasPorPagar,
+  guardarCuentasPorPagar,
   leerProductos,
   leerProductosActivos,
   factorKg,
@@ -117,6 +119,7 @@ export default function BodegaPage() {
   };
   const [productoSel, setProductoSel] = useState<string | null>(null);
   const [facturaSel, setFacturaSel] = useState<string | null>(null);
+  const [facturaGastoSel, setFacturaGastoSel] = useState<string | null>(null);
 
   // Una sola vez: los artículos de la bodega anterior pasan al catálogo
   useEffect(() => {
@@ -281,7 +284,8 @@ export default function BodegaPage() {
                   <h2 className="mb-1.5 mt-1 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Gastos de producción y genética · {otrasFacturas.length}</h2>
                   <ul className="divide-y divide-slate-100 overflow-hidden rounded-3xl bg-white ring-1 ring-slate-200/80">
                     {otrasFacturas.map((f) => (
-                      <li key={f.id} className="flex items-center gap-3 px-3.5 py-2.5">
+                      <li key={f.id}>
+                        <button type="button" onClick={() => setFacturaGastoSel(f.id)} className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left transition active:bg-slate-100">
                         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-base" aria-hidden="true">
                           {f.categoria === "Genética" ? "🧬" : "🧾"}
                         </span>
@@ -300,6 +304,8 @@ export default function BodegaPage() {
                               <span className="block text-[10px] font-semibold text-sky-700">Crédito pagado</span>
                             ))}
                         </span>
+                        <Chevron />
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -415,6 +421,7 @@ export default function BodegaPage() {
       {factura && datos && (
         <DetalleFactura factura={factura} productos={datos.productos} onCerrar={() => setFacturaSel(null)} />
       )}
+      {facturaGastoSel && <DetalleFacturaGasto id={facturaGastoSel} onCerrar={() => setFacturaGastoSel(null)} />}
     </ModuloPage>
   );
 }
@@ -1281,6 +1288,55 @@ function DevolverPrestamo({ prestamo: p, onCerrar }: { prestamo: PrestamoBodega;
             : `Sale de esta bodega y vuelve a la de ${p.deNombre}. Puedes devolver por partes.`}
         </p>
       </form>
+    </Modal>
+  );
+}
+
+/** Factura de un gasto de producción o genética: ver el detalle y, si es a crédito, abonar o pagar */
+function DetalleFacturaGasto({ id, onCerrar }: { id: string; onCerrar: () => void }) {
+  useVersionDatos();
+  const cuenta = leerCuentasPorPagar().find((c) => c.id === id);
+  const mov = cuenta ? undefined : leerMovimientos().find((m) => m.id === id);
+  const fuente = cuenta ?? mov;
+  if (!fuente) return null;
+  const total = cuenta ? cuenta.total : mov!.monto;
+  const filas: [string, string][] = [
+    ["Fecha", formatoFecha(fuente.fecha, true)],
+    ["Categoría", textoCategoriaProduccion(fuente.categoria)],
+    ["Producto o servicio", fuente.descripcion],
+    ...(fuente.marca ? ([["Marca", fuente.marca]] as [string, string][]) : []),
+    ...(fuente.cantidadNum ? ([["Cantidad", `${fmt(fuente.cantidadNum)} ${fuente.unidad ?? ""}`.trim()]] as [string, string][]) : fuente.cantidad ? ([["Cantidad", fuente.cantidad]] as [string, string][]) : []),
+    ...(fuente.valorUnitario ? ([["Valor por unidad", `${formatoPesos(fuente.valorUnitario)}${fuente.unidad ? ` por ${fuente.unidad}` : ""}`]] as [string, string][]) : []),
+    ["Método de pago", cuenta ? "Crédito" : "Contado"],
+  ];
+  return (
+    <Modal abierta etiqueta="Factura de gasto" titulo={`Factura ${fuente.factura ?? ""}`} subtitulo={formatoPesos(total)} icono={fuente.categoria === "Genética" ? "🧬" : "🧾"} onCerrar={onCerrar}>
+      <div className="flex flex-col gap-3">
+        <dl className="divide-y divide-slate-100 rounded-2xl bg-white ring-1 ring-slate-200">
+          {filas.map(([k, v]) => (
+            <div key={k} className="flex items-start justify-between gap-3 px-3.5 py-2.5">
+              <dt className="shrink-0 text-sm text-slate-500">{k}</dt>
+              <dd className="min-w-0 text-right text-sm font-semibold text-slate-900">{v}</dd>
+            </div>
+          ))}
+          <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+            <dt className="text-sm font-semibold text-slate-900">Total</dt>
+            <dd className="text-base font-bold tabular-nums text-slate-900">{formatoPesos(total)}</dd>
+          </div>
+        </dl>
+        {cuenta && (
+          <PagoCredito
+            credito
+            total={cuenta.total}
+            abonos={cuenta.abonos}
+            conGasto
+            categoria={cuenta.categoria}
+            descripcionAbono={`Abono · Factura ${cuenta.factura ?? ""} · ${cuenta.descripcion}`}
+            onAbonos={(abonos) => guardarCuentasPorPagar(leerCuentasPorPagar().map((c) => (c.id === cuenta.id ? { ...c, abonos } : c)))}
+          />
+        )}
+        {cuenta && <p className="text-center text-xs text-slate-500">Cada abono se registra como gasto en Contabilidad.</p>}
+      </div>
     </Modal>
   );
 }
