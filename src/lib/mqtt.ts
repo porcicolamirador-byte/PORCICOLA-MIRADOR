@@ -318,3 +318,5 @@ export function useGranjaEnVivo(config: ConfigMqtt | null) {
 
   return { ...estado, enviar };
 }
+
+export type GranjaEnVivoEstado = ReturnType<typeof useGranjaEnVivo>;

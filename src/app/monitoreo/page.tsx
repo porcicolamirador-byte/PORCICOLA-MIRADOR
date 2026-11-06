@@ -1,7 +1,7 @@
 "use client";
 
 import Emoji from "@/components/Emoji";
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import ModuloPage from "@/components/ModuloPage";
 import { Boton, Campo, Entrada, Hoja, IconoMas, Insignia, Selector, Tarjeta, Vacio } from "@/components/ui";
 import {
@@ -15,7 +15,8 @@ import {
   type ZonaMonitoreo,
 } from "@/lib/datos";
 import { confirmar } from "@/components/Dialogo";
-import GranjaEnVivo from "@/components/GranjaEnVivo";
+import GranjaEnVivo, { haceCuanto } from "@/components/GranjaEnVivo";
+import { useConfigMqtt, useGranjaEnVivo } from "@/lib/mqtt";
 
 /** Rangos de confort recomendados por zona (°C) y humedad relativa (%) */
 const ZONAS: { zona: ZonaMonitoreo; icono: string; min: number; max: number }[] = [
@@ -48,6 +49,32 @@ export default function MonitoreoPage() {
   const version = useVersionDatos();
   const [nueva, setNueva] = useState<ZonaMonitoreo | null>(null);
 
+  // Una sola conexión con el ESP32 para la tarjeta en vivo y el recuadro de Gestación
+  const config = useConfigMqtt();
+  const granja = useGranjaEnVivo(config);
+  const [ahora, setAhora] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setAhora(Date.now()), 5000);
+    return () => clearInterval(t);
+  }, []);
+  // Lectura en vivo válida: conectado, sensor funcionando y recibida en los últimos 2 minutos
+  const vivoGestacion =
+    granja.conexion === "conectado" &&
+    granja.esp32 !== false &&
+    !granja.sensorError &&
+    granja.temperatura !== null &&
+    granja.actualizado !== null &&
+    ahora - granja.actualizado < 120_000
+      ? granja.temperatura
+      : null;
+
+  const avisosVivo = (min: number, max: number, t: number) => {
+    const a: string[] = [];
+    if (t < min) a.push(`Frío (mín. ${min} °C)`);
+    if (t > max) a.push(`Calor (máx. ${max} °C)`);
+    return a;
+  };
+
   const datos = useMemo(() => {
     if (version < 0) return null;
     const lecturas = leerLecturas().sort(ordenar);
@@ -66,6 +93,12 @@ export default function MonitoreoPage() {
     return { lecturas, porZona, alertas };
   }, [version]);
 
+  const alertas = (datos?.porZona ?? []).filter((z) =>
+    z.zona === "Gestación" && vivoGestacion !== null
+      ? avisosVivo(z.min, z.max, vivoGestacion).length > 0
+      : z.ultima && evaluar(z.ultima).length > 0
+  ).length;
+
   const eliminar = async (id: string) => {
     if (!(await confirmar({ titulo: "Eliminar lectura", mensaje: "Esta lectura se borrará del historial.", aceptar: "Eliminar", destructivo: true }))) return;
     guardarLecturas(leerLecturas().filter((l) => l.id !== id));
@@ -83,19 +116,20 @@ export default function MonitoreoPage() {
         </Boton>
       }
     >
-      <GranjaEnVivo />
+      <GranjaEnVivo config={config} granja={granja} />
 
-      {datos && datos.alertas > 0 && (
+      {alertas > 0 && (
         <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 ring-1 ring-red-200">
-          {datos.alertas === 1 ? "1 zona fuera de rango" : `${datos.alertas} zonas fuera de rango`} en la última lectura
+          {alertas === 1 ? "1 zona fuera de rango" : `${alertas} zonas fuera de rango`} en la última lectura
         </div>
       )}
 
       <div className="grid grid-cols-2 gap-2.5">
         {(datos?.porZona ?? ZONAS.map((z) => ({ ...z, ultima: undefined, minHoy: undefined, maxHoy: undefined }))).map(
           (z) => {
-            const avisos = z.ultima ? evaluar(z.ultima) : [];
-            const ok = z.ultima && avisos.length === 0;
+            const enVivo = z.zona === "Gestación" && vivoGestacion !== null;
+            const avisos = enVivo ? avisosVivo(z.min, z.max, vivoGestacion) : z.ultima ? evaluar(z.ultima) : [];
+            const ok = (enVivo || z.ultima) && avisos.length === 0;
             return (
               <button
                 key={z.zona}
@@ -109,7 +143,7 @@ export default function MonitoreoPage() {
                   <span className="truncate text-sm font-semibold text-slate-900">
                     <span aria-hidden="true"><Emoji e={z.icono} /></span> {z.zona}
                   </span>
-                  {z.ultima && (
+                  {(enVivo || z.ultima) && (
                     <Insignia
                       clase={
                         ok
@@ -121,7 +155,19 @@ export default function MonitoreoPage() {
                     </Insignia>
                   )}
                 </div>
-                {z.ultima ? (
+                {enVivo ? (
+                  <>
+                    <p className="text-3xl font-bold leading-none text-slate-900 tabular-nums">
+                      {vivoGestacion.toFixed(1)}
+                      <span className="text-base font-semibold text-slate-500"> °C</span>
+                    </p>
+                    <p className="flex items-center gap-1.5 text-xs text-slate-500">
+                      <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+                      En vivo · {haceCuanto(ahora - (granja.actualizado ?? ahora))}
+                    </p>
+                    {avisos.length > 0 && <p className="text-[11px] font-semibold text-red-600">{avisos.join(" · ")}</p>}
+                  </>
+                ) : z.ultima ? (
                   <>
                     <p className="text-3xl font-bold leading-none text-slate-900 tabular-nums">
                       {z.ultima.temperatura.toFixed(1)}

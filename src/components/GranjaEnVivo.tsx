@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { Boton, Campo, Entrada, Hoja, Insignia, Interruptor, Tarjeta, Vacio } from "@/components/ui";
-import { guardarConfigMqtt, normalizarUrl, useConfigMqtt, useGranjaEnVivo, type ConfigMqtt } from "@/lib/mqtt";
+import { guardarConfigMqtt, normalizarUrl, type ConfigMqtt, type GranjaEnVivoEstado } from "@/lib/mqtt";
 
 const COLORES = [
   { nombre: "Rojo", hex: "#FF0000" },
@@ -12,7 +12,7 @@ const COLORES = [
 ];
 
 /** "hace 8 s", "hace 3 min"… */
-function haceCuanto(ms: number) {
+export function haceCuanto(ms: number) {
   const s = Math.max(0, Math.round(ms / 1000));
   if (s < 60) return `hace ${s} s`;
   const m = Math.round(s / 60);
@@ -20,10 +20,11 @@ function haceCuanto(ms: number) {
   return `hace ${Math.round(m / 60)} h`;
 }
 
-/** Tarjeta de Monitoreo con la temperatura del ESP32 en tiempo real y los controles de la granja */
-export default function GranjaEnVivo() {
-  const config = useConfigMqtt();
-  const granja = useGranjaEnVivo(config);
+/**
+ * Tarjeta de Monitoreo con la temperatura del ESP32 en tiempo real y los controles de la granja.
+ * La página abre una sola conexión (useGranjaEnVivo) y la comparte aquí y en el recuadro de Gestación.
+ */
+export default function GranjaEnVivo({ config, granja }: { config: ConfigMqtt | null; granja: GranjaEnVivoEstado }) {
   const [configurando, setConfigurando] = useState(false);
   const [aviso, setAviso] = useState("");
   const [ahora, setAhora] = useState(() => Date.now());
