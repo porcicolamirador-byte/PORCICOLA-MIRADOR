@@ -15,6 +15,7 @@ import {
   type ZonaMonitoreo,
 } from "@/lib/datos";
 import { confirmar } from "@/components/Dialogo";
+import GranjaEnVivo from "@/components/GranjaEnVivo";
 
 /** Rangos de confort recomendados por zona (°C) y humedad relativa (%) */
 const ZONAS: { zona: ZonaMonitoreo; icono: string; min: number; max: number }[] = [
@@ -82,6 +83,8 @@ export default function MonitoreoPage() {
         </Boton>
       }
     >
+      <GranjaEnVivo />
+
       {datos && datos.alertas > 0 && (
         <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 ring-1 ring-red-200">
           {datos.alertas === 1 ? "1 zona fuera de rango" : `${datos.alertas} zonas fuera de rango`} en la última lectura
