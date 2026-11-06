@@ -49,7 +49,7 @@ export default function MonitoreoPage() {
   const version = useVersionDatos();
   const [nueva, setNueva] = useState<ZonaMonitoreo | null>(null);
 
-  // Una sola conexión con el ESP32 para la tarjeta en vivo y el recuadro de Gestación
+  // Una sola conexión con el ESP32 para la tarjeta en vivo y el recuadro de Precebo
   const config = useConfigMqtt();
   const granja = useGranjaEnVivo(config);
   const [ahora, setAhora] = useState(() => Date.now());
@@ -58,7 +58,7 @@ export default function MonitoreoPage() {
     return () => clearInterval(t);
   }, []);
   // Lectura en vivo válida: conectado, sensor funcionando y recibida en los últimos 2 minutos
-  const vivoGestacion =
+  const vivoPrecebo =
     granja.conexion === "conectado" &&
     granja.esp32 !== false &&
     !granja.sensorError &&
@@ -94,8 +94,8 @@ export default function MonitoreoPage() {
   }, [version]);
 
   const alertas = (datos?.porZona ?? []).filter((z) =>
-    z.zona === "Gestación" && vivoGestacion !== null
-      ? avisosVivo(z.min, z.max, vivoGestacion).length > 0
+    z.zona === "Precebo" && vivoPrecebo !== null
+      ? avisosVivo(z.min, z.max, vivoPrecebo).length > 0
       : z.ultima && evaluar(z.ultima).length > 0
   ).length;
 
@@ -127,8 +127,8 @@ export default function MonitoreoPage() {
       <div className="grid grid-cols-2 gap-2.5">
         {(datos?.porZona ?? ZONAS.map((z) => ({ ...z, ultima: undefined, minHoy: undefined, maxHoy: undefined }))).map(
           (z) => {
-            const enVivo = z.zona === "Gestación" && vivoGestacion !== null;
-            const avisos = enVivo ? avisosVivo(z.min, z.max, vivoGestacion) : z.ultima ? evaluar(z.ultima) : [];
+            const enVivo = z.zona === "Precebo" && vivoPrecebo !== null;
+            const avisos = enVivo ? avisosVivo(z.min, z.max, vivoPrecebo) : z.ultima ? evaluar(z.ultima) : [];
             const ok = (enVivo || z.ultima) && avisos.length === 0;
             return (
               <button
@@ -158,7 +158,7 @@ export default function MonitoreoPage() {
                 {enVivo ? (
                   <>
                     <p className="text-3xl font-bold leading-none text-slate-900 tabular-nums">
-                      {vivoGestacion.toFixed(1)}
+                      {vivoPrecebo.toFixed(1)}
                       <span className="text-base font-semibold text-slate-500"> °C</span>
                     </p>
                     <p className="flex items-center gap-1.5 text-xs text-slate-500">

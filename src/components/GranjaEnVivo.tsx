@@ -22,7 +22,7 @@ export function haceCuanto(ms: number) {
 
 /**
  * Tarjeta de Monitoreo con la temperatura del ESP32 en tiempo real y los controles de la granja.
- * La página abre una sola conexión (useGranjaEnVivo) y la comparte aquí y en el recuadro de Gestación.
+ * La página abre una sola conexión (useGranjaEnVivo) y la comparte aquí y en el recuadro de Precebo.
  */
 export default function GranjaEnVivo({ config, granja }: { config: ConfigMqtt | null; granja: GranjaEnVivoEstado }) {
   const [configurando, setConfigurando] = useState(false);
