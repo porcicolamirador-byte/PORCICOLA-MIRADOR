@@ -5,7 +5,8 @@ import PagoFactura, { PagoCredito } from "@/components/PagoFactura";
 import { calcularInventario, codigoDe, leerCerdas, guardarCuentasPorPagar, guardarFacturas, leerCuentasPorPagar, leerFacturas, leerProductos, leerSalidas, saldoCuenta, saldoFactura, totalFactura } from "@/lib/datos";
 import { useMemo, useState, type FormEvent } from "react";
 import ModuloPage from "@/components/ModuloPage";
-import { Boton, Campo, Entrada, IconoMas, SeccionDesplegable, Selector, Vacio, EntradaPesos } from "@/components/ui";
+import { Boton, Campo, Entrada, IconoMas, SeccionDesplegable, Selector, Vacio, EntradaPesos, CLASE_SELECTOR } from "@/components/ui";
+import SelectorApp from "@/components/SelectorApp";
 import {
   formatoFecha,
   formatoPesos,
@@ -1071,6 +1072,16 @@ const textoSemana = (lunes: string) => {
   return `Semana del ${fechaCorta(lunes)} al ${fechaCorta(domingo)} ${domingo.slice(0, 4)}`;
 };
 
+/** Momento en que se registró el movimiento (va en su id) */
+function momentoIngreso(m: Movimiento): number | null {
+  const t = parseInt(m.id.slice(0, 8), 36);
+  return Number.isFinite(t) && t > 1.6e12 && t < 4.1e12 ? t : null;
+}
+function horaIngreso(m: Movimiento) {
+  const t = momentoIngreso(m);
+  return t ? new Date(t).toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit", hour12: true }) : "";
+}
+
 function MovimientosPeriodo({ version, mes, onEliminar }: { version: number; mes: string; onEliminar: (id: string) => void }) {
   const [modo, setModo] = useState<"mes" | "semana">("mes");
   const [lunes, setLunes] = useState(() => lunesDe(hoy()));
@@ -1084,14 +1095,19 @@ function MovimientosPeriodo({ version, mes, onEliminar }: { version: number; mes
     return ids;
   }, [version]);
 
-  const movs = useMemo(() => {
+  const movsPeriodo = useMemo(() => {
     void version;
     const todos = leerMovimientos();
     const domingo = sumarDias(lunes, 6);
     return todos
       .filter((m) => (modo === "mes" ? m.fecha.slice(0, 7) === mes : m.fecha >= lunes && m.fecha <= domingo))
-      .sort((a, b) => b.fecha.localeCompare(a.fecha));
+      // Orden de ingreso: lo último registrado arriba
+      .sort((a, b) => (momentoIngreso(b) ?? 0) - (momentoIngreso(a) ?? 0) || b.fecha.localeCompare(a.fecha));
   }, [version, mes, modo, lunes]);
+  const [categoriaFiltro, setCategoriaFiltro] = useState("");
+  const categoriasPeriodo = useMemo(() => [...new Set(movsPeriodo.map((m) => m.categoria))].sort((a, b) => a.localeCompare(b)), [movsPeriodo]);
+  const filtro = categoriasPeriodo.includes(categoriaFiltro) ? categoriaFiltro : "";
+  const movs = filtro ? movsPeriodo.filter((m) => m.categoria === filtro) : movsPeriodo;
   const periodo = modo === "mes" ? nombreMes(mes) : textoSemana(lunes);
   const ingresos = movs.filter((m) => m.tipo === "ingreso").reduce((s, m) => s + m.monto, 0);
   const gastos = movs.filter((m) => m.tipo === "gasto").reduce((s, m) => s + m.monto, 0);
@@ -1103,7 +1119,7 @@ function MovimientosPeriodo({ version, mes, onEliminar }: { version: number; mes
       const logo = await cargarLogoJpeg("/images/logo.png");
       const blob = generarPdfContabilidad({
         granja: nombreGranjaActual(),
-        periodo: periodo.charAt(0).toUpperCase() + periodo.slice(1),
+        periodo: `${periodo.charAt(0).toUpperCase() + periodo.slice(1)}${filtro ? ` · ${filtro}` : ""}`,
         filas: movs.map((m) => ({ fecha: formatoFecha(m.fecha), descripcion: m.descripcion, categoria: m.categoria, tipo: m.tipo, monto: m.monto })),
         fechaGeneracion: formatoFecha(hoy()),
         logo,
@@ -1142,6 +1158,16 @@ function MovimientosPeriodo({ version, mes, onEliminar }: { version: number; mes
           <p className="text-center text-[13px] font-semibold capitalize text-slate-900">{nombreMes(mes)}</p>
         )}
 
+        {categoriasPeriodo.length > 1 && (
+          <SelectorApp
+            valor={filtro}
+            onCambiar={setCategoriaFiltro}
+            titulo="Filtrar por categoría"
+            opciones={[{ valor: "", texto: "Todas las categorías" }, ...categoriasPeriodo.map((c) => ({ valor: c, texto: c }))]}
+            className="w-full"
+            claseBoton={CLASE_SELECTOR}
+          />
+        )}
         <div className="flex items-center justify-between gap-2 text-[12px]">
           <span className="text-slate-500">
             <span className="font-semibold text-sky-700">+{formatoPesos(ingresos)}</span> · <span className="font-semibold text-slate-900">−{formatoPesos(gastos)}</span>
@@ -1177,6 +1203,7 @@ function MovimientosPeriodo({ version, mes, onEliminar }: { version: number; mes
                   <p className="truncate text-[13px] font-semibold text-slate-900">{m.descripcion || m.categoria}</p>
                   <p className="truncate text-[11px] text-slate-500">
                     {m.categoria} · {formatoFecha(m.fecha)}
+                    {horaIngreso(m) ? ` · ${horaIngreso(m)}` : ""}
                   </p>
                 </div>
                 <span className={`shrink-0 text-[13px] font-semibold tabular-nums ${m.tipo === "ingreso" ? "text-sky-700" : "text-slate-900"}`}>
