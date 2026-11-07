@@ -345,7 +345,7 @@ const CATEGORIA_PRODUCTO: Record<string, string> = {
  * de la más antigua a la más nueva; lo que sobra de una pasa a la siguiente.
  * Devuelve el reparto o un texto de error.
  */
-export function abonoGeneralLote(loteId: string, monto: number, fecha: string): { titulo: string; monto: number }[] | string {
+export function abonoGeneralLote(loteId: string, monto: number, fecha: string, anticipoId = nuevoId()): { titulo: string; monto: number }[] | string {
   const lote = leerLotes().find((l) => l.id === loteId);
   if (!lote) return "Lote no encontrado.";
   if (!(monto > 0)) return "Escribe el valor del abono.";
@@ -370,13 +370,13 @@ export function abonoGeneralLote(loteId: string, monto: number, fecha: string): 
       if (!f) continue;
       const conGasto = f.registrarGasto ?? Boolean(f.movimientoId);
       const cat = productos.get(f.lineas[0]?.productoId ?? "")?.categoria ?? "";
-      if (conGasto) movs.push({ id: movimientoId, fecha, tipo: "gasto", categoria: CATEGORIA_PRODUCTO[cat] ?? "Otros gastos", descripcion: `Abono general ${etiqueta} · Factura ${f.numero}${f.proveedor ? ` · ${f.proveedor}` : ""}`, monto: parte });
-      facturas = facturas.map((x) => (x.id === f.id ? { ...x, abonos: [...(x.abonos ?? []), { id: nuevoId(), fecha, monto: parte, ...(conGasto ? { movimientoId } : {}) }] } : x));
+      if (conGasto) movs.push({ id: movimientoId, fecha, tipo: "gasto", categoria: CATEGORIA_PRODUCTO[cat] ?? "Otros gastos", descripcion: `Anticipo ${etiqueta} · Factura ${f.numero}${f.proveedor ? ` · ${f.proveedor}` : ""}`, monto: parte, anticipoId, anticipoLote: lote.id });
+      facturas = facturas.map((x) => (x.id === f.id ? { ...x, abonos: [...(x.abonos ?? []), { id: nuevoId(), fecha, monto: parte, anticipoId, ...(conGasto ? { movimientoId } : {}) }] } : x));
     } else {
       const c = cuentas.find((x) => x.id === d.id);
       if (!c) continue;
-      movs.push({ id: movimientoId, fecha, tipo: "gasto", categoria: c.categoria, descripcion: `Abono general ${etiqueta} · ${c.factura ? `Factura ${c.factura} · ` : ""}${c.descripcion}`, monto: parte });
-      cuentas = cuentas.map((x) => (x.id === c.id ? { ...x, abonos: [...x.abonos, { id: nuevoId(), fecha, monto: parte, movimientoId }] } : x));
+      movs.push({ id: movimientoId, fecha, tipo: "gasto", categoria: c.categoria, descripcion: `Anticipo ${etiqueta} · ${c.factura ? `Factura ${c.factura} · ` : ""}${c.descripcion}`, monto: parte, anticipoId, anticipoLote: lote.id });
+      cuentas = cuentas.map((x) => (x.id === c.id ? { ...x, abonos: [...x.abonos, { id: nuevoId(), fecha, monto: parte, movimientoId, anticipoId }] } : x));
     }
     reparto.push({ titulo: d.titulo, monto: parte });
   }
@@ -384,4 +384,74 @@ export function abonoGeneralLote(loteId: string, monto: number, fecha: string): 
   guardarCuentasPorPagar(cuentas);
   guardarMovimientos(movs);
   return reparto;
+}
+
+/* ───────────── Anticipos a lotes ───────────── */
+
+export interface AnticipoLote {
+  id: string;
+  loteId: string;
+  lote: string;
+  fecha: string;
+  total: number;
+  partes: { titulo: string; monto: number }[];
+}
+
+/** Anticipos hechos (agrupados por sus abonos), los más recientes primero */
+export function leerAnticipos(): AnticipoLote[] {
+  const lotes = new Map(leerLotes().map((l) => [l.id, l]));
+  const grupos = new Map<string, AnticipoLote>();
+  const sumar = (id: string, loteId: string, fecha: string, titulo: string, monto: number) => {
+    const g = grupos.get(id) ?? { id, loteId, lote: "", fecha, total: 0, partes: [] };
+    if (!g.loteId && loteId) g.loteId = loteId;
+    g.total += monto;
+    g.partes.push({ titulo, monto });
+    grupos.set(id, g);
+  };
+  const conMov = new Set<string>();
+  for (const m of leerMovimientos()) {
+    if (!m.anticipoId) continue;
+    conMov.add(m.id);
+    sumar(m.anticipoId, m.anticipoLote ?? "", m.fecha, m.descripcion.replace(/^Anticipo [^·]*· /, ""), Number(m.monto) || 0);
+  }
+  // Abonos de facturas que no se registran como gasto (no tienen movimiento)
+  for (const f of leerFacturas())
+    for (const a of f.abonos ?? [])
+      if (a.anticipoId && !(a.movimientoId && conMov.has(a.movimientoId))) sumar(a.anticipoId, "", a.fecha, `Factura ${f.numero}${f.proveedor ? ` · ${f.proveedor}` : ""}`, Number(a.monto) || 0);
+  for (const g of grupos.values()) {
+    const l = lotes.get(g.loteId);
+    g.lote = l ? nombreLote(l) : "Lote";
+  }
+  return [...grupos.values()].sort((a, b) => b.id.localeCompare(a.id));
+}
+
+/** Quita un anticipo completo: sus abonos y sus gastos; los saldos vuelven a quedar pendientes */
+export function eliminarAnticipo(id: string) {
+  guardarFacturas(leerFacturas().map((f) => ((f.abonos ?? []).some((a) => a.anticipoId === id) ? { ...f, abonos: (f.abonos ?? []).filter((a) => a.anticipoId !== id) } : f)));
+  guardarCuentasPorPagar(leerCuentasPorPagar().map((c) => (c.abonos.some((a) => a.anticipoId === id) ? { ...c, abonos: c.abonos.filter((a) => a.anticipoId !== id) } : c)));
+  guardarMovimientos(leerMovimientos().filter((m) => m.anticipoId !== id));
+}
+
+/** Cambia el valor o la fecha de un anticipo: se quitan sus abonos y se reparte de nuevo */
+export function editarAnticipo(id: string, monto: number, fecha: string): string | null {
+  const ant = leerAnticipos().find((a) => a.id === id);
+  if (!ant || !ant.loteId) return "No se encontró el anticipo.";
+  const antes = { f: leerFacturas(), c: leerCuentasPorPagar(), m: leerMovimientos() };
+  eliminarAnticipo(id);
+  const r = abonoGeneralLote(ant.loteId, monto, fecha, id);
+  if (typeof r === "string") {
+    guardarFacturas(antes.f);
+    guardarCuentasPorPagar(antes.c);
+    guardarMovimientos(antes.m);
+    return r;
+  }
+  return null;
+}
+
+/** Lo que el lote debe sin contar un anticipo (para editarlo) */
+export function pendienteLoteSin(loteId: string, anticipoId?: string): number {
+  const l = leerLotes().find((x) => x.id === loteId);
+  if (!l) return 0;
+  const propio = anticipoId ? (leerAnticipos().find((a) => a.id === anticipoId)?.total ?? 0) : 0;
+  return documentosCreditoLote(l).reduce((t, d) => t + d.saldo, 0) + propio;
 }

@@ -30,7 +30,7 @@ import { avisar, confirmar } from "@/components/Dialogo";
 import { puede } from "@/lib/nube";
 import { cargarLogoJpeg, entregarPdf } from "@/lib/pdfFicha";
 import { generarPdfContabilidad } from "@/lib/pdfContabilidad";
-import { abonoGeneralLote, creditoDelLote, documentosCreditoLote, exportarContabilidadLote, loteTieneMadre } from "@/lib/exportarLote";
+import { abonoGeneralLote, creditoDelLote, documentosCreditoLote, editarAnticipo, eliminarAnticipo, exportarContabilidadLote, leerAnticipos, loteTieneMadre, pendienteLoteSin } from "@/lib/exportarLote";
 import { nombreGranjaActual } from "@/lib/sincronizar";
 
 const CATEGORIAS: Record<Movimiento["tipo"], string[]> = {
@@ -274,7 +274,7 @@ export default function ContabilidadPage() {
 }
 
 function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: () => void }) {
-  const [tipo, setTipo] = useState<Movimiento["tipo"] | "abono">("gasto");
+  const [tipo, setTipo] = useState<Movimiento["tipo"] | "abono" | "anticipos">("gasto");
   const [categoria, setCategoria] = useState(CATEGORIAS.gasto[0]);
   const [descripcion, setDescripcion] = useState("");
   const [monto, setMonto] = useState("");
@@ -284,9 +284,9 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
   const [error, setError] = useState("");
   const lotesActivos = abierta ? leerLotes().filter((l) => l.activo) : [];
 
-  const cambiarTipo = (t: Movimiento["tipo"] | "abono") => {
+  const cambiarTipo = (t: Movimiento["tipo"] | "abono" | "anticipos") => {
     setTipo(t);
-    if (t !== "abono") setCategoria(CATEGORIAS[t][0]);
+    if (t === "gasto" || t === "ingreso") setCategoria(CATEGORIAS[t][0]);
     if (t !== "ingreso") setLoteId("");
     setPago("");
     setError("");
@@ -295,7 +295,7 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
   const guardar = (e: FormEvent) => {
     e.preventDefault();
     const valor = Number(monto) || 0;
-    if (valor <= 0 || tipo === "abono") return;
+    if (valor <= 0 || tipo === "abono" || tipo === "anticipos") return;
     if (tipo === "gasto" && !pago) return setError("Selecciona el método de pago: contado o crédito.");
     const lote = tipo === "ingreso" && loteId ? leerLotes().find((l) => l.id === loteId) : undefined;
     const texto = descripcion.trim();
@@ -338,13 +338,13 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
       abierta={abierta}
       etiqueta="Contabilidad"
       titulo="Nuevo movimiento"
-      subtitulo={tipo === "gasto" ? "Registrar un gasto" : tipo === "ingreso" ? "Registrar un ingreso" : "Abono general a un lote con crédito"}
+      subtitulo={tipo === "gasto" ? "Registrar un gasto" : tipo === "ingreso" ? "Registrar un ingreso" : tipo === "abono" ? "Anticipo a las facturas a crédito de un lote" : "Anticipos hechos"}
       icono={tipo === "gasto" ? "💸" : tipo === "ingreso" ? "💰" : "🧾"}
       onCerrar={onCerrar}
     >
       <form onSubmit={guardar} className="flex flex-col gap-3.5">
-        <div className="grid grid-cols-3 gap-1 rounded-2xl bg-slate-100 p-1">
-          {(["gasto", "ingreso", "abono"] as const).map((t) => (
+        <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1">
+          {(["gasto", "ingreso", "abono", "anticipos"] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -353,12 +353,14 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
                 tipo === t ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
               }`}
             >
-              {t === "gasto" ? "Gasto" : t === "ingreso" ? "Ingreso" : "Abono general"}
+              {t === "gasto" ? "Gasto" : t === "ingreso" ? "Ingreso" : t === "abono" ? "Anticipo" : "Anticipos"}
             </button>
           ))}
         </div>
         {tipo === "abono" ? (
           <AbonoGeneral abierta={abierta} onListo={onCerrar} />
+        ) : tipo === "anticipos" ? (
+          <ListaAnticipos abierta={abierta} />
         ) : (
         <>
         <Campo etiqueta="Categoría">
@@ -422,7 +424,7 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
   );
 }
 
-/** Abono general: un valor que se reparte entre las facturas a crédito del lote, de la más antigua a la más nueva */
+/** Anticipo de lote: un valor que se reparte entre las facturas a crédito del lote, de la más antigua a la más nueva */
 function AbonoGeneral({ abierta, onListo }: { abierta: boolean; onListo: () => void }) {
   const version = useVersionDatos();
   const [loteId, setLoteId] = useState("");
@@ -467,11 +469,11 @@ function AbonoGeneral({ abierta, onListo }: { abierta: boolean; onListo: () => v
             setError("");
           }}
           placeholder="Elige el lote"
-          opciones={lotes.map((x) => ({ valor: x.l.id, texto: `${x.l.codigo ? `${x.l.codigo} · ` : ""}${nombreLote(x.l)} · debe ${formatoPesos(x.pendiente)}` }))}
+          opciones={lotes.map((x) => ({ valor: x.l.id, texto: `${nombreLote(x.l)} · debe ${formatoPesos(x.pendiente)}` }))}
         />
       </Campo>
       <div className="grid grid-cols-2 gap-3">
-        <Campo etiqueta="Valor del abono *">
+        <Campo etiqueta="Valor del anticipo *">
           <EntradaPesos
             value={monto}
             onChange={(v) => {
@@ -508,10 +510,99 @@ function AbonoGeneral({ abierta, onListo }: { abierta: boolean; onListo: () => v
       )}
       {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
       <Boton onClick={guardar} disabled={!loteId || !(valor > 0)} className="mt-1 w-full py-3">
-        Abonar
+        Registrar anticipo
       </Boton>
-      <p className="-mt-1.5 text-xs leading-snug text-slate-500">Se abona primero a la factura más antigua; lo que sobre pasa a la siguiente. Cada abono queda como gasto en su fecha.</p>
+      <p className="-mt-1.5 text-xs leading-snug text-slate-500">Se abona primero a la factura más antigua; lo que sobre pasa a la siguiente. Cada abono queda como gasto en su fecha y el anticipo aparece en "Anticipos".</p>
     </>
+  );
+}
+
+/** Lista de anticipos hechos a lotes: se pueden editar (valor y fecha) o eliminar */
+function ListaAnticipos({ abierta }: { abierta: boolean }) {
+  const version = useVersionDatos();
+  const anticipos = useMemo(() => (abierta && version >= 0 ? leerAnticipos() : []), [abierta, version]);
+  const [editando, setEditando] = useState<string | null>(null);
+  const [monto, setMonto] = useState("");
+  const [fecha, setFecha] = useState(hoy());
+  const [error, setError] = useState("");
+  if (anticipos.length === 0) return <p className="rounded-xl bg-slate-50 px-3 py-4 text-center text-sm text-slate-500 ring-1 ring-slate-100">Aún no has hecho anticipos.</p>;
+  const abrir = (id: string) => {
+    const a = anticipos.find((x) => x.id === id);
+    if (!a) return;
+    setEditando(editando === id ? null : id);
+    setMonto(String(Math.round(a.total)));
+    setFecha(a.fecha);
+    setError("");
+  };
+  const guardar = (id: string) => {
+    const r = editarAnticipo(id, Number(monto) || 0, fecha);
+    if (r) return setError(r);
+    setEditando(null);
+  };
+  const quitar = async (id: string) => {
+    const a = anticipos.find((x) => x.id === id);
+    if (!a) return;
+    if (
+      !(await confirmar({
+        titulo: "Eliminar anticipo",
+        mensaje: `Se quitará el anticipo de ${formatoPesos(a.total)} a ${a.lote}. Sus facturas vuelven a quedar con saldo pendiente y la contabilidad se recalcula.`,
+        aceptar: "Eliminar",
+        destructivo: true,
+      }))
+    )
+      return;
+    eliminarAnticipo(id);
+    setEditando(null);
+  };
+  return (
+    <ul className="flex flex-col gap-2">
+      {anticipos.map((a) => {
+        const abiertoAqui = editando === a.id;
+        const maximo = abiertoAqui ? pendienteLoteSin(a.loteId, a.id) : 0;
+        return (
+          <li key={a.id} className="overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/80">
+            <button type="button" onClick={() => abrir(a.id)} className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left active:bg-slate-50">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold text-slate-900">{a.lote}</span>
+                <span className="block truncate text-[11px] text-slate-500">
+                  {formatoFecha(a.fecha, true)} · {a.partes.length} {a.partes.length === 1 ? "factura" : "facturas"}
+                </span>
+              </span>
+              <span className="shrink-0 text-sm font-bold tabular-nums text-sky-700">{formatoPesos(a.total)}</span>
+              <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12.5 4.5l3 3L7 16H4v-3z" />
+              </svg>
+            </button>
+            <div className="border-t border-slate-100 px-3 py-1.5">
+              {a.partes.map((p, i) => (
+                <div key={i} className="flex items-baseline justify-between gap-2 py-0.5 text-[11px]">
+                  <span className="min-w-0 flex-1 truncate text-slate-500">{p.titulo}</span>
+                  <span className="shrink-0 tabular-nums text-slate-700">{formatoPesos(p.monto)}</span>
+                </div>
+              ))}
+            </div>
+            {abiertoAqui && (
+              <div className="flex flex-col gap-2.5 border-t border-slate-100 bg-slate-50 p-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <Campo etiqueta="Valor del anticipo">
+                    <EntradaPesos value={monto} onChange={(v) => { setMonto(v); setError(""); }} />
+                  </Campo>
+                  <Campo etiqueta="Fecha">
+                    <Entrada type="date" value={fecha} onChange={setFecha} required />
+                  </Campo>
+                </div>
+                <p className="text-[11px] text-slate-500">Máximo {formatoPesos(maximo)} (lo que debe el lote sin este anticipo). Al guardar se reparte de nuevo desde la factura más antigua.</p>
+                {error && <p className="text-xs font-medium text-rose-600">{error}</p>}
+                <div className="grid grid-cols-2 gap-2">
+                  <Boton variante="secundario" onClick={() => void quitar(a.id)}>Eliminar</Boton>
+                  <Boton onClick={() => guardar(a.id)} disabled={!((Number(monto) || 0) > 0)}>Guardar</Boton>
+                </div>
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -684,7 +775,6 @@ function CreditoPorLote({ version }: { version: number }) {
                 <button type="button" onClick={() => setAbierto(abiertoAqui ? null : l.id)} className="flex w-full items-center gap-2.5 px-3 py-2 text-left active:bg-slate-50">
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold text-slate-900">
-                      {l.codigo ? <span className="text-sky-700">{l.codigo} · </span> : null}
                       {nombreLote(l)}
                       {!l.activo ? <span className="font-normal text-slate-400"> · cerrado</span> : null}
                     </span>

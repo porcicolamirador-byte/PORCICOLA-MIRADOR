@@ -193,6 +193,9 @@ export interface Movimiento {
   /** Abono por préstamo pagado: producto al que corresponde */
   productoCodigo?: string;
   gastoId?: string;
+  /** Anticipo a un lote: id del anticipo y lote (sin loteId para no sumarlo como costo del lote) */
+  anticipoId?: string;
+  anticipoLote?: string;
   /** Gastos de producción: unidad de medida (ml, Dosis, Litro), cantidad en número y valor por unidad */
   unidad?: string;
   cantidadNum?: number;
@@ -551,6 +554,8 @@ export interface AbonoFactura {
   nota?: string;
   /** Gasto creado en Contabilidad por este abono */
   movimientoId?: string;
+  /** Anticipo de lote al que pertenece */
+  anticipoId?: string;
 }
 export interface SalidaBodega {
   id: string;
