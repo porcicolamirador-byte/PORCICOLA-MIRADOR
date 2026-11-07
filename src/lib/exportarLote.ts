@@ -5,6 +5,15 @@
 
 import {
   leerTratamientos,
+  leerFacturas,
+  leerLotes,
+  formatoPesos,
+  guardarFacturas,
+  guardarCuentasPorPagar,
+  guardarMovimientos,
+  nuevoId,
+  saldoCuenta,
+  saldoFactura,
   calcularInventario,
   codigoDe,
   diasEntre,
@@ -290,4 +299,89 @@ export function creditoDelLote(lote: Lote): CreditoLote {
     .map((origen) => ({ origen, total: Math.round(partes[origen].total), abonado: Math.round(partes[origen].abonado) }))
     .filter((x) => x.total > 0);
   return { total: lista.reduce((t, x) => t + x.total, 0), abonado: lista.reduce((t, x) => t + x.abonado, 0), partes: lista };
+}
+
+
+/** Facturas y gastos a crédito con saldo de los que salió algo para el lote (más antiguos primero) */
+export interface DocCreditoLote {
+  clase: "factura" | "gasto";
+  id: string;
+  fecha: string;
+  titulo: string;
+  saldo: number;
+}
+export function documentosCreditoLote(lote: Lote): DocCreditoLote[] {
+  const docs = new Map<string, DocCreditoLote>();
+  const cuentas = new Map(leerCuentasPorPagar().map((c) => [c.id, c]));
+  const agregarCuenta = (id?: string) => {
+    const c = id ? cuentas.get(id) : undefined;
+    if (!c || saldoCuenta(c) <= 0) return;
+    docs.set(`g:${c.id}`, { clase: "gasto", id: c.id, fecha: c.fecha, titulo: c.factura ? `Factura ${c.factura} · ${c.descripcion}` : c.descripcion, saldo: saldoCuenta(c) });
+  };
+  for (const g of lote.gastos ?? []) agregarCuenta(g.cuentaId);
+  for (const t of leerTratamientos()) if (t.objetivo === "lote" && t.objetivoId === lote.id) agregarCuenta(t.gastoId);
+  const salidasDelLote = new Set(lote.alimento.map((a) => a.salidaId).filter(Boolean) as string[]);
+  for (const t of trazabilidadSalidas()) {
+    if (t.salida.loteId !== lote.id && !salidasDelLote.has(t.salida.id)) continue;
+    for (const parte of t.partes) {
+      const f = parte.factura;
+      if (f.pago !== "credito" || !(parte.valor > 0)) continue;
+      const actual = leerFacturas().find((x) => x.id === f.id) ?? f;
+      if (saldoFactura(actual) <= 0) continue;
+      docs.set(`f:${f.id}`, { clase: "factura", id: f.id, fecha: f.fecha, titulo: `Factura ${f.numero}${f.proveedor ? ` · ${f.proveedor}` : ""}`, saldo: saldoFactura(actual) });
+    }
+  }
+  return [...docs.values()].sort((a, b) => a.fecha.localeCompare(b.fecha) || a.titulo.localeCompare(b.titulo));
+}
+
+const CATEGORIA_PRODUCTO: Record<string, string> = {
+  Alimento: "Alimento",
+  Medicamentos: "Medicamentos y vacunas",
+  Vacunas: "Medicamentos y vacunas",
+};
+
+/**
+ * Abono general a un lote: reparte el valor entre sus facturas y gastos a crédito,
+ * de la más antigua a la más nueva; lo que sobra de una pasa a la siguiente.
+ * Devuelve el reparto o un texto de error.
+ */
+export function abonoGeneralLote(loteId: string, monto: number, fecha: string): { titulo: string; monto: number }[] | string {
+  const lote = leerLotes().find((l) => l.id === loteId);
+  if (!lote) return "Lote no encontrado.";
+  if (!(monto > 0)) return "Escribe el valor del abono.";
+  const docs = documentosCreditoLote(lote);
+  const pendiente = docs.reduce((t, d) => t + d.saldo, 0);
+  if (pendiente <= 0) return "Este lote no tiene crédito pendiente.";
+  if (monto > pendiente + 0.5) return `El abono es mayor que lo pendiente del lote (${formatoPesos(pendiente)}).`;
+  const etiqueta = lote.codigo || nombreLote(lote);
+  const productos = new Map(leerProductos().map((p) => [p.id, p]));
+  let facturas = leerFacturas();
+  let cuentas = leerCuentasPorPagar();
+  const movs = leerMovimientos();
+  const reparto: { titulo: string; monto: number }[] = [];
+  let resto = monto;
+  for (const d of docs) {
+    if (resto <= 0.5) break;
+    const parte = Math.min(resto, d.saldo);
+    resto -= parte;
+    const movimientoId = nuevoId();
+    if (d.clase === "factura") {
+      const f = facturas.find((x) => x.id === d.id);
+      if (!f) continue;
+      const conGasto = f.registrarGasto ?? Boolean(f.movimientoId);
+      const cat = productos.get(f.lineas[0]?.productoId ?? "")?.categoria ?? "";
+      if (conGasto) movs.push({ id: movimientoId, fecha, tipo: "gasto", categoria: CATEGORIA_PRODUCTO[cat] ?? "Otros gastos", descripcion: `Abono general ${etiqueta} · Factura ${f.numero}${f.proveedor ? ` · ${f.proveedor}` : ""}`, monto: parte });
+      facturas = facturas.map((x) => (x.id === f.id ? { ...x, abonos: [...(x.abonos ?? []), { id: nuevoId(), fecha, monto: parte, ...(conGasto ? { movimientoId } : {}) }] } : x));
+    } else {
+      const c = cuentas.find((x) => x.id === d.id);
+      if (!c) continue;
+      movs.push({ id: movimientoId, fecha, tipo: "gasto", categoria: c.categoria, descripcion: `Abono general ${etiqueta} · ${c.factura ? `Factura ${c.factura} · ` : ""}${c.descripcion}`, monto: parte });
+      cuentas = cuentas.map((x) => (x.id === c.id ? { ...x, abonos: [...x.abonos, { id: nuevoId(), fecha, monto: parte, movimientoId }] } : x));
+    }
+    reparto.push({ titulo: d.titulo, monto: parte });
+  }
+  guardarFacturas(facturas);
+  guardarCuentasPorPagar(cuentas);
+  guardarMovimientos(movs);
+  return reparto;
 }

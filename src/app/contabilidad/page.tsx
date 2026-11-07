@@ -26,7 +26,7 @@ import { avisar, confirmar } from "@/components/Dialogo";
 import { puede } from "@/lib/nube";
 import { cargarLogoJpeg, entregarPdf } from "@/lib/pdfFicha";
 import { generarPdfContabilidad } from "@/lib/pdfContabilidad";
-import { creditoDelLote, exportarContabilidadLote, loteTieneMadre } from "@/lib/exportarLote";
+import { abonoGeneralLote, creditoDelLote, documentosCreditoLote, exportarContabilidadLote, loteTieneMadre } from "@/lib/exportarLote";
 import { nombreGranjaActual } from "@/lib/sincronizar";
 
 const CATEGORIAS: Record<Movimiento["tipo"], string[]> = {
@@ -255,7 +255,7 @@ export default function ContabilidadPage() {
 }
 
 function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: () => void }) {
-  const [tipo, setTipo] = useState<Movimiento["tipo"]>("gasto");
+  const [tipo, setTipo] = useState<Movimiento["tipo"] | "abono">("gasto");
   const [categoria, setCategoria] = useState(CATEGORIAS.gasto[0]);
   const [descripcion, setDescripcion] = useState("");
   const [monto, setMonto] = useState("");
@@ -265,9 +265,9 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
   const [error, setError] = useState("");
   const lotesActivos = abierta ? leerLotes().filter((l) => l.activo) : [];
 
-  const cambiarTipo = (t: Movimiento["tipo"]) => {
+  const cambiarTipo = (t: Movimiento["tipo"] | "abono") => {
     setTipo(t);
-    setCategoria(CATEGORIAS[t][0]);
+    if (t !== "abono") setCategoria(CATEGORIAS[t][0]);
     if (t !== "ingreso") setLoteId("");
     setPago("");
     setError("");
@@ -276,7 +276,7 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
   const guardar = (e: FormEvent) => {
     e.preventDefault();
     const valor = Number(monto) || 0;
-    if (valor <= 0) return;
+    if (valor <= 0 || tipo === "abono") return;
     if (tipo === "gasto" && !pago) return setError("Selecciona el método de pago: contado o crédito.");
     const lote = tipo === "ingreso" && loteId ? leerLotes().find((l) => l.id === loteId) : undefined;
     const texto = descripcion.trim();
@@ -319,13 +319,13 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
       abierta={abierta}
       etiqueta="Contabilidad"
       titulo="Nuevo movimiento"
-      subtitulo={tipo === "gasto" ? "Registrar un gasto" : "Registrar un ingreso"}
-      icono={tipo === "gasto" ? "💸" : "💰"}
+      subtitulo={tipo === "gasto" ? "Registrar un gasto" : tipo === "ingreso" ? "Registrar un ingreso" : "Abono general a un lote con crédito"}
+      icono={tipo === "gasto" ? "💸" : tipo === "ingreso" ? "💰" : "🧾"}
       onCerrar={onCerrar}
     >
       <form onSubmit={guardar} className="flex flex-col gap-3.5">
-        <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1">
-          {(["gasto", "ingreso"] as const).map((t) => (
+        <div className="grid grid-cols-3 gap-1 rounded-2xl bg-slate-100 p-1">
+          {(["gasto", "ingreso", "abono"] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -334,10 +334,14 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
                 tipo === t ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
               }`}
             >
-              {t === "gasto" ? "Gasto" : "Ingreso"}
+              {t === "gasto" ? "Gasto" : t === "ingreso" ? "Ingreso" : "Abono general"}
             </button>
           ))}
         </div>
+        {tipo === "abono" ? (
+          <AbonoGeneral abierta={abierta} onListo={onCerrar} />
+        ) : (
+        <>
         <Campo etiqueta="Categoría">
           <Selector value={categoria} onChange={setCategoria} opciones={CATEGORIAS[tipo].map((c) => ({ valor: c, texto: c }))} />
         </Campo>
@@ -392,8 +396,103 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
         <Boton type="submit" className="mt-1 w-full py-3">
           Guardar
         </Boton>
+        </>
+        )}
       </form>
     </Modal>
+  );
+}
+
+/** Abono general: un valor que se reparte entre las facturas a crédito del lote, de la más antigua a la más nueva */
+function AbonoGeneral({ abierta, onListo }: { abierta: boolean; onListo: () => void }) {
+  const version = useVersionDatos();
+  const [loteId, setLoteId] = useState("");
+  const [monto, setMonto] = useState("");
+  const [fecha, setFecha] = useState(hoy());
+  const [error, setError] = useState("");
+  const lotes = useMemo(() => {
+    if (!abierta || version < 0) return [];
+    return leerLotes()
+      .map((l) => {
+        const docs = documentosCreditoLote(l);
+        return { l, docs, pendiente: docs.reduce((t, d) => t + d.saldo, 0) };
+      })
+      .filter((x) => x.pendiente > 0);
+  }, [abierta, version]);
+  const sel = lotes.find((x) => x.l.id === loteId);
+  const valor = Number(monto) || 0;
+  // Vista previa del reparto
+  let resto = valor;
+  const reparto = (sel?.docs ?? []).map((d) => {
+    const parte = Math.max(0, Math.min(resto, d.saldo));
+    resto -= parte;
+    return { d, parte };
+  });
+  const guardar = () => {
+    if (!loteId) return setError("Elige el lote.");
+    const r = abonoGeneralLote(loteId, valor, fecha);
+    if (typeof r === "string") return setError(r);
+    setMonto("");
+    setLoteId("");
+    setError("");
+    onListo();
+  };
+  if (lotes.length === 0) return <p className="rounded-xl bg-slate-50 px-3 py-4 text-center text-sm text-slate-500 ring-1 ring-slate-100">Ningún lote tiene crédito pendiente.</p>;
+  return (
+    <>
+      <Campo etiqueta="Lote *">
+        <Selector
+          value={loteId}
+          onChange={(v) => {
+            setLoteId(v);
+            setError("");
+          }}
+          placeholder="Elige el lote"
+          opciones={lotes.map((x) => ({ valor: x.l.id, texto: `${x.l.codigo ? `${x.l.codigo} · ` : ""}${nombreLote(x.l)} · debe ${formatoPesos(x.pendiente)}` }))}
+        />
+      </Campo>
+      <div className="grid grid-cols-2 gap-3">
+        <Campo etiqueta="Valor del abono *">
+          <EntradaPesos
+            value={monto}
+            onChange={(v) => {
+              setMonto(v);
+              setError("");
+            }}
+          />
+        </Campo>
+        <Campo etiqueta="Fecha">
+          <Entrada type="date" value={fecha} onChange={setFecha} required />
+        </Campo>
+      </div>
+      {sel && (
+        <div className="rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-100">
+          <p className="mb-1 flex justify-between text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            <span>Facturas del lote</span>
+            <span className="normal-case tracking-normal text-orange-600">pendiente {formatoPesos(sel.pendiente)}</span>
+          </p>
+          {reparto.map(({ d, parte }) => (
+            <div key={`${d.clase}-${d.id}`} className="flex items-baseline justify-between gap-2 py-1 text-xs">
+              <span className="min-w-0 flex-1 truncate text-slate-600">
+                {d.titulo} <span className="text-slate-400">· {formatoFecha(d.fecha, true)}</span>
+              </span>
+              <span className="shrink-0 text-right tabular-nums">
+                {parte > 0 ? <span className="font-semibold text-sky-700">abona {formatoPesos(parte)}</span> : null}
+                <span className="block text-[10px] text-slate-400">
+                  saldo {formatoPesos(d.saldo)}
+                  {parte > 0 ? ` → ${formatoPesos(d.saldo - parte)}` : ""}
+                </span>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
+      <Boton onClick={guardar} disabled={!loteId || !(valor > 0)} className="mt-1 w-full py-3">
+        Abonar
+      </Boton>
+      <p className="-mt-1.5 text-xs leading-snug text-slate-500">Se abona primero a la factura más antigua; lo que sobre pasa a la siguiente. Cada abono queda como gasto en su fecha.</p>
+    </>
   );
 }
 
