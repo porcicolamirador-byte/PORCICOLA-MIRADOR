@@ -26,7 +26,7 @@ import { avisar, confirmar } from "@/components/Dialogo";
 import { puede } from "@/lib/nube";
 import { cargarLogoJpeg, entregarPdf } from "@/lib/pdfFicha";
 import { generarPdfContabilidad } from "@/lib/pdfContabilidad";
-import { exportarContabilidadLote, loteTieneMadre } from "@/lib/exportarLote";
+import { creditoDelLote, exportarContabilidadLote, loteTieneMadre } from "@/lib/exportarLote";
 import { nombreGranjaActual } from "@/lib/sincronizar";
 
 const CATEGORIAS: Record<Movimiento["tipo"], string[]> = {
@@ -212,6 +212,7 @@ export default function ContabilidadPage() {
       </section>
 
       <FacturasCredito version={version} />
+      <CreditoPorLote version={version} />
 
       <ContabilidadLotes version={version} />
 
@@ -532,6 +533,77 @@ function DestinoGasto({ gastoId }: { gastoId: string }) {
       filas={datos.filas}
       resto={datos.resto > 0 && datos.med ? { texto: `Queda sin usar (${fmtCant(datos.med.restante)} ${datos.med.unidad})`, valor: datos.resto } : undefined}
     />
+  );
+}
+
+const ORIGEN_CREDITO = { alimento: "Alimento de facturas", gastos: "Otros gastos del lote", medicamentos: "Medicamentos aplicados" } as const;
+
+/** Cuánto tiene cada lote en crédito: total, abonado y pendiente */
+function CreditoPorLote({ version }: { version: number }) {
+  const [abierto, setAbierto] = useState<string | null>(null);
+  const filas = useMemo(() => {
+    if (version < 0) return [];
+    return leerLotes()
+      .map((l) => ({ l, c: creditoDelLote(l) }))
+      .filter((x) => x.c.total > 0)
+      .map((x) => ({ ...x, pendiente: Math.max(0, x.c.total - x.c.abonado) }))
+      .sort((a, b) => b.pendiente - a.pendiente || (a.l.codigo ?? "").localeCompare(b.l.codigo ?? ""));
+  }, [version]);
+  if (filas.length === 0) return null;
+  const pendiente = filas.reduce((t, f) => t + f.pendiente, 0);
+  return (
+    <section>
+      <h2 className="mb-1.5 flex items-baseline justify-between gap-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+        <span>Crédito por lote</span>
+        <span className="normal-case tracking-normal font-semibold text-orange-600">{formatoPesos(pendiente)}</span>
+      </h2>
+      <SeccionDesplegable titulo="Lo que cada lote tiene en crédito" cantidad={filas.length}>
+        <ul className="divide-y divide-slate-100 bg-white">
+          {filas.map(({ l, c, pendiente: p }) => {
+            const abiertoAqui = abierto === l.id;
+            return (
+              <li key={l.id}>
+                <button type="button" onClick={() => setAbierto(abiertoAqui ? null : l.id)} className="flex w-full items-center gap-2.5 px-3 py-2 text-left active:bg-slate-50">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-slate-900">
+                      {l.codigo ? <span className="text-sky-700">{l.codigo} · </span> : null}
+                      {nombreLote(l)}
+                      {!l.activo ? <span className="font-normal text-slate-400"> · cerrado</span> : null}
+                    </span>
+                    <span className="mt-1 block h-1 overflow-hidden rounded-full bg-slate-100">
+                      <span className="block h-full rounded-full bg-sky-500" style={{ width: `${c.total > 0 ? (c.abonado / c.total) * 100 : 0}%` }} />
+                    </span>
+                    <span className="mt-0.5 block truncate text-[11px] text-slate-500">
+                      En crédito {formatoPesos(c.total)} · abonado {formatoPesos(c.abonado)}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-right">
+                    <span className={`block text-sm font-bold tabular-nums ${p > 0 ? "text-orange-600" : "text-emerald-600"}`}>{p > 0 ? formatoPesos(p) : "Pagado"}</span>
+                    <span className="block text-[10px] text-slate-400">{p > 0 ? "pendiente" : "sin deuda"}</span>
+                  </span>
+                  <span className={`shrink-0 text-slate-300 transition ${abiertoAqui ? "rotate-90" : ""}`}>›</span>
+                </button>
+                {abiertoAqui && (
+                  <div className="mx-3 mb-2.5 rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-100">
+                    {c.partes.map((x) => (
+                      <div key={x.origen} className="flex items-baseline justify-between gap-2 py-1 text-xs">
+                        <span className="text-slate-600">{ORIGEN_CREDITO[x.origen]}</span>
+                        <span className="text-right tabular-nums">
+                          <span className="font-semibold text-slate-800">{formatoPesos(x.total)}</span>
+                          <span className={x.total - x.abonado > 0 ? " text-orange-600" : " text-emerald-600"}>
+                            {x.total - x.abonado > 0 ? ` · debe ${formatoPesos(x.total - x.abonado)}` : " · pagado"}
+                          </span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </SeccionDesplegable>
+    </section>
   );
 }
 

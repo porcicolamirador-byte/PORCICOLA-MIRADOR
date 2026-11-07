@@ -241,16 +241,38 @@ function contabilidadMadre(lote: Lote): { movimientos: MovimientoLotePdf[]; nota
 }
 
 /** Gastos del lote a crédito: total comprado y lo abonado (de sus cuentas por pagar) */
-function creditoDelLote(lote: Lote) {
+export interface CreditoLote {
+  total: number;
+  abonado: number;
+  /** Desglose por origen: alimento de facturas, otros gastos del lote, medicamentos aplicados */
+  partes: { origen: "alimento" | "gastos" | "medicamentos"; total: number; abonado: number }[];
+}
+
+/** Cuánto del costo de un lote salió a crédito y cuánto de eso ya se pagó */
+export function creditoDelLote(lote: Lote): CreditoLote {
   const cuentas = new Map(leerCuentasPorPagar().map((c) => [c.id, c]));
-  let total = 0;
-  let abonado = 0;
+  const pagadoCuenta = (id: string) => {
+    const c = cuentas.get(id);
+    const tot = Number(c?.total) || 0;
+    const ab = (c?.abonos ?? []).reduce((t, a) => t + (Number(a.monto) || 0), 0);
+    return tot > 0 ? Math.min(1, ab / tot) : 0;
+  };
+  const partes = { alimento: { total: 0, abonado: 0 }, gastos: { total: 0, abonado: 0 }, medicamentos: { total: 0, abonado: 0 } };
   // Otros gastos del lote registrados a crédito
   for (const g of lote.gastos ?? []) {
     if (!g.cuentaId) continue;
-    total += Number(g.valor) || 0;
+    const v = Number(g.valor) || 0;
     const c = cuentas.get(g.cuentaId);
-    abonado += Math.min(Number(g.valor) || 0, (c?.abonos ?? []).reduce((t, a) => t + (Number(a.monto) || 0), 0));
+    partes.gastos.total += v;
+    partes.gastos.abonado += Math.min(v, (c?.abonos ?? []).reduce((t, a) => t + (Number(a.monto) || 0), 0));
+  }
+  // Medicamentos aplicados al lote que se compraron a crédito
+  for (const t of leerTratamientos()) {
+    if (t.objetivo !== "lote" || t.objetivoId !== lote.id || !t.gastoId || !cuentas.has(t.gastoId)) continue;
+    const v = Number(t.costo) || 0;
+    if (!(v > 0)) continue;
+    partes.medicamentos.total += v;
+    partes.medicamentos.abonado += v * pagadoCuenta(t.gastoId);
   }
   // Alimento e insumos que salieron de facturas a crédito (reparto por factura, primero en entrar)
   const salidasDelLote = new Set(lote.alimento.map((a) => a.salidaId).filter(Boolean) as string[]);
@@ -260,9 +282,12 @@ function creditoDelLote(lote: Lote) {
       if (parte.factura.pago !== "credito" || !(parte.valor > 0)) continue;
       const totalF = totalFactura(parte.factura);
       const pagado = totalF > 0 ? Math.min(1, abonadoFactura(parte.factura) / totalF) : 0;
-      total += parte.valor;
-      abonado += parte.valor * pagado;
+      partes.alimento.total += parte.valor;
+      partes.alimento.abonado += parte.valor * pagado;
     }
   }
-  return { total: Math.round(total), abonado: Math.round(abonado) };
+  const lista = (["alimento", "gastos", "medicamentos"] as const)
+    .map((origen) => ({ origen, total: Math.round(partes[origen].total), abonado: Math.round(partes[origen].abonado) }))
+    .filter((x) => x.total > 0);
+  return { total: lista.reduce((t, x) => t + x.total, 0), abonado: lista.reduce((t, x) => t + x.abonado, 0), partes: lista };
 }
