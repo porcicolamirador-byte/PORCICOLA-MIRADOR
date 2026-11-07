@@ -19,6 +19,9 @@ import {
   leerTratamientos,
   medicamentosRegistrados,
   useVersionDatos,
+  abonoDeMovimiento,
+  editarAbono,
+  eliminarAbonoMovimiento,
   type Lote,
   type Movimiento,
 } from "@/lib/datos";
@@ -82,8 +85,23 @@ export default function ContabilidadPage() {
   }, [version, mes]);
 
   const eliminar = async (id: string) => {
-    // Genética de una inseminación: se elimina desde el registro de la cerda
     const mov = leerMovimientos().find((m) => m.id === id);
+    // Abono a una factura o gasto a crédito: se quita solo el abono y el saldo vuelve a subir
+    const ab = abonoDeMovimiento(id);
+    if (ab) {
+      if (
+        !(await confirmar({
+          titulo: "Eliminar abono",
+          mensaje: `Se quitará el abono de ${formatoPesos(ab.abono.monto)} a ${ab.titulo}. Su saldo vuelve a quedar pendiente y la contabilidad se recalcula.`,
+          aceptar: "Eliminar",
+          destructivo: true,
+        }))
+      )
+        return;
+      eliminarAbonoMovimiento(id);
+      return;
+    }
+    // Genética de una inseminación: se elimina desde el registro de la cerda
     if (mov?.cerdaId && leerCerdas().some((c) => c.id === mov.cerdaId)) {
       await avisar({
         titulo: "Gasto de una cerda",
@@ -1057,6 +1075,14 @@ function MovimientosPeriodo({ version, mes, onEliminar }: { version: number; mes
   const [modo, setModo] = useState<"mes" | "semana">("mes");
   const [lunes, setLunes] = useState(() => lunesDe(hoy()));
   const [exportando, setExportando] = useState(false);
+  const [editando, setEditando] = useState<string | null>(null);
+  const esAbono = useMemo(() => {
+    void version;
+    const ids = new Set<string>();
+    for (const f of leerFacturas()) for (const a of f.abonos ?? []) if (a.movimientoId) ids.add(a.movimientoId);
+    for (const c of leerCuentasPorPagar()) for (const a of c.abonos) if (a.movimientoId) ids.add(a.movimientoId);
+    return ids;
+  }, [version]);
 
   const movs = useMemo(() => {
     void version;
@@ -1157,6 +1183,18 @@ function MovimientosPeriodo({ version, mes, onEliminar }: { version: number; mes
                   {m.tipo === "ingreso" ? "+" : "−"}
                   {formatoPesos(m.monto)}
                 </span>
+                {esAbono.has(m.id) && (
+                  <button
+                    type="button"
+                    onClick={() => setEditando(m.id)}
+                    aria-label={`Editar ${m.descripcion || m.categoria}`}
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-400 active:bg-sky-50 active:text-sky-700"
+                  >
+                    <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M12.5 4.5l3 3L7 16H4v-3z" />
+                    </svg>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => onEliminar(m.id)}
@@ -1172,6 +1210,47 @@ function MovimientosPeriodo({ version, mes, onEliminar }: { version: number; mes
           </ul>
         )}
       </div>
+      {editando && <EditarAbono movimientoId={editando} onEliminar={() => { const id = editando; setEditando(null); onEliminar(id); }} onCerrar={() => setEditando(null)} />}
     </SeccionDesplegable>
+  );
+}
+
+/** Editar el valor y la fecha de un abono (factura o gasto a crédito) */
+function EditarAbono({ movimientoId, onCerrar, onEliminar }: { movimientoId: string; onCerrar: () => void; onEliminar: () => void }) {
+  const info = useMemo(() => abonoDeMovimiento(movimientoId), [movimientoId]);
+  const [monto, setMonto] = useState(info ? String(Math.round(info.abono.monto)) : "");
+  const [fecha, setFecha] = useState(info?.abono.fecha ?? hoy());
+  const [error, setError] = useState("");
+  if (!info) return null;
+  const valor = Number(monto) || 0;
+  const guardar = (e: FormEvent) => {
+    e.preventDefault();
+    const r = editarAbono(movimientoId, valor, fecha);
+    if (r) return setError(r);
+    onCerrar();
+  };
+  return (
+    <Modal abierta etiqueta="Contabilidad · Abono" titulo="Editar abono" subtitulo={info.titulo} icono="🧾" onCerrar={onCerrar}>
+      <form onSubmit={guardar} className="flex flex-col gap-3.5">
+        <div className="grid grid-cols-2 gap-3">
+          <Campo etiqueta="Valor del abono *">
+            <EntradaPesos value={monto} onChange={(v) => { setMonto(v); setError(""); }} required />
+          </Campo>
+          <Campo etiqueta="Fecha">
+            <Entrada type="date" value={fecha} onChange={setFecha} required />
+          </Campo>
+        </div>
+        <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs ring-1 ring-slate-100">
+          <div className="flex justify-between py-0.5"><span className="text-slate-500">Total del crédito</span><b className="tabular-nums text-slate-800">{formatoPesos(info.total)}</b></div>
+          <div className="flex justify-between py-0.5"><span className="text-slate-500">Saldo sin este abono</span><b className="tabular-nums text-slate-800">{formatoPesos(info.saldoSinEste)}</b></div>
+          <div className="flex justify-between py-0.5"><span className="text-slate-500">Saldo quedaría en</span><b className={`tabular-nums ${info.saldoSinEste - valor > 0 ? "text-orange-600" : "text-sky-700"}`}>{formatoPesos(Math.max(0, info.saldoSinEste - valor))}</b></div>
+        </div>
+        {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
+        <div className="grid grid-cols-2 gap-2">
+          <Boton variante="secundario" onClick={onEliminar}>Eliminar</Boton>
+          <Boton type="submit" disabled={!(valor > 0)}>Guardar</Boton>
+        </div>
+      </form>
+    </Modal>
   );
 }

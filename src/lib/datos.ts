@@ -645,6 +645,58 @@ export const leerCuentasPorPagar = () =>
 export const guardarCuentasPorPagar = (c: CuentaPorPagar[]) => escribir(CLAVES.cuentasPagar, c);
 export const saldoCuenta = (c: CuentaPorPagar) => Math.max(0, (Number(c.total) || 0) - c.abonos.reduce((s, a) => s + (Number(a.monto) || 0), 0));
 
+/** Abono (de factura de Bodega o de gasto a crédito) ligado a un gasto de Contabilidad */
+export interface AbonoDeMovimiento {
+  clase: "factura" | "gasto";
+  docId: string;
+  titulo: string;
+  abono: AbonoFactura;
+  total: number;
+  /** Saldo del crédito sin contar este abono */
+  saldoSinEste: number;
+}
+export function abonoDeMovimiento(movimientoId: string): AbonoDeMovimiento | null {
+  for (const f of leerFacturas()) {
+    const a = (f.abonos ?? []).find((x) => x.movimientoId === movimientoId);
+    if (a) {
+      const total = totalFactura(f);
+      return { clase: "factura", docId: f.id, titulo: `Factura ${f.numero}${f.proveedor ? ` · ${f.proveedor}` : ""}`, abono: a, total, saldoSinEste: Math.max(0, total - abonadoFactura(f) + (Number(a.monto) || 0)) };
+    }
+  }
+  for (const c of leerCuentasPorPagar()) {
+    const a = c.abonos.find((x) => x.movimientoId === movimientoId);
+    if (a) {
+      const total = Number(c.total) || 0;
+      return { clase: "gasto", docId: c.id, titulo: c.factura ? `Factura ${c.factura} · ${c.descripcion}` : c.descripcion, abono: a, total, saldoSinEste: saldoCuenta(c) + (Number(a.monto) || 0) };
+    }
+  }
+  return null;
+}
+
+/** Cambia el valor (y la fecha) de un abono y de su gasto en Contabilidad */
+export function editarAbono(movimientoId: string, monto: number, fecha: string): string | null {
+  const info = abonoDeMovimiento(movimientoId);
+  if (!info) return "No se encontró el abono.";
+  if (!(monto > 0)) return "Escribe el valor del abono.";
+  if (monto > info.saldoSinEste + 0.5) return `El abono no puede ser mayor que lo que se debe (${formatoPesos(info.saldoSinEste)}).`;
+  const cambiar = (abonos: AbonoFactura[]) => abonos.map((a) => (a.id === info.abono.id ? { ...a, monto, fecha } : a));
+  if (info.clase === "factura") guardarFacturas(leerFacturas().map((f) => (f.id === info.docId ? { ...f, abonos: cambiar(f.abonos ?? []) } : f)));
+  else guardarCuentasPorPagar(leerCuentasPorPagar().map((c) => (c.id === info.docId ? { ...c, abonos: cambiar(c.abonos) } : c)));
+  guardarMovimientos(leerMovimientos().map((m) => (m.id === movimientoId ? { ...m, monto, fecha } : m)));
+  return null;
+}
+
+/** Quita un abono y su gasto: el saldo del crédito vuelve a subir */
+export function eliminarAbonoMovimiento(movimientoId: string) {
+  const info = abonoDeMovimiento(movimientoId);
+  if (info) {
+    const quitar = (abonos: AbonoFactura[]) => abonos.filter((a) => a.id !== info.abono.id);
+    if (info.clase === "factura") guardarFacturas(leerFacturas().map((f) => (f.id === info.docId ? { ...f, abonos: quitar(f.abonos ?? []) } : f)));
+    else guardarCuentasPorPagar(leerCuentasPorPagar().map((c) => (c.id === info.docId ? { ...c, abonos: quitar(c.abonos) } : c)));
+  }
+  guardarMovimientos(leerMovimientos().filter((m) => m.id !== movimientoId));
+}
+
 /** Lo abonado a una factura a crédito */
 export const abonadoFactura = (f: Factura) => (f.abonos ?? []).reduce((s, a) => s + (Number(a.monto) || 0), 0);
 /** Lo que falta por pagar (0 en las de contado) */
