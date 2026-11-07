@@ -30,7 +30,7 @@ import { avisar, confirmar } from "@/components/Dialogo";
 import { puede } from "@/lib/nube";
 import { cargarLogoJpeg, entregarPdf } from "@/lib/pdfFicha";
 import { generarPdfContabilidad } from "@/lib/pdfContabilidad";
-import { abonoGeneralLote, creditoDelLote, documentosCreditoLote, editarAnticipo, eliminarAnticipo, exportarContabilidadLote, leerAnticipos, loteTieneMadre, pendienteLoteSin } from "@/lib/exportarLote";
+import { abonoGeneralLote, claveDoc, creditoDelLote, documentosCreditoLote, editarAnticipo, eliminarAnticipo, exportarContabilidadLote, leerAnticipos, loteTieneMadre, type DocCreditoLote } from "@/lib/exportarLote";
 import { nombreGranjaActual } from "@/lib/sincronizar";
 
 const CATEGORIAS: Record<Movimiento["tipo"], string[]> = {
@@ -431,6 +431,7 @@ function AbonoGeneral({ abierta, onListo }: { abierta: boolean; onListo: () => v
   const [monto, setMonto] = useState("");
   const [fecha, setFecha] = useState(hoy());
   const [error, setError] = useState("");
+  const [elegidas, setElegidas] = useState<string[]>([]);
   const lotes = useMemo(() => {
     if (!abierta || version < 0) return [];
     return leerLotes()
@@ -442,16 +443,9 @@ function AbonoGeneral({ abierta, onListo }: { abierta: boolean; onListo: () => v
   }, [abierta, version]);
   const sel = lotes.find((x) => x.l.id === loteId);
   const valor = Number(monto) || 0;
-  // Vista previa del reparto
-  let resto = valor;
-  const reparto = (sel?.docs ?? []).map((d) => {
-    const parte = Math.max(0, Math.min(resto, d.saldo));
-    resto -= parte;
-    return { d, parte };
-  });
   const guardar = () => {
     if (!loteId) return setError("Elige el lote.");
-    const r = abonoGeneralLote(loteId, valor, fecha);
+    const r = abonoGeneralLote(loteId, valor, fecha, undefined, elegidas);
     if (typeof r === "string") return setError(r);
     setMonto("");
     setLoteId("");
@@ -466,6 +460,7 @@ function AbonoGeneral({ abierta, onListo }: { abierta: boolean; onListo: () => v
           value={loteId}
           onChange={(v) => {
             setLoteId(v);
+            setElegidas((lotes.find((x) => x.l.id === v)?.docs ?? []).map(claveDoc));
             setError("");
           }}
           placeholder="Elige el lote"
@@ -486,34 +481,63 @@ function AbonoGeneral({ abierta, onListo }: { abierta: boolean; onListo: () => v
           <Entrada type="date" value={fecha} onChange={setFecha} required />
         </Campo>
       </div>
-      {sel && (
-        <div className="rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-100">
-          <p className="mb-1 flex justify-between text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-            <span>Facturas del lote</span>
-            <span className="normal-case tracking-normal text-orange-600">pendiente {formatoPesos(sel.pendiente)}</span>
-          </p>
-          {reparto.map(({ d, parte }) => (
-            <div key={`${d.clase}-${d.id}`} className="flex items-baseline justify-between gap-2 py-1 text-xs">
-              <span className="min-w-0 flex-1 truncate text-slate-600">
-                {d.titulo} <span className="text-slate-400">· {formatoFecha(d.fecha, true)}</span>
-              </span>
-              <span className="shrink-0 text-right tabular-nums">
-                {parte > 0 ? <span className="font-semibold text-sky-700">abona {formatoPesos(parte)}</span> : null}
-                <span className="block text-[10px] text-slate-400">
-                  saldo {formatoPesos(d.saldo)}
-                  {parte > 0 ? ` → ${formatoPesos(d.saldo - parte)}` : ""}
-                </span>
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
+      {sel && <ElegirFacturas docs={sel.docs} elegidas={elegidas} onCambiar={(e) => { setElegidas(e); setError(""); }} valor={valor} />}
       {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
-      <Boton onClick={guardar} disabled={!loteId || !(valor > 0)} className="mt-1 w-full py-3">
+      <Boton onClick={guardar} disabled={!loteId || !(valor > 0) || elegidas.length === 0} className="mt-1 w-full py-3">
         Registrar anticipo
       </Boton>
-      <p className="-mt-1.5 text-xs leading-snug text-slate-500">Se abona primero a la factura más antigua; lo que sobre pasa a la siguiente. Cada abono queda como gasto en su fecha y el anticipo aparece en "Anticipos".</p>
+      <p className="-mt-1.5 text-xs leading-snug text-slate-500">Marca las facturas que quieres anticipar. Se abona primero a la más antigua de las marcadas; lo que sobre pasa a la siguiente. Cada abono queda como gasto en su fecha.</p>
     </>
+  );
+}
+
+/** Facturas a crédito del lote con casilla para elegir cuáles anticipar y vista previa del reparto */
+function ElegirFacturas({ docs, elegidas, onCambiar, valor }: { docs: DocCreditoLote[]; elegidas: string[]; onCambiar: (e: string[]) => void; valor: number }) {
+  const set = new Set(elegidas);
+  let resto = valor;
+  const pendiente = docs.filter((d) => set.has(claveDoc(d))).reduce((t, d) => t + d.saldo, 0);
+  const todas = docs.length > 0 && docs.every((d) => set.has(claveDoc(d)));
+  return (
+    <div className="rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-100">
+      <div className="mb-1 flex items-baseline justify-between gap-2">
+        <button type="button" onClick={() => onCambiar(todas ? [] : docs.map(claveDoc))} className="text-[11px] font-semibold uppercase tracking-wider text-sky-700">
+          {todas ? "Quitar todas" : "Marcar todas"}
+        </button>
+        <span className="text-[11px] font-semibold text-orange-600">pendiente {formatoPesos(pendiente)}</span>
+      </div>
+      {docs.map((d) => {
+        const clave = claveDoc(d);
+        const marcada = set.has(clave);
+        const parte = marcada ? Math.max(0, Math.min(resto, d.saldo)) : 0;
+        if (marcada) resto -= parte;
+        return (
+          <button
+            key={clave}
+            type="button"
+            onClick={() => onCambiar(marcada ? elegidas.filter((x) => x !== clave) : [...elegidas, clave])}
+            className="flex w-full items-center gap-2.5 py-1.5 text-left text-xs"
+          >
+            <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md ring-1 transition ${marcada ? "bg-sky-600 text-white ring-sky-600" : "bg-white ring-slate-300"}`} aria-hidden="true">
+              {marcada && (
+                <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 10.5l3.2 3L15 7" />
+                </svg>
+              )}
+            </span>
+            <span className={`min-w-0 flex-1 truncate ${marcada ? "text-slate-700" : "text-slate-400"}`}>
+              {d.titulo} <span className="text-slate-400">· {formatoFecha(d.fecha, true)}</span>
+            </span>
+            <span className="shrink-0 text-right tabular-nums">
+              {parte > 0 ? <span className="font-semibold text-sky-700">abona {formatoPesos(parte)}</span> : null}
+              <span className="block text-[10px] text-slate-400">
+                saldo {formatoPesos(d.saldo)}
+                {parte > 0 ? ` → ${formatoPesos(d.saldo - parte)}` : ""}
+              </span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -525,6 +549,7 @@ function ListaAnticipos({ abierta }: { abierta: boolean }) {
   const [monto, setMonto] = useState("");
   const [fecha, setFecha] = useState(hoy());
   const [error, setError] = useState("");
+  const [elegidas, setElegidas] = useState<string[]>([]);
   if (anticipos.length === 0) return <p className="rounded-xl bg-slate-50 px-3 py-4 text-center text-sm text-slate-500 ring-1 ring-slate-100">Aún no has hecho anticipos.</p>;
   const abrir = (id: string) => {
     const a = anticipos.find((x) => x.id === id);
@@ -532,10 +557,11 @@ function ListaAnticipos({ abierta }: { abierta: boolean }) {
     setEditando(editando === id ? null : id);
     setMonto(String(Math.round(a.total)));
     setFecha(a.fecha);
+    setElegidas([...new Set(a.docs)]);
     setError("");
   };
   const guardar = (id: string) => {
-    const r = editarAnticipo(id, Number(monto) || 0, fecha);
+    const r = editarAnticipo(id, Number(monto) || 0, fecha, elegidas);
     if (r) return setError(r);
     setEditando(null);
   };
@@ -558,7 +584,8 @@ function ListaAnticipos({ abierta }: { abierta: boolean }) {
     <ul className="flex flex-col gap-2">
       {anticipos.map((a) => {
         const abiertoAqui = editando === a.id;
-        const maximo = abiertoAqui ? pendienteLoteSin(a.loteId, a.id) : 0;
+        const lote = abiertoAqui ? leerLotes().find((l) => l.id === a.loteId) : undefined;
+        const docsLote = lote ? documentosCreditoLote(lote, a.id) : [];
         return (
           <li key={a.id} className="overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/80">
             <button type="button" onClick={() => abrir(a.id)} className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left active:bg-slate-50">
@@ -591,11 +618,12 @@ function ListaAnticipos({ abierta }: { abierta: boolean }) {
                     <Entrada type="date" value={fecha} onChange={setFecha} required />
                   </Campo>
                 </div>
-                <p className="text-[11px] text-slate-500">Máximo {formatoPesos(maximo)} (lo que debe el lote sin este anticipo). Al guardar se reparte de nuevo desde la factura más antigua.</p>
+                <ElegirFacturas docs={docsLote} elegidas={elegidas} onCambiar={(e) => { setElegidas(e); setError(""); }} valor={Number(monto) || 0} />
+                <p className="text-[11px] text-slate-500">Al guardar se reparte de nuevo desde la más antigua de las facturas marcadas.</p>
                 {error && <p className="text-xs font-medium text-rose-600">{error}</p>}
                 <div className="grid grid-cols-2 gap-2">
                   <Boton variante="secundario" onClick={() => void quitar(a.id)}>Eliminar</Boton>
-                  <Boton onClick={() => guardar(a.id)} disabled={!((Number(monto) || 0) > 0)}>Guardar</Boton>
+                  <Boton onClick={() => guardar(a.id)} disabled={!((Number(monto) || 0) > 0) || elegidas.length === 0}>Guardar</Boton>
                 </div>
               </div>
             )}

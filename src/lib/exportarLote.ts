@@ -310,13 +310,21 @@ export interface DocCreditoLote {
   titulo: string;
   saldo: number;
 }
-export function documentosCreditoLote(lote: Lote): DocCreditoLote[] {
+/** Clave de un documento a crédito: "f:<id>" (factura) o "g:<id>" (gasto) */
+export const claveDoc = (d: Pick<DocCreditoLote, "clase" | "id">) => `${d.clase === "factura" ? "f" : "g"}:${d.id}`;
+
+/** sinAnticipo: calcula los saldos como si ese anticipo no existiera (para editarlo) */
+export function documentosCreditoLote(lote: Lote, sinAnticipo?: string): DocCreditoLote[] {
   const docs = new Map<string, DocCreditoLote>();
   const cuentas = new Map(leerCuentasPorPagar().map((c) => [c.id, c]));
+  const devuelto = (abonos: { monto: number; anticipoId?: string }[] | undefined) =>
+    sinAnticipo ? (abonos ?? []).filter((a) => a.anticipoId === sinAnticipo).reduce((t, a) => t + (Number(a.monto) || 0), 0) : 0;
   const agregarCuenta = (id?: string) => {
     const c = id ? cuentas.get(id) : undefined;
-    if (!c || saldoCuenta(c) <= 0) return;
-    docs.set(`g:${c.id}`, { clase: "gasto", id: c.id, fecha: c.fecha, titulo: c.factura ? `Factura ${c.factura} · ${c.descripcion}` : c.descripcion, saldo: saldoCuenta(c) });
+    if (!c) return;
+    const saldo = saldoCuenta(c) + devuelto(c.abonos);
+    if (saldo <= 0) return;
+    docs.set(`g:${c.id}`, { clase: "gasto", id: c.id, fecha: c.fecha, titulo: c.factura ? `Factura ${c.factura} · ${c.descripcion}` : c.descripcion, saldo });
   };
   for (const g of lote.gastos ?? []) agregarCuenta(g.cuentaId);
   for (const t of leerTratamientos()) if (t.objetivo === "lote" && t.objetivoId === lote.id) agregarCuenta(t.gastoId);
@@ -327,8 +335,9 @@ export function documentosCreditoLote(lote: Lote): DocCreditoLote[] {
       const f = parte.factura;
       if (f.pago !== "credito" || !(parte.valor > 0)) continue;
       const actual = leerFacturas().find((x) => x.id === f.id) ?? f;
-      if (saldoFactura(actual) <= 0) continue;
-      docs.set(`f:${f.id}`, { clase: "factura", id: f.id, fecha: f.fecha, titulo: `Factura ${f.numero}${f.proveedor ? ` · ${f.proveedor}` : ""}`, saldo: saldoFactura(actual) });
+      const saldo = saldoFactura(actual) + devuelto(actual.abonos);
+      if (saldo <= 0) continue;
+      docs.set(`f:${f.id}`, { clase: "factura", id: f.id, fecha: f.fecha, titulo: `Factura ${f.numero}${f.proveedor ? ` · ${f.proveedor}` : ""}`, saldo });
     }
   }
   return [...docs.values()].sort((a, b) => a.fecha.localeCompare(b.fecha) || a.titulo.localeCompare(b.titulo));
@@ -345,14 +354,16 @@ const CATEGORIA_PRODUCTO: Record<string, string> = {
  * de la más antigua a la más nueva; lo que sobra de una pasa a la siguiente.
  * Devuelve el reparto o un texto de error.
  */
-export function abonoGeneralLote(loteId: string, monto: number, fecha: string, anticipoId = nuevoId()): { titulo: string; monto: number }[] | string {
+export function abonoGeneralLote(loteId: string, monto: number, fecha: string, anticipoId = nuevoId(), seleccion?: string[]): { titulo: string; monto: number }[] | string {
   const lote = leerLotes().find((l) => l.id === loteId);
   if (!lote) return "Lote no encontrado.";
   if (!(monto > 0)) return "Escribe el valor del abono.";
-  const docs = documentosCreditoLote(lote);
+  const elegidas = seleccion ? new Set(seleccion) : null;
+  const docs = documentosCreditoLote(lote).filter((d) => !elegidas || elegidas.has(claveDoc(d)));
+  if (elegidas && docs.length === 0) return "Selecciona al menos una factura.";
   const pendiente = docs.reduce((t, d) => t + d.saldo, 0);
   if (pendiente <= 0) return "Este lote no tiene crédito pendiente.";
-  if (monto > pendiente + 0.5) return `El abono es mayor que lo pendiente del lote (${formatoPesos(pendiente)}).`;
+  if (monto > pendiente + 0.5) return `El anticipo es mayor que lo pendiente de ${elegidas ? "las facturas seleccionadas" : "el lote"} (${formatoPesos(pendiente)}).`;
   const etiqueta = lote.codigo || nombreLote(lote);
   const productos = new Map(leerProductos().map((p) => [p.id, p]));
   let facturas = leerFacturas();
@@ -395,6 +406,8 @@ export interface AnticipoLote {
   fecha: string;
   total: number;
   partes: { titulo: string; monto: number }[];
+  /** Facturas a las que abonó (claves f:/g:) */
+  docs: string[];
 }
 
 /** Anticipos hechos (agrupados por sus abonos), los más recientes primero */
@@ -402,7 +415,7 @@ export function leerAnticipos(): AnticipoLote[] {
   const lotes = new Map(leerLotes().map((l) => [l.id, l]));
   const grupos = new Map<string, AnticipoLote>();
   const sumar = (id: string, loteId: string, fecha: string, titulo: string, monto: number) => {
-    const g = grupos.get(id) ?? { id, loteId, lote: "", fecha, total: 0, partes: [] };
+    const g = grupos.get(id) ?? { id, loteId, lote: "", fecha, total: 0, partes: [], docs: [] as string[] };
     if (!g.loteId && loteId) g.loteId = loteId;
     g.total += monto;
     g.partes.push({ titulo, monto });
@@ -418,6 +431,8 @@ export function leerAnticipos(): AnticipoLote[] {
   for (const f of leerFacturas())
     for (const a of f.abonos ?? [])
       if (a.anticipoId && !(a.movimientoId && conMov.has(a.movimientoId))) sumar(a.anticipoId, "", a.fecha, `Factura ${f.numero}${f.proveedor ? ` · ${f.proveedor}` : ""}`, Number(a.monto) || 0);
+  for (const f of leerFacturas()) for (const a of f.abonos ?? []) if (a.anticipoId) grupos.get(a.anticipoId)?.docs.push(`f:${f.id}`);
+  for (const c of leerCuentasPorPagar()) for (const a of c.abonos) if (a.anticipoId) grupos.get(a.anticipoId)?.docs.push(`g:${c.id}`);
   for (const g of grupos.values()) {
     const l = lotes.get(g.loteId);
     g.lote = l ? nombreLote(l) : "Lote";
@@ -433,12 +448,12 @@ export function eliminarAnticipo(id: string) {
 }
 
 /** Cambia el valor o la fecha de un anticipo: se quitan sus abonos y se reparte de nuevo */
-export function editarAnticipo(id: string, monto: number, fecha: string): string | null {
+export function editarAnticipo(id: string, monto: number, fecha: string, seleccion?: string[]): string | null {
   const ant = leerAnticipos().find((a) => a.id === id);
   if (!ant || !ant.loteId) return "No se encontró el anticipo.";
   const antes = { f: leerFacturas(), c: leerCuentasPorPagar(), m: leerMovimientos() };
   eliminarAnticipo(id);
-  const r = abonoGeneralLote(ant.loteId, monto, fecha, id);
+  const r = abonoGeneralLote(ant.loteId, monto, fecha, id, seleccion);
   if (typeof r === "string") {
     guardarFacturas(antes.f);
     guardarCuentasPorPagar(antes.c);
