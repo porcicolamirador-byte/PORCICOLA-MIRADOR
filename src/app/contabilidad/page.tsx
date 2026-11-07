@@ -15,6 +15,9 @@ import {
   leerLotes,
   nombreLote,
   nuevoId,
+  trazabilidadSalidas,
+  leerTratamientos,
+  medicamentosRegistrados,
   useVersionDatos,
   type Lote,
   type Movimiento,
@@ -407,15 +410,133 @@ function cuentasLote(l: Lote, movimientos = leerMovimientos()) {
 
 /* Por pagar a crédito: facturas de Bodega y gastos de Contabilidad con saldo; se abonan aquí */
 type ItemCredito =
-  | { clase: "factura"; id: string; fecha: string; titulo: string; detalle?: string; total: number; saldo: number }
-  | { clase: "gasto"; id: string; fecha: string; titulo: string; detalle?: string; total: number; saldo: number };
+  | { clase: "factura"; id: string; fecha: string; titulo: string; detalle?: string; total: number; saldo: number; lotes?: string[] }
+  | { clase: "gasto"; id: string; fecha: string; titulo: string; detalle?: string; total: number; saldo: number; lotes?: string[] };
+
+/** Lista "a qué lote fue" (o a qué otro destino), con cantidades y valor */
+function ListaDestinos({ titulo, filas, resto }: { titulo: string; filas: { clave: string; destino: string; detalle: string; valor: number }[]; resto?: { texto: string; valor: number } }) {
+  if (filas.length === 0 && !resto) return null;
+  return (
+    <section>
+      <h4 className="mb-1.5 px-1 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">{titulo}</h4>
+      <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200">
+        {filas.map((f) => (
+          <li key={f.clave} className="flex items-center gap-3 px-3.5 py-2.5">
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold text-slate-900">{f.destino}</span>
+              <span className="block truncate text-xs text-slate-500">{f.detalle}</span>
+            </span>
+            <span className="shrink-0 text-sm font-bold tabular-nums text-slate-900">{formatoPesos(f.valor)}</span>
+          </li>
+        ))}
+        {resto && (
+          <li className="flex items-center gap-3 bg-slate-50 px-3.5 py-2.5">
+            <span className="min-w-0 flex-1 text-sm text-slate-600">{resto.texto}</span>
+            <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-600">{formatoPesos(resto.valor)}</span>
+          </li>
+        )}
+      </ul>
+    </section>
+  );
+}
+
+const fmtCant = (n: number) => (Math.round(n * 100) / 100).toLocaleString("es-CO");
+
+/** De una factura de Bodega: a qué lotes (u otros destinos) salió su alimento, por producto */
+function DestinoFactura({ facturaId }: { facturaId: string }) {
+  const version = useVersionDatos();
+  const datos = useMemo(() => {
+    if (version < 0) return null;
+    const factura = leerFacturas().find((f) => f.id === facturaId);
+    if (!factura) return null;
+    const grupos = new Map<string, { destino: string; productos: Map<string, { nombre: string; unidad: string; cantidad: number }>; valor: number }>();
+    let usadoValor = 0;
+    for (const t of trazabilidadSalidas()) {
+      for (const p of t.partes) {
+        if (p.factura.id !== facturaId || !(p.cantidad > 0)) continue;
+        const clave = t.salida.loteId ?? `otro:${t.salida.nota ?? ""}`;
+        const destino = t.lote ? nombreLote(t.lote) : t.salida.loteId ? "Lote eliminado" : t.salida.nota?.trim() || "Otro destino";
+        const g = grupos.get(clave) ?? { destino, productos: new Map(), valor: 0 };
+        const pr = g.productos.get(t.producto.id) ?? { nombre: t.producto.nombre, unidad: t.producto.unidad, cantidad: 0 };
+        pr.cantidad += p.cantidad;
+        g.productos.set(t.producto.id, pr);
+        g.valor += p.valor;
+        usadoValor += p.valor;
+        grupos.set(clave, g);
+      }
+    }
+    const filas = [...grupos.entries()]
+      .map(([clave, g]) => ({
+        clave,
+        destino: g.destino,
+        detalle: [...g.productos.values()].map((p) => `${fmtCant(p.cantidad)} ${p.unidad} de ${p.nombre}`).join(" · "),
+        valor: Math.round(g.valor),
+      }))
+      .sort((a, b) => b.valor - a.valor);
+    const resto = Math.round(totalFactura(factura) - usadoValor);
+    return { filas, resto };
+  }, [version, facturaId]);
+  if (!datos) return null;
+  return (
+    <ListaDestinos
+      titulo="¿A dónde salió?"
+      filas={datos.filas}
+      resto={datos.resto > 0 ? { texto: datos.filas.length ? "Aún en bodega (sin salir)" : "Todavía no ha salido nada de esta factura", valor: datos.resto } : undefined}
+    />
+  );
+}
+
+/** De un gasto a crédito (medicamento): a qué lotes o cerdas se aplicó */
+function DestinoGasto({ gastoId }: { gastoId: string }) {
+  const version = useVersionDatos();
+  const datos = useMemo(() => {
+    if (version < 0) return null;
+    const lotes = leerLotes();
+    const grupos = new Map<string, { destino: string; cantidad: number; unidad: string; valor: number }>();
+    for (const t of leerTratamientos()) {
+      if (t.gastoId !== gastoId || !(Number(t.costo) > 0)) continue;
+      const clave = `${t.objetivo}:${t.objetivoId}`;
+      const l = t.objetivo === "lote" ? lotes.find((x) => x.id === t.objetivoId) : undefined;
+      const destino = t.objetivo === "lote" ? (l ? nombreLote(l) : "Lote eliminado") : `Cerda ${t.objetivoId}`;
+      const g = grupos.get(clave) ?? { destino, cantidad: 0, unidad: "", valor: 0 };
+      g.cantidad += Number(t.cantidadUsada) || 0;
+      g.valor += Number(t.costo) || 0;
+      grupos.set(clave, g);
+    }
+    const med = medicamentosRegistrados().find((m) => m.id === gastoId);
+    return {
+      filas: [...grupos.entries()].map(([clave, g]) => ({ clave, destino: g.destino, detalle: `${fmtCant(g.cantidad)} ${med?.unidad ?? ""} aplicados`.trim(), valor: Math.round(g.valor) })),
+      resto: med ? Math.round(med.restante * med.valorUnitario) : 0,
+      med,
+    };
+  }, [version, gastoId]);
+  if (!datos || (!datos.med && datos.filas.length === 0)) return null;
+  return (
+    <ListaDestinos
+      titulo="¿A dónde se aplicó?"
+      filas={datos.filas}
+      resto={datos.resto > 0 && datos.med ? { texto: `Queda sin usar (${fmtCant(datos.med.restante)} ${datos.med.unidad})`, valor: datos.resto } : undefined}
+    />
+  );
+}
 
 function FacturasCredito({ version }: { version: number }) {
   const items = useMemo<ItemCredito[]>(() => {
     if (version < 0) return [];
+    // Lotes a los que salió el alimento de cada factura
+    const lotesPorFactura = new Map<string, Set<string>>();
+    for (const t of trazabilidadSalidas()) {
+      if (!t.lote) continue;
+      for (const p of t.partes) {
+        if (!(p.cantidad > 0)) continue;
+        const set = lotesPorFactura.get(p.factura.id) ?? new Set<string>();
+        set.add(t.lote.codigo || nombreLote(t.lote));
+        lotesPorFactura.set(p.factura.id, set);
+      }
+    }
     const facturas: ItemCredito[] = leerFacturas()
       .filter((f) => f.pago === "credito" && saldoFactura(f) > 0)
-      .map((f) => ({ clase: "factura", id: f.id, fecha: f.fecha, titulo: `Factura ${f.numero}`, detalle: f.proveedor, total: totalFactura(f), saldo: saldoFactura(f) }));
+      .map((f) => ({ clase: "factura", id: f.id, fecha: f.fecha, titulo: `Factura ${f.numero}`, detalle: f.proveedor, total: totalFactura(f), saldo: saldoFactura(f), lotes: [...(lotesPorFactura.get(f.id) ?? [])] }));
     const gastos: ItemCredito[] = leerCuentasPorPagar()
       .filter((c) => saldoCuenta(c) > 0)
       .map((c) => ({ clase: "gasto", id: c.id, fecha: c.fecha, titulo: c.descripcion, detalle: c.categoria, total: c.total, saldo: saldoCuenta(c) }));
@@ -472,6 +593,7 @@ function FacturasCredito({ version }: { version: number }) {
                     </span>
                     <span className="mt-0.5 block truncate text-[11px] text-slate-500">
                       {i.clase === "factura" ? "Bodega" : "Gasto"} · {formatoFecha(i.fecha, true)} · total {formatoPesos(i.total)}
+                      {i.lotes && i.lotes.length > 0 ? <span className="font-semibold text-sky-700">{` · ${i.lotes.join(", ")}`}</span> : null}
                     </span>
                   </span>
                   <span className="shrink-0 text-right">
@@ -498,6 +620,7 @@ function FacturasCredito({ version }: { version: number }) {
               <span className="text-sm font-medium text-sky-900">Total</span>
               <span className="text-lg font-bold tabular-nums text-sky-900">{formatoPesos(totalFactura(factura))}</span>
             </div>
+            <DestinoFactura facturaId={factura.id} />
             <PagoFactura factura={factura} productos={leerProductos()} />
           </div>
         </Modal>
@@ -516,6 +639,7 @@ function FacturasCredito({ version }: { version: number }) {
               <span className="text-sm font-medium text-sky-900">Total</span>
               <span className="text-lg font-bold tabular-nums text-sky-900">{formatoPesos(cuenta.total)}</span>
             </div>
+            <DestinoGasto gastoId={cuenta.id} />
             <PagoCredito
               credito
               total={cuenta.total}
