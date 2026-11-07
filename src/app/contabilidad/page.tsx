@@ -493,6 +493,7 @@ function DestinoGasto({ gastoId }: { gastoId: string }) {
     if (version < 0) return null;
     const lotes = leerLotes();
     const grupos = new Map<string, { destino: string; cantidad: number; unidad: string; valor: number }>();
+    const detallesLote = new Map<string, string>();
     for (const t of leerTratamientos()) {
       if (t.gastoId !== gastoId || !(Number(t.costo) > 0)) continue;
       const clave = `${t.objetivo}:${t.objetivoId}`;
@@ -503,9 +504,23 @@ function DestinoGasto({ gastoId }: { gastoId: string }) {
       g.valor += Number(t.costo) || 0;
       grupos.set(clave, g);
     }
+    // Gasto registrado directamente en un lote (Engorde → Otro gasto del lote)
+    for (const l of lotes) {
+      for (const g of l.gastos ?? []) {
+        if (g.cuentaId !== gastoId) continue;
+        const clave = `gasto:${l.id}:${g.id}`;
+        grupos.set(clave, { destino: nombreLote(l), cantidad: 0, unidad: "", valor: Number(g.valor) || 0 });
+        detallesLote.set(clave, `${g.descripcion}${g.cantidad ? ` · ${g.cantidad}` : ""} · ${formatoFecha(g.fecha, true)}`);
+      }
+    }
     const med = medicamentosRegistrados().find((m) => m.id === gastoId);
     return {
-      filas: [...grupos.entries()].map(([clave, g]) => ({ clave, destino: g.destino, detalle: `${fmtCant(g.cantidad)} ${med?.unidad ?? ""} aplicados`.trim(), valor: Math.round(g.valor) })),
+      filas: [...grupos.entries()].map(([clave, g]) => ({
+        clave,
+        destino: g.destino,
+        detalle: detallesLote.get(clave) ?? `${fmtCant(g.cantidad)} ${med?.unidad ?? ""} aplicados`.trim(),
+        valor: Math.round(g.valor),
+      })),
       resto: med ? Math.round(med.restante * med.valorUnitario) : 0,
       med,
     };
@@ -513,7 +528,7 @@ function DestinoGasto({ gastoId }: { gastoId: string }) {
   if (!datos || (!datos.med && datos.filas.length === 0)) return null;
   return (
     <ListaDestinos
-      titulo="¿A dónde se aplicó?"
+      titulo={datos.med ? "¿A dónde se aplicó?" : "¿De qué lote es?"}
       filas={datos.filas}
       resto={datos.resto > 0 && datos.med ? { texto: `Queda sin usar (${fmtCant(datos.med.restante)} ${datos.med.unidad})`, valor: datos.resto } : undefined}
     />
@@ -537,9 +552,20 @@ function FacturasCredito({ version }: { version: number }) {
     const facturas: ItemCredito[] = leerFacturas()
       .filter((f) => f.pago === "credito" && saldoFactura(f) > 0)
       .map((f) => ({ clase: "factura", id: f.id, fecha: f.fecha, titulo: `Factura ${f.numero}`, detalle: f.proveedor, total: totalFactura(f), saldo: saldoFactura(f), lotes: [...(lotesPorFactura.get(f.id) ?? [])] }));
+    // Gastos a crédito registrados en un lote (Engorde → Otro gasto) y medicamentos aplicados a lotes
+    const lotesTodos = leerLotes();
+    const lotesPorCuenta = new Map<string, Set<string>>();
+    const sumarLote = (cuentaId: string, l: Lote | undefined) => {
+      if (!l) return;
+      const set = lotesPorCuenta.get(cuentaId) ?? new Set<string>();
+      set.add(l.codigo || nombreLote(l));
+      lotesPorCuenta.set(cuentaId, set);
+    };
+    for (const l of lotesTodos) for (const g of l.gastos ?? []) if (g.cuentaId) sumarLote(g.cuentaId, l);
+    for (const t of leerTratamientos()) if (t.gastoId && t.objetivo === "lote") sumarLote(t.gastoId, lotesTodos.find((l) => l.id === t.objetivoId));
     const gastos: ItemCredito[] = leerCuentasPorPagar()
       .filter((c) => saldoCuenta(c) > 0)
-      .map((c) => ({ clase: "gasto", id: c.id, fecha: c.fecha, titulo: c.descripcion, detalle: c.categoria, total: c.total, saldo: saldoCuenta(c) }));
+      .map((c) => ({ clase: "gasto", id: c.id, fecha: c.fecha, titulo: c.descripcion, detalle: c.categoria, total: c.total, saldo: saldoCuenta(c), lotes: [...(lotesPorCuenta.get(c.id) ?? [])] }));
     return [...facturas, ...gastos].sort((x, y) => x.fecha.localeCompare(y.fecha));
   }, [version]);
   const [abierta, setAbierta] = useState<{ clase: ItemCredito["clase"]; id: string } | null>(null);
