@@ -567,6 +567,8 @@ export interface SalidaBodega {
   nota?: string;
   /** Lote de engorde que consumió el producto */
   loteId?: string;
+  /** Consumo automático de cerdas: cantidad que tocaba ese día (en la unidad del producto) */
+  plan?: number;
 }
 
 /* ═════════════════════ Corrales ═════════════════════ */

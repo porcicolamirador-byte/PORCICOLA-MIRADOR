@@ -141,6 +141,15 @@ function contarCerdas(diaCambio: number) {
   return { gestacion: n.g, preparto: n.pre, lactando: n.lac };
 }
 
+/** Lo que tocaba descontar ese día: el plan guardado o, en salidas antiguas, los kg de la nota */
+function planDe(s: SalidaBodega, kgPorUnidad: number): number | null {
+  if (typeof s.plan === "number") return s.plan;
+  const m = / · ([\d.,]+) kg hoy$/.exec(s.nota ?? "");
+  if (!m) return null;
+  const kg = Number(m[1].replace(",", "."));
+  return Number.isFinite(kg) && kg > 0 ? Math.round((kg / kgPorUnidad) * 1000) / 1000 : null;
+}
+
 const PREFIJOS_AUTO = { gestacion: "auto-cg-", lactancia: "auto-cl-" } as const;
 export const esSalidaAutomatica = (s: SalidaBodega) => s.id.startsWith("auto-cg-") || s.id.startsWith("auto-cl-");
 
@@ -152,7 +161,8 @@ export const esSalidaAutomatica = (s: SalidaBodega) => s.id.startsWith("auto-cg-
  * se registra un parto…), así el descuento es inmediato. Los días pasados ya
  * no cambian; si hubo días sin abrir la app se ponen al día (máximo 60).
  * Cada día tiene un id fijo por alimento para que varios teléfonos no lo
- * dupliquen. Nunca deja la existencia en negativo.
+ * dupliquen. Descuenta completo aunque la existencia quede en negativo; los días
+ * que quedaron cortos se completan cuando entra alimento (p. ej. una factura de fecha anterior).
  */
 export function aplicarDescuentoCerdas() {
   if (typeof window === "undefined") return;
@@ -173,38 +183,39 @@ export function aplicarDescuentoCerdas() {
     const inventario = calcularInventario();
     const todos = leerProductos();
     const cambios = new Map<string, SalidaBodega>();
+    const kgTexto = (n: number) => `${Math.round(n * 10) / 10} kg`;
 
     const descontar = (codigo: string, prefijo: string, kgDia: number, kgHoy: number, nota: string) => {
       const productos = todos.filter((p) => codigoDe(p) === codigo && p.activo !== false);
       const producto = productos.find((p) => p.unidad === "bultos") ?? productos[0];
       if (!producto) return;
       const item = inventario.find((i) => i.producto.id === producto.id);
+      // Sin ninguna compra todavía no se descuenta: al ingresar la primera factura se ponen al día los días que faltan
       if (!item || item.sinCompras) return;
-      const deHoy = porId.get(prefijo + hoyIso);
-      // Lo de hoy se vuelve a calcular: se devuelve lo que ya se había descontado hoy
-      let disponible = item.disponible + (deHoy && deHoy.productoId === producto.id ? Number(deHoy.cantidad) || 0 : 0);
-      const porDia = kgDia / factorKg(producto);
-      const deHoyKg = kgHoy / factorKg(producto);
+      const porDia = Math.round((kgDia / factorKg(producto)) * 1000) / 1000;
+      const deHoyKg = Math.round((kgHoy / factorKg(producto)) * 1000) / 1000;
       for (let f = desde; f <= hoyIso; f = sumarDias(f, 1)) {
         const id = prefijo + f;
         const esHoy = f === hoyIso;
-        if (!esHoy && porId.has(id)) continue;
-        const cantidad = Math.round(Math.max(0, Math.min(esHoy ? deHoyKg : porDia, disponible)) * 1000) / 1000;
-        if (esHoy && deHoy) {
-          if (Math.abs((Number(deHoy.cantidad) || 0) - cantidad) < 0.0005 && deHoy.nota === nota && deHoy.productoId === producto.id) return;
-          cambios.set(id, { ...deHoy, productoId: producto.id, cantidad, nota });
-          return;
-        }
-        if (cantidad <= 0) {
-          if (esHoy) return;
+        const previa = porId.get(id);
+        if (!esHoy && previa) {
+          // Día pasado que quedó corto porque no había existencia: se completa lo que tocaba
+          const plan = planDe(previa, factorKg(producto));
+          if (plan !== null && (Number(previa.cantidad) || 0) < plan - 0.0005) cambios.set(id, { ...previa, cantidad: plan, plan });
           continue;
         }
-        disponible -= cantidad;
-        cambios.set(id, { id, productoId: producto.id, fecha: f, hora: "06:00", cantidad, nota });
+        // Se descuenta completo aunque la existencia quede en negativo: al ingresar la factura (aunque sea de fecha anterior) se compensa
+        const cantidad = esHoy ? deHoyKg : porDia;
+        if (esHoy && previa) {
+          if (Math.abs((Number(previa.cantidad) || 0) - cantidad) < 0.0005 && previa.nota === nota && previa.productoId === producto.id) return;
+          cambios.set(id, { ...previa, productoId: producto.id, cantidad, plan: cantidad, nota });
+          return;
+        }
+        if (cantidad <= 0) continue;
+        cambios.set(id, { id, productoId: producto.id, fecha: f, hora: "06:00", cantidad, plan: cantidad, nota: esHoy ? nota : `${nota.replace(/ · [\d.,]+ kg hoy$/, "")} · ${kgTexto(kgDia)}` });
       }
     };
 
-    const kgTexto = (n: number) => `${Math.round(n * 10) / 10} kg`;
     descontar(
       reglas.codigoGestacion,
       PREFIJOS_AUTO.gestacion,
