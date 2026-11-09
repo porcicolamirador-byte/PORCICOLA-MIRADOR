@@ -94,9 +94,6 @@ export default function AjustesPage() {
 
 
 
-  const resumen = cargado
-    ? { cerdas: leerCerdas().length, lotes: leerLotes().length, movimientos: leerMovimientos().length }
-    : null;
 
   const avisar = (texto: string) => {
     setMensaje(texto);
@@ -168,11 +165,9 @@ export default function AjustesPage() {
           </button>
         </div>
       )}
-      <Tarjeta titulo="Datos">
+      <Tarjeta titulo="Copia de seguridad (backup)">
         <p className="mb-3 text-sm text-slate-500">
-          Los datos de la granja {cargado ? <b className="text-slate-700">{nombreGranjaActual()}</b> : null} se guardan en este teléfono y en la nube
-          {resumen ? ` · ${resumen.cerdas} cerdas, ${resumen.lotes} lotes, ${resumen.movimientos} movimientos` : ""}.
-          Exporta un respaldo con frecuencia.
+          Los datos de la granja {cargado ? <b className="text-slate-700">{nombreGranjaActual()}</b> : null} están en la nube. Exporta un respaldo con frecuencia.
         </p>
         <div className="grid grid-cols-2 gap-2">
           <Boton variante="secundario" onClick={exportar} disabled={!cargado}>Exportar respaldo</Boton>
