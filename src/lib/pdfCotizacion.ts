@@ -79,8 +79,7 @@ export function generarPdfCotizacion(d: DatosPdfCotizacion): Blob {
   let y = 132;
 
   // Cliente y lote
-  const caja = (x: number, w: number, titulo: string, lineas: { t: string; negrita?: boolean }[]) => {
-    const alto = 22 + lineas.length * 13;
+  const caja = (x: number, w: number, titulo: string, lineas: { t: string; negrita?: boolean }[], alto = 22 + lineas.length * 13) => {
     L.rect(x, y, w, alto, P50, 8);
     L.texto(x + 12, y + 16, titulo, 7.5, AZUL_TEXTO, true);
     lineas.forEach((l, i) => L.texto(x + 12, y + 31 + i * 13, l.t, 9.5, l.negrita ? P900 : P700, l.negrita));
@@ -93,14 +92,19 @@ export function generarPdfCotizacion(d: DatosPdfCotizacion): Blob {
     ...(d.cliente.telefono ? [{ t: `Tel. ${d.cliente.telefono}` }] : []),
     ...(d.cliente.ubicacion ? [{ t: d.cliente.ubicacion }] : []),
   ];
-  const lot = [
-    { t: d.lote, negrita: true },
-    { t: `${d.cantidad} lechones · ${d.edadDias} días de edad` },
-    ...(d.pesoPromedio ? [{ t: `Peso promedio: ${d.pesoPromedio}` }] : []),
+  // Vendedor: los datos de la asociación
+  const vend = [
+    ...partir(d.empresa.razonSocial, 36).map((t) => ({ t, negrita: true })),
+    { t: `NIT ${d.empresa.nit}` },
+    { t: `${d.empresa.direccion}, ${d.empresa.municipio}` },
+    { t: `Tel. ${d.empresa.telefonos}` },
+    { t: d.empresa.correo },
   ];
-  const a1 = caja(M, wCaja, "CLIENTE", cli);
-  const a2 = caja(M + wCaja + 10, wCaja, "LOTE", lot);
-  y += Math.max(a1, a2) + 20;
+  // Las dos cajas con la misma altura
+  const alto = 22 + Math.max(cli.length, vend.length) * 13;
+  caja(M, wCaja, "CLIENTE", cli, alto);
+  caja(M + wCaja + 10, wCaja, "VENDEDOR", vend, alto);
+  y += alto + 20;
 
   // Tabla
   const cols = [
