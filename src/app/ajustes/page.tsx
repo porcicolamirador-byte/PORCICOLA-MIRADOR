@@ -23,11 +23,12 @@ import { avisar as mostrarAviso, confirmar } from "@/components/Dialogo";
 import { perfilGuardado, puede, puedeCrearGranjas, type PerfilNube } from "@/lib/nube";
 import {
   EVENTO_SYNC,
-  GRANJA_PRINCIPAL,
   eliminarGranjaActual,
   errorSync,
   estadoSync,
   granjaActual,
+  granjaPrincipal,
+  hacerPrincipal,
   leerGranjas,
   leerMeta,
   nombreGranjaActual,
@@ -336,9 +337,9 @@ function TarjetaGranja({ version, esAdmin, onRespaldo }: { version: number; esAd
   const [confirmacion, setConfirmacion] = useState("");
   const [respaldoHecho, setRespaldoHecho] = useState(false);
   const [error, setError] = useState("");
-  const id = version >= 0 ? granjaActual() : GRANJA_PRINCIPAL;
+  const id = version >= 0 ? granjaActual() : "";
   const actual = version >= 0 ? nombreGranjaActual() : "";
-  const principal = id === GRANJA_PRINCIPAL;
+  const principal = version >= 0 ? id === granjaPrincipal() : true;
   const resumen = version >= 0 ? { cerdas: leerCerdas().length, lotes: leerLotes().length, movimientos: leerMovimientos().length } : null;
 
   const guardarNombre = () => {
@@ -349,6 +350,20 @@ function TarjetaGranja({ version, esAdmin, onRespaldo }: { version: number; esAd
     registrarLog([{ accion: "Modificación", modulo: "Granjas", detalle: `Granja ${actual} ahora se llama ${limpio}` }]);
     notificarCambio();
     setAbierta(null);
+  };
+
+  const volverPrincipal = async () => {
+    if (
+      !(await confirmar({
+        titulo: "Hacer granja principal",
+        mensaje: `${actual} pasará a ser la granja principal: saldrá primero en la lista y no se podrá eliminar. ${leerGranjas().find((g) => g.principal)?.nombre ?? "La principal actual"} pasará a ser una granja normal. Los datos de las dos no cambian.`,
+        aceptar: "Hacer principal",
+      }))
+    )
+      return;
+    hacerPrincipal(id);
+    registrarLog([{ accion: "Modificación", modulo: "Granjas", detalle: `${actual} es ahora la granja principal` }]);
+    notificarCambio();
   };
 
   const eliminar = async () => {
@@ -401,6 +416,11 @@ function TarjetaGranja({ version, esAdmin, onRespaldo }: { version: number; esAd
             </Boton>
           )}
         </div>
+        {esAdmin && !principal && (
+          <Boton variante="secundario" className="mt-2 w-full" onClick={() => void volverPrincipal()}>
+            Hacer granja principal
+          </Boton>
+        )}
         {principal && esAdmin && <p className="mt-2 text-[11px] text-slate-400">La granja principal no se puede eliminar; solo cambiarle el nombre.</p>}
       </Tarjeta>
 

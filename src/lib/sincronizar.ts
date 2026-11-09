@@ -52,16 +52,38 @@ export const seSincroniza = (clave: string) => GLOBALES.has(clave) || LISTAS.has
 
 /* ───────────── Granjas ───────────── */
 
+/**
+ * Granja "base": sus datos se guardan en la nube sin prefijo (es solo cómo se
+ * guardan). Cuál es la granja principal (la primera, la que no se puede eliminar)
+ * se elige aparte: ver granjaPrincipal().
+ */
 export const GRANJA_PRINCIPAL = "mirador";
 const CLAVE_GRANJA_ACTUAL = "granja-actual";
 export interface Granja {
   id: string;
   nombre: string;
   creada?: string;
+  /** Granja principal elegida por el administrador */
+  principal?: boolean;
+  /** Solo para la granja base: se eliminó */
+  eliminada?: boolean;
+}
+
+const listaGranjas = () => leerJson<Granja[]>(CLAVE_GRANJAS, []).filter((g) => g && g.id);
+
+/** Id de la granja principal (por defecto El Mirador) */
+export function granjaPrincipal(): string {
+  const lista = listaGranjas();
+  const elegida = lista.find((g) => g.principal && !g.eliminada);
+  if (elegida) return elegida.id;
+  const base = lista.find((g) => g.id === GRANJA_PRINCIPAL);
+  if (base?.eliminada) return lista.find((g) => g.id !== GRANJA_PRINCIPAL)?.id ?? GRANJA_PRINCIPAL;
+  return GRANJA_PRINCIPAL;
 }
 
 export function granjaActual(): string {
   try {
+    // Sin elegir: los datos "en vivo" del teléfono son los de la granja base
     return localStorage.getItem(CLAVE_GRANJA_ACTUAL) || GRANJA_PRINCIPAL;
   } catch {
     return GRANJA_PRINCIPAL;
@@ -70,10 +92,27 @@ export function granjaActual(): string {
 
 /** Todas las granjas (la principal siempre primero) */
 export function leerGranjas(): Granja[] {
-  const lista = leerJson<Granja[]>(CLAVE_GRANJAS, []).filter((g) => g && g.id);
-  // La principal puede tener otro nombre guardado en la lista
-  const principal = lista.find((g) => g.id === GRANJA_PRINCIPAL)?.nombre?.trim() || "El Mirador";
-  return [{ id: GRANJA_PRINCIPAL, nombre: principal }, ...lista.filter((g) => g.id !== GRANJA_PRINCIPAL)];
+  const lista = listaGranjas();
+  const datosBase = lista.find((g) => g.id === GRANJA_PRINCIPAL);
+  const todas: Granja[] = [
+    ...(datosBase?.eliminada ? [] : [{ id: GRANJA_PRINCIPAL, nombre: datosBase?.nombre?.trim() || "El Mirador" }]),
+    ...lista.filter((g) => g.id !== GRANJA_PRINCIPAL),
+  ];
+  const principal = granjaPrincipal();
+  return todas.map((g) => ({ ...g, principal: g.id === principal })).sort((a, b) => Number(Boolean(b.principal)) - Number(Boolean(a.principal)));
+}
+
+/** El administrador elige cuál es la granja principal */
+export function hacerPrincipal(id: string) {
+  const lista = listaGranjas();
+  const conBase = lista.some((g) => g.id === GRANJA_PRINCIPAL) ? lista : [...lista, { id: GRANJA_PRINCIPAL, nombre: "El Mirador" }];
+  reemplazarClave(
+    CLAVE_GRANJAS,
+    conBase.map((g) => {
+      const { principal: _p, ...resto } = g;
+      return g.id === id ? { ...resto, principal: true } : resto;
+    }),
+  );
 }
 export const nombreGranjaActual = () => leerGranjas().find((g) => g.id === granjaActual())?.nombre ?? "El Mirador";
 
@@ -568,7 +607,8 @@ export function renombrarGranja(id: string, nombre: string) {
  */
 export function eliminarGranjaActual(): boolean {
   const id = granjaActual();
-  if (id === GRANJA_PRINCIPAL) return false;
+  const principal = granjaPrincipal();
+  if (id === principal) return false;
   // 1. Sus datos: se borran registro por registro (la nube los marca como borrados)
   for (const k of clavesLocales()) reemplazarClave(k, null);
   // 2. Lo común a todas las granjas que era de ella
@@ -576,9 +616,16 @@ export function eliminarGranjaActual(): boolean {
   if (Array.isArray(jaulas) && jaulas.some((e) => e?.granja === id)) reemplazarClave(CLAVE_JAULAS, jaulas.filter((e) => e?.granja !== id));
   const existencias = leerJson<{ id?: string }[]>(CLAVE_EXISTENCIAS, []);
   if (Array.isArray(existencias) && existencias.some((e) => e?.id === id)) reemplazarClave(CLAVE_EXISTENCIAS, existencias.filter((e) => e?.id !== id));
-  reemplazarClave(CLAVE_GRANJAS, leerJson<Granja[]>(CLAVE_GRANJAS, []).filter((g) => g && g.id !== id));
+  // La granja base no se quita de la lista: queda marcada como eliminada
+  const lista = listaGranjas();
+  reemplazarClave(
+    CLAVE_GRANJAS,
+    id === GRANJA_PRINCIPAL
+      ? [...lista.filter((g) => g.id !== id), { id, nombre: lista.find((g) => g.id === id)?.nombre ?? "El Mirador", eliminada: true }]
+      : lista.filter((g) => g.id !== id),
+  );
   // 3. Se abre la principal y se borra la copia guardada de la eliminada
-  cambiarGranja(GRANJA_PRINCIPAL);
+  cambiarGranja(principal);
   const prefijo = prefijoGuardado(id);
   const viejas: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
@@ -593,9 +640,9 @@ export function eliminarGranjaActual(): boolean {
 /** Si la granja abierta fue eliminada en otro teléfono, se vuelve a la principal */
 export function revisarGranjaActual(): boolean {
   const id = granjaActual();
-  if (id === GRANJA_PRINCIPAL || leerGranjas().some((g) => g.id === id)) return false;
+  if (leerGranjas().some((g) => g.id === id)) return false;
   // Solo si la lista ya se bajó de la nube (si está vacía puede ser un teléfono nuevo)
   if (!localStorage.getItem(CLAVE_GRANJAS)) return false;
-  cambiarGranja(GRANJA_PRINCIPAL);
+  cambiarGranja(granjaPrincipal());
   return true;
 }
