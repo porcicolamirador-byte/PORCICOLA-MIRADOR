@@ -159,7 +159,6 @@ function NuevaCotizacion({ onCerrar }: { onCerrar: () => void }) {
     setError("");
     const l = lotes.find((x) => x.id === id);
     if (!l) return;
-    setCantidad(String(l.vivos));
     setEdad(String(Math.max(0, diasEntre(l.fechaIngreso, hoy()))));
     const ultimo = [...(l.pesajes ?? [])].sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
     setPeso(ultimo ? String(ultimo.pesoPromedio).replace(".", ",") : "");
@@ -169,7 +168,7 @@ function NuevaCotizacion({ onCerrar }: { onCerrar: () => void }) {
     e.preventDefault();
     if (!lote) return setError("Elige el lote de donde saldrán los lechones.");
     const n = Math.round(num(cantidad));
-    if (!(n > 0)) return setError("Escribe cuántos lechones.");
+    if (!(n > 0)) return setError("Escribe cuántos lechones vas a cotizar.");
     if (n > lote.vivos) return setError(`El lote solo tiene ${lote.vivos} lechones.`);
     if (!(num(valor) > 0)) return setError("Escribe el valor por lechón.");
     if (!nombre.trim()) return setError("Escribe el nombre del cliente.");
@@ -213,8 +212,8 @@ function NuevaCotizacion({ onCerrar }: { onCerrar: () => void }) {
           />
         </Campo>
         <div className="grid grid-cols-3 gap-2">
-          <Campo etiqueta="Cantidad *">
-            <Entrada type="number" inputMode="numeric" value={cantidad} onChange={setCantidad} />
+          <Campo etiqueta="A cotizar *">
+            <Entrada type="number" inputMode="numeric" value={cantidad} onChange={setCantidad} placeholder={lote ? `de ${lote.vivos}` : ""} />
           </Campo>
           <Campo etiqueta="Edad (días)">
             <Entrada type="number" inputMode="numeric" value={edad} onChange={setEdad} />
