@@ -4,7 +4,8 @@ import { registrarLog } from "@/lib/log";
 import { useRef, useState, type ChangeEvent, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
-import { Boton, Chevron, Tarjeta, Interruptor } from "@/components/ui";
+import { Boton, Campo, Chevron, Entrada, Tarjeta, Interruptor } from "@/components/ui";
+import Modal from "@/components/Modal";
 import { aplicarTema, temaGuardado } from "@/lib/tema";
 import DescargaSinConexion from "@/components/DescargaSinConexion";
 import { activarFaceId, CLAVE_FACEID_APP, faceIdActivo } from "@/lib/faceid";
@@ -19,8 +20,23 @@ import {
   useVersionDatos,
 } from "@/lib/datos";
 import { avisar as mostrarAviso, confirmar } from "@/components/Dialogo";
-import { perfilGuardado, puede, type PerfilNube } from "@/lib/nube";
-import { EVENTO_SYNC, errorSync, estadoSync, leerMeta, pendientesPorSubir, reemplazarClave, sincronizar, type EstadoSync } from "@/lib/sincronizar";
+import { perfilGuardado, puede, puedeCrearGranjas, type PerfilNube } from "@/lib/nube";
+import {
+  EVENTO_SYNC,
+  GRANJA_PRINCIPAL,
+  eliminarGranjaActual,
+  errorSync,
+  estadoSync,
+  granjaActual,
+  leerGranjas,
+  leerMeta,
+  nombreGranjaActual,
+  pendientesPorSubir,
+  reemplazarClave,
+  renombrarGranja,
+  sincronizar,
+  type EstadoSync,
+} from "@/lib/sincronizar";
 import { salirDeLaApp } from "@/components/PuertaAcceso";
 
 export default function AjustesPage() {
@@ -101,7 +117,7 @@ export default function AjustesPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `respaldo-el-mirador-${hoy()}.json`;
+    a.download = `respaldo-${nombreGranjaActual().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-")}-${hoy()}.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -160,6 +176,9 @@ export default function AjustesPage() {
         </div>
         <input ref={archivo} type="file" accept="application/json,.json" onChange={importar} className="hidden" />
       </Tarjeta>
+
+      {/* Granja en uso: cambiar nombre o eliminarla */}
+      {perfil && puedeCrearGranjas(perfil) && <TarjetaGranja version={version} esAdmin={perfil.rol === "admin"} onRespaldo={exportar} />}
 
       {/* Descargar la app completa para usarla sin conexión */}
       <DescargaSinConexion />
@@ -298,5 +317,167 @@ function EstadoNube() {
       </div>
       {error && estado !== "sincronizando" && <p className="mt-2 text-xs text-amber-700">{error}</p>}
     </div>
+  );
+}
+
+/* ───────────── Granja en uso ───────────── */
+
+const ICONO_GRANJA_AJ = (
+  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M3 10.5 12 4l9 6.5" />
+    <path d="M5 9.5V20h14V9.5" />
+    <path d="M10 20v-5h4v5" />
+  </svg>
+);
+
+function TarjetaGranja({ version, esAdmin, onRespaldo }: { version: number; esAdmin: boolean; onRespaldo: () => void }) {
+  const [abierta, setAbierta] = useState<"nombre" | "eliminar" | null>(null);
+  const [nombre, setNombre] = useState("");
+  const [confirmacion, setConfirmacion] = useState("");
+  const [respaldoHecho, setRespaldoHecho] = useState(false);
+  const [error, setError] = useState("");
+  const id = version >= 0 ? granjaActual() : GRANJA_PRINCIPAL;
+  const actual = version >= 0 ? nombreGranjaActual() : "";
+  const principal = id === GRANJA_PRINCIPAL;
+  const resumen = version >= 0 ? { cerdas: leerCerdas().length, lotes: leerLotes().length, movimientos: leerMovimientos().length } : null;
+
+  const guardarNombre = () => {
+    const limpio = nombre.trim();
+    if (limpio.length < 2) return setError("Escribe el nombre de la granja.");
+    if (leerGranjas().some((g) => g.id !== id && g.nombre.trim().toLowerCase() === limpio.toLowerCase())) return setError("Ya existe otra granja con ese nombre.");
+    renombrarGranja(id, limpio);
+    registrarLog([{ accion: "Modificación", modulo: "Granjas", detalle: `Granja ${actual} ahora se llama ${limpio}` }]);
+    notificarCambio();
+    setAbierta(null);
+  };
+
+  const eliminar = async () => {
+    if (confirmacion.trim().toLowerCase() !== actual.trim().toLowerCase()) return setError("Escribe el nombre exacto de la granja.");
+    if (
+      !(await confirmar({
+        titulo: `Eliminar ${actual}`,
+        mensaje: `Última confirmación: se borrarán para siempre todos los datos de ${actual} en todos los teléfonos. Esta acción es irreversible.`,
+        aceptar: "Eliminar granja",
+        destructivo: true,
+      }))
+    )
+      return;
+    registrarLog([{ accion: "Eliminación", modulo: "Granjas", detalle: `Granja ${actual} eliminada con todos sus datos` }]);
+    if (eliminarGranjaActual()) window.location.replace("/dashboard");
+  };
+
+  return (
+    <>
+      <Tarjeta titulo="Granja">
+        <div className="mb-3 flex items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-800">{ICONO_GRANJA_AJ}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold text-slate-900">{actual}</span>
+            <span className="block text-xs text-slate-500">{principal ? "Granja principal" : "Granja en uso"}</span>
+          </span>
+        </div>
+        <div className={`grid gap-2 ${esAdmin && !principal ? "grid-cols-2" : "grid-cols-1"}`}>
+          <Boton
+            variante="secundario"
+            onClick={() => {
+              setNombre(actual);
+              setError("");
+              setAbierta("nombre");
+            }}
+          >
+            Cambiar nombre
+          </Boton>
+          {esAdmin && !principal && (
+            <Boton
+              variante="secundario"
+              onClick={() => {
+                setConfirmacion("");
+                setRespaldoHecho(false);
+                setError("");
+                setAbierta("eliminar");
+              }}
+            >
+              Eliminar granja
+            </Boton>
+          )}
+        </div>
+        {principal && esAdmin && <p className="mt-2 text-[11px] text-slate-400">La granja principal no se puede eliminar; solo cambiarle el nombre.</p>}
+      </Tarjeta>
+
+      {abierta === "nombre" && (
+        <Modal abierta etiqueta="Ajustes · Granja" titulo="Cambiar nombre" subtitulo={actual} icono={ICONO_GRANJA_AJ} onCerrar={() => setAbierta(null)}>
+          <form
+            className="flex flex-col gap-3.5"
+            onSubmit={(e) => {
+              e.preventDefault();
+              guardarNombre();
+            }}
+          >
+            <Campo etiqueta="Nombre de la granja">
+              <Entrada
+                value={nombre}
+                onChange={(v) => {
+                  setNombre(v.slice(0, 40));
+                  setError("");
+                }}
+              />
+            </Campo>
+            {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
+            <p className="text-xs text-slate-500">El nombre cambia en todos los teléfonos, en los reportes y en los PDF. Los datos no cambian.</p>
+            <Boton type="submit" className="w-full py-3" disabled={nombre.trim().length < 2 || nombre.trim() === actual}>
+              Guardar
+            </Boton>
+          </form>
+        </Modal>
+      )}
+
+      {abierta === "eliminar" && (
+        <Modal abierta etiqueta="Ajustes · Granja" titulo="Eliminar granja" subtitulo={actual} icono="🗑️" onCerrar={() => setAbierta(null)}>
+          <div className="flex flex-col gap-3.5">
+            <div className="rounded-2xl bg-rose-50 px-3.5 py-3 text-sm leading-snug text-rose-800 ring-1 ring-rose-200">
+              <p className="font-semibold">¡Atención! Esta acción es irreversible.</p>
+              <p className="mt-1">
+                Se borrarán para siempre todos los datos de <b>{actual}</b>
+                {resumen ? ` (${resumen.cerdas} cerdas, ${resumen.lotes} lotes, ${resumen.movimientos} movimientos)` : ""}: cerdas, lotes, bodega, facturas, contabilidad y registros, en este teléfono y en la nube. Sus cerdas también saldrán del mapa de jaulas.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-sky-50 px-3.5 py-3 ring-1 ring-sky-200">
+              <p className="text-sm font-semibold text-sky-900">Haz un respaldo antes de eliminarla</p>
+              <p className="mt-0.5 text-xs leading-snug text-sky-800">
+                Descarga un archivo con todos los datos de esta granja. Si lo necesitas después, puedes crear una granja nueva y restaurarlo con &quot;Importar respaldo&quot;.
+              </p>
+              <Boton
+                variante="secundario"
+                className="mt-2.5 w-full"
+                onClick={() => {
+                  onRespaldo();
+                  setRespaldoHecho(true);
+                }}
+              >
+                {respaldoHecho ? "✓ Respaldo descargado" : "Descargar respaldo"}
+              </Boton>
+            </div>
+            <Campo etiqueta={`Para confirmar, escribe "${actual}"`}>
+              <Entrada
+                value={confirmacion}
+                onChange={(v) => {
+                  setConfirmacion(v);
+                  setError("");
+                }}
+              />
+            </Campo>
+            {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
+            <div className="grid grid-cols-2 gap-2">
+              <Boton variante="secundario" onClick={() => setAbierta(null)}>
+                Cancelar
+              </Boton>
+              <Boton onClick={() => void eliminar()} disabled={confirmacion.trim().toLowerCase() !== actual.trim().toLowerCase()}>
+                Eliminar
+              </Boton>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </>
   );
 }

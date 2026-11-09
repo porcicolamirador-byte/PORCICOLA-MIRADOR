@@ -70,8 +70,10 @@ export function granjaActual(): string {
 
 /** Todas las granjas (la principal siempre primero) */
 export function leerGranjas(): Granja[] {
-  const otras = leerJson<Granja[]>(CLAVE_GRANJAS, []).filter((g) => g && g.id && g.id !== GRANJA_PRINCIPAL);
-  return [{ id: GRANJA_PRINCIPAL, nombre: "El Mirador" }, ...otras];
+  const lista = leerJson<Granja[]>(CLAVE_GRANJAS, []).filter((g) => g && g.id);
+  // La principal puede tener otro nombre guardado en la lista
+  const principal = lista.find((g) => g.id === GRANJA_PRINCIPAL)?.nombre?.trim() || "El Mirador";
+  return [{ id: GRANJA_PRINCIPAL, nombre: principal }, ...lista.filter((g) => g.id !== GRANJA_PRINCIPAL)];
 }
 export const nombreGranjaActual = () => leerGranjas().find((g) => g.id === granjaActual())?.nombre ?? "El Mirador";
 
@@ -548,4 +550,52 @@ export function cambiarGranja(id: string) {
     aplicandoRemoto = false;
   }
   window.dispatchEvent(new Event("storage"));
+}
+
+/** Cambia el nombre de una granja (también la principal) */
+export function renombrarGranja(id: string, nombre: string) {
+  const limpio = nombre.trim().slice(0, 40);
+  if (!limpio) return;
+  const lista = leerJson<Granja[]>(CLAVE_GRANJAS, []).filter((g) => g && g.id);
+  const existe = lista.some((g) => g.id === id);
+  reemplazarClave(CLAVE_GRANJAS, existe ? lista.map((g) => (g.id === id ? { ...g, nombre: limpio } : g)) : [...lista, { id, nombre: limpio }]);
+}
+
+/**
+ * Elimina la granja en uso (no la principal): borra todos sus datos aquí y en la
+ * nube, la quita de la lista, del mapa de jaulas y de las existencias compartidas,
+ * y deja abierta la granja principal.
+ */
+export function eliminarGranjaActual(): boolean {
+  const id = granjaActual();
+  if (id === GRANJA_PRINCIPAL) return false;
+  // 1. Sus datos: se borran registro por registro (la nube los marca como borrados)
+  for (const k of clavesLocales()) reemplazarClave(k, null);
+  // 2. Lo común a todas las granjas que era de ella
+  const jaulas = leerJson<{ granja?: string }[]>(CLAVE_JAULAS, []);
+  if (Array.isArray(jaulas) && jaulas.some((e) => e?.granja === id)) reemplazarClave(CLAVE_JAULAS, jaulas.filter((e) => e?.granja !== id));
+  const existencias = leerJson<{ id?: string }[]>(CLAVE_EXISTENCIAS, []);
+  if (Array.isArray(existencias) && existencias.some((e) => e?.id === id)) reemplazarClave(CLAVE_EXISTENCIAS, existencias.filter((e) => e?.id !== id));
+  reemplazarClave(CLAVE_GRANJAS, leerJson<Granja[]>(CLAVE_GRANJAS, []).filter((g) => g && g.id !== id));
+  // 3. Se abre la principal y se borra la copia guardada de la eliminada
+  cambiarGranja(GRANJA_PRINCIPAL);
+  const prefijo = prefijoGuardado(id);
+  const viejas: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(prefijo)) viejas.push(k);
+  }
+  viejas.forEach((k) => localStorage.removeItem(k));
+  void sincronizar();
+  return true;
+}
+
+/** Si la granja abierta fue eliminada en otro teléfono, se vuelve a la principal */
+export function revisarGranjaActual(): boolean {
+  const id = granjaActual();
+  if (id === GRANJA_PRINCIPAL || leerGranjas().some((g) => g.id === id)) return false;
+  // Solo si la lista ya se bajó de la nube (si está vacía puede ser un teléfono nuevo)
+  if (!localStorage.getItem(CLAVE_GRANJAS)) return false;
+  cambiarGranja(GRANJA_PRINCIPAL);
+  return true;
 }

@@ -18,7 +18,7 @@ import {
   type PerfilNube,
 } from "@/lib/nube";
 import { bloqueoActivo, estaDesbloqueada, largoPinLocal, marcarDesbloqueada, olvidarPinLocal, pinLocalCorrecto, recordarPinLocal, tocarDesbloqueo } from "@/lib/bloqueo";
-import { sincronizar } from "@/lib/sincronizar";
+import { revisarGranjaActual, sincronizar } from "@/lib/sincronizar";
 import { CLAVE_FACEID_APP, desactivarFaceId, faceIdActivo, verificarFaceId } from "@/lib/faceid";
 
 /*
@@ -101,7 +101,15 @@ export default function PuertaAcceso({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!conSesion || !abierta) return;
     // Después de cada sincronización se aplica el descuento diario del alimento de las cerdas
-    const ciclo = () => void sincronizar().finally(aplicarDescuentoCerdas);
+    const ciclo = () =>
+      void sincronizar().finally(() => {
+        // La granja abierta se eliminó en otro teléfono: se vuelve a la principal
+        if (revisarGranjaActual()) {
+          window.location.replace("/dashboard");
+          return;
+        }
+        aplicarDescuentoCerdas();
+      });
     ciclo();
     const t = setInterval(() => {
       if (document.visibilityState === "visible") ciclo();
