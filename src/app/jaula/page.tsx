@@ -263,20 +263,53 @@ export default function JaulaPage() {
     if (Math.abs(t.clientX - p.x) > 10 || Math.abs(t.clientY - p.y) > 10) cancelarPulsacion();
   };
   const activo = arrastre !== null;
+  // Al llevar la cerda al borde del teléfono (y esperar un momento) pasa a la otra área
+  const areaRef = useRef(area);
+  areaRef.current = area;
+  const borde = useRef<{ lado: "izq" | "der"; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const [bordeActivo, setBordeActivo] = useState<"izq" | "der" | null>(null);
   useEffect(() => {
     if (!activo) return;
+    const quitarBorde = () => {
+      if (borde.current) clearTimeout(borde.current.timer);
+      borde.current = null;
+      setBordeActivo(null);
+    };
+    const revisarBorde = (x: number) => {
+      const lado = x < 40 ? "izq" : x > window.innerWidth - 40 ? "der" : null;
+      // Solo hacia donde hay otra área: a la derecha lactancia, a la izquierda gestación
+      const destino = lado === "der" && areaRef.current === "gestacion" ? "lactancia" : lado === "izq" && areaRef.current === "lactancia" ? "gestacion" : null;
+      if (!lado || !destino) return quitarBorde();
+      if (borde.current?.lado === lado) return;
+      quitarBorde();
+      setBordeActivo(lado);
+      borde.current = {
+        lado,
+        timer: setTimeout(() => {
+          setArea(destino);
+          try {
+            navigator.vibrate?.(10);
+          } catch {}
+          // Hay que salir del borde para volver a cambiar
+          borde.current = { lado, timer: setTimeout(() => {}, 0) };
+          setBordeActivo(null);
+        }, 650),
+      };
+    };
     const jaulaEn = (x: number, y: number) => (document.elementFromPoint(x, y)?.closest("[data-jaula]") as HTMLElement | null)?.dataset.jaula ?? null;
     const mover = (e: TouchEvent) => {
       e.preventDefault(); // mientras se arrastra la pantalla no se desplaza
       const t = e.touches[0];
       const a = arrastreRef.current;
       if (!t || !a) return;
+      revisarBorde(t.clientX);
       // Cerca del borde de arriba o de abajo la pantalla se desplaza sola
       if (t.clientY < 90) window.scrollBy(0, -14);
       else if (t.clientY > window.innerHeight - 90) window.scrollBy(0, 14);
       ponerArrastre({ ...a, x: t.clientX, y: t.clientY, sobre: jaulaEn(t.clientX, t.clientY) });
     };
     const soltar = () => {
+      quitarBorde();
       const a = arrastreRef.current;
       ponerArrastre(null);
       setTimeout(() => (sinClick.current = false), 350);
@@ -285,6 +318,7 @@ export default function JaulaPage() {
       asignar(a.sobre, a.cerda, a.granja);
     };
     const cancelar = () => {
+      quitarBorde();
       ponerArrastre(null);
       setTimeout(() => (sinClick.current = false), 350);
     };
@@ -504,6 +538,18 @@ export default function JaulaPage() {
         ))}
       </div>
 
+      {arrastre && (area === "gestacion" || area === "lactancia") && (
+        <div
+          className={`pointer-events-none fixed inset-y-0 z-40 flex w-10 items-center justify-center ${area === "gestacion" ? "right-0" : "left-0"} ${
+            bordeActivo ? "bg-sky-600/90" : "bg-sky-600/25"
+          } transition-colors`}
+          aria-hidden="true"
+        >
+          <span className="whitespace-nowrap text-[11px] font-bold uppercase tracking-wider text-white [writing-mode:vertical-rl]">
+            {area === "gestacion" ? "Lactancia ›" : "‹ Gestación"}
+          </span>
+        </div>
+      )}
       {arrastre && (
         <div
           className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-[130%] rounded-2xl bg-amber-500 px-4 py-2 text-center shadow-xl ring-2 ring-white"
