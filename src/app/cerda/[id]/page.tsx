@@ -1583,25 +1583,29 @@ export default function CerdaDetalle() {
                 )}
                 {tipo === "Destete" && (() => {
                   const lote = loteUltimoParto();
-                  const parto = registros.find((r) => r.tipo === "Parto");
-                  const n = Number(destetadosTxt);
-                  const faltan = lote && destetadosTxt.trim() !== "" && Number.isFinite(n) ? lote.vivos - n : 0;
+                  const vivos = lote ? lote.vivos : registros.find((r) => r.tipo === "Parto")?.vivos;
                   return (
-                    <div>
-                      <label className="block text-sm text-gray-600 font-medium">Lechones destetados *</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={destetadosTxt}
-                        onChange={(e) => setDestetadosTxt(e.target.value.replace(/\D/g, "").slice(0, 3))}
-                        placeholder={lote ? String(lote.vivos) : "Cantidad"}
-                        className="mt-1 w-full max-w-[160px] px-4 py-2 rounded-2xl bg-gray-100 border border-gray-300 text-black outline-none box-border"
-                      />
-                      <p className="mt-1.5 text-xs text-gray-500">
-                        {parto?.vivos != null ? `Nacieron ${parto.vivos} vivos` : ""}
-                        {lote ? `${parto?.vivos != null ? " · " : ""}en ${nombreLote(lote)} hay ${lote.vivos}` : ""}
-                      </p>
-                      {faltan > 0 && <p className="mt-1 text-xs font-semibold text-rose-600">{faltan} quedarán como muertes antes del destete en el lote</p>}
+                    <div className="grid w-full max-w-[320px] grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm text-gray-600 font-medium">Vivos</label>
+                        <input
+                          type="text"
+                          value={vivos != null ? String(vivos) : "—"}
+                          disabled
+                          readOnly
+                          className="mt-1 w-full px-4 py-2 rounded-2xl bg-gray-200 border border-gray-300 text-gray-500 outline-none box-border"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-600 font-medium">Destetados *</label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={destetadosTxt}
+                          onChange={(e) => setDestetadosTxt(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                          className="mt-1 w-full px-4 py-2 rounded-2xl bg-gray-100 border border-gray-300 text-black outline-none box-border"
+                        />
+                      </div>
                     </div>
                   );
                 })()}
