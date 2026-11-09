@@ -435,11 +435,8 @@ function TarjetaGranja({ version, esAdmin, onRespaldo }: { version: number; esAd
         <Modal abierta etiqueta="Ajustes · Granja" titulo="Eliminar granja" subtitulo={actual} icono="🗑️" onCerrar={() => setAbierta(null)}>
           <div className="flex flex-col gap-3.5">
             <div className="rounded-2xl bg-rose-50 px-3.5 py-3 text-sm leading-snug text-rose-800 ring-1 ring-rose-200">
-              <p className="font-semibold">¡Atención! Esta acción es irreversible.</p>
-              <p className="mt-1">
-                Se borrarán para siempre todos los datos de <b>{actual}</b>
-                {resumen ? ` (${resumen.cerdas} cerdas, ${resumen.lotes} lotes, ${resumen.movimientos} movimientos)` : ""}: cerdas, lotes, bodega, facturas, contabilidad y registros, en este teléfono y en la nube. Sus cerdas también saldrán del mapa de jaulas.
-              </p>
+              <p className="font-semibold">¡Advertencia! Esta acción es irreversible.</p>
+              <p className="mt-1">Se eliminarán todos los datos y registros relacionados con esta granja, incluidos los de este teléfono y los sincronizados en la nube.</p>
             </div>
             <div className="rounded-2xl bg-sky-50 px-3.5 py-3 ring-1 ring-sky-200">
               <p className="text-sm font-semibold text-sky-900">Haz un respaldo antes de eliminarla</p>
