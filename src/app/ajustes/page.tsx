@@ -149,15 +149,18 @@ export default function AjustesPage() {
   return (
     <ModuloPage titulo="Ajustes" subtitulo="Respaldo de los datos" icono="⚙️" tono="slate">
       {perfil && <EstadoNube />}
+      {/* Granja en uso: cambiar nombre o eliminarla */}
+      {perfil && puedeCrearGranjas(perfil) && <TarjetaGranja version={version} esAdmin={perfil.rol === "admin"} onRespaldo={exportar} />}
       {perfil && (
         <div className="flex items-center gap-3 rounded-3xl bg-white p-4 ring-1 ring-slate-200/80">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-100 text-base font-bold text-sky-800" aria-hidden="true">
             {perfil.nombre.trim().charAt(0).toUpperCase()}
           </span>
           <span className="min-w-0 flex-1">
+            <span className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400">Tu usuario</span>
             <span className="block truncate text-sm font-semibold text-slate-900">{perfil.nombre}</span>
             <span className="block truncate text-xs text-slate-500">
-              @{perfil.usuario} · {perfil.rol === "admin" ? "Administrador" : "Usuario"}
+              @{perfil.usuario} · {perfil.rol === "admin" ? "Administrador (todas las granjas)" : "Usuario"}
             </span>
           </span>
           <button type="button" onClick={cerrarSesion} className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold text-rose-600 ring-1 ring-rose-200 active:bg-rose-50">
@@ -167,7 +170,7 @@ export default function AjustesPage() {
       )}
       <Tarjeta titulo="Datos">
         <p className="mb-3 text-sm text-slate-500">
-          Los datos se guardan en este teléfono y en la nube
+          Los datos de la granja {cargado ? <b className="text-slate-700">{nombreGranjaActual()}</b> : null} se guardan en este teléfono y en la nube
           {resumen ? ` · ${resumen.cerdas} cerdas, ${resumen.lotes} lotes, ${resumen.movimientos} movimientos` : ""}.
           Exporta un respaldo con frecuencia.
         </p>
@@ -177,9 +180,6 @@ export default function AjustesPage() {
         </div>
         <input ref={archivo} type="file" accept="application/json,.json" onChange={importar} className="hidden" />
       </Tarjeta>
-
-      {/* Granja en uso: cambiar nombre o eliminarla */}
-      {perfil && puedeCrearGranjas(perfil) && <TarjetaGranja version={version} esAdmin={perfil.rol === "admin"} onRespaldo={exportar} />}
 
       {/* Descargar la app completa para usarla sin conexión */}
       <DescargaSinConexion />
@@ -383,12 +383,12 @@ function TarjetaGranja({ version, esAdmin, onRespaldo }: { version: number; esAd
 
   return (
     <>
-      <Tarjeta titulo="Granja">
+      <Tarjeta titulo="Granja abierta">
         <div className="mb-3 flex items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-800">{ICONO_GRANJA_AJ}</span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-semibold text-slate-900">{actual}</span>
-            <span className="block text-xs text-slate-500">{principal ? "Granja principal" : "Granja en uso"}</span>
+            <span className="block text-xs text-slate-500">{principal ? "Estás en esta granja · principal" : "Estás en esta granja"}</span>
           </span>
         </div>
         <div className={`grid gap-2 ${esAdmin && !principal ? "grid-cols-2" : "grid-cols-1"}`}>
