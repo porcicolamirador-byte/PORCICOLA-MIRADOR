@@ -62,9 +62,15 @@ export function generarPdfCotizacion(d: DatosPdfCotizacion): Blob {
     L.imagen(M + 6, 28, 54, 54);
   }
   const xt = d.logo ? M + 80 : M;
-  L.texto(xt, 40, d.empresa.razonSocial.toUpperCase(), 7.5, CELESTE, true);
-  L.texto(xt, 66, "Cotización de lechones", 20, BLANCO, true);
-  L.texto(xt, 84, `NIT ${d.empresa.nit}`, 9, [224, 242, 254], true);
+  // Nombre de la asociación grande (en dos líneas si es largo) y el tipo de documento pequeño
+  const palabras = d.empresa.razonSocial.split(" ");
+  const corte = palabras.length > 3 ? palabras.length - 2 : palabras.length;
+  const linea1 = palabras.slice(0, corte).join(" ");
+  const linea2 = palabras.slice(corte).join(" ");
+  L.texto(xt, linea2 ? 42 : 52, linea1, 15, BLANCO, true);
+  if (linea2) L.texto(xt, 60, linea2, 15, BLANCO, true);
+  L.texto(xt, 78, "Cotización de lechones", 9.5, CELESTE, true);
+  L.texto(xt, 91, `NIT ${d.empresa.nit}`, 8.5, [224, 242, 254]);
   der(L, DER, 40, "COTIZACIÓN", 8, CELESTE, true);
   der(L, DER, 58, `N.º ${d.numero}`, 13, BLANCO, true);
   der(L, DER, 74, `Fecha: ${d.fecha}`, 8.5, [224, 242, 254]);
