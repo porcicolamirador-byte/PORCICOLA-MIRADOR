@@ -250,7 +250,9 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
 
   if (regCelo) {
     const diasDesdeCelo = calcularDiasEntre(regCelo.fecha || hoy, hoy);
-    if (diasDesdeCelo >= 0 && diasDesdeCelo <= 10) {
+    // Si ya se registró la inseminación (o algo posterior como parto o baja) desde ese celo, la alerta desaparece
+    const yaInseminada = historial.some((r) => ['Inseminación', 'Parto', 'Baja'].includes(r.tipo || '') && (r.fecha || '') >= (regCelo.fecha || ''));
+    if (!yaInseminada && diasDesdeCelo >= 0 && diasDesdeCelo <= 10) {
       tareas.push({
         id: cerda.id,
         tipo: 'Inseminación pendiente',
