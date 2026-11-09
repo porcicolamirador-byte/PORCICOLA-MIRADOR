@@ -1589,7 +1589,8 @@ function TarjetaConsumoCerdas() {
   const [abierta, setAbierta] = useState(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const datos = useMemo(() => (version < 0 ? null : calcularConsumoCerdas()), [version]);
-  if (!datos || datos.cerdas === 0) return null;
+  // Se muestra en todas las granjas, aunque no tengan cerdas
+  if (!datos) return null;
   const minimo = [datos.gestacion, datos.lactancia].filter((a) => a.dias !== null).sort((a, b) => a.dias! - b.dias!)[0];
   const revisar = [datos.gestacion, datos.lactancia].some(agotado);
   const naranja = revisar || [datos.gestacion, datos.lactancia].some(porAgotarse);
@@ -1611,7 +1612,8 @@ function TarjetaConsumoCerdas() {
             <span className="shrink-0 rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 ring-1 ring-sky-200">Aprox.</span>
           </span>
           <span className="block truncate text-xs text-slate-500">
-            {datos.cerdas} cerdas · {kgTexto(kgDia)} al día
+            {datos.cerdas} {datos.cerdas === 1 ? "cerda" : "cerdas"} · {kgTexto(kgDia)} hoy
+            {datos.eliminadasHoy > 0 ? ` (incluye lo que comió ${datos.eliminadasHoy === 1 ? "1 eliminada" : `${datos.eliminadasHoy} eliminadas`} hoy)` : ""}
           </span>
         </span>
         <span className="shrink-0 text-right">

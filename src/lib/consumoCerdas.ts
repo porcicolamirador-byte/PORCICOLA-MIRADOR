@@ -123,14 +123,18 @@ function kilosDeHoy(dia: RegistroDia, reglas: { gestacion: number; preparto: num
   // El conteo de cerdas es solo de las que existen ahora; los kilos sí incluyen
   // lo que ya comió hoy una cerda eliminada
   const existentes = new Set(leerCerdas().map((c) => c.id));
+  let eliminadas = 0;
   for (const [id, e] of Object.entries(dia.cerdas)) {
     kg[e.am] += racion[e.am] / 2;
     kg[e.pm] += racion[e.pm] / 2;
-    if (!existentes.has(id)) continue;
+    if (!existentes.has(id)) {
+      if (e.am !== "x" || e.pm !== "x") eliminadas++;
+      continue;
+    }
     // Cuenta en la regla de su estado actual (o la de la mañana si ya no come)
     cerdas[e.pm !== "x" ? e.pm : e.am]++;
   }
-  return { kg, cerdas };
+  return { kg, cerdas, eliminadas };
 }
 
 /** Cerdas en cada regla hoy (día completo, para los días anteriores que faltan) */
@@ -240,7 +244,7 @@ export function aplicarDescuentoCerdas() {
   }
 }
 
-export function calcularConsumoCerdas(): { gestacion: ConsumoAlimentoCerdas; lactancia: ConsumoAlimentoCerdas; cerdas: number } {
+export function calcularConsumoCerdas(): { gestacion: ConsumoAlimentoCerdas; lactancia: ConsumoAlimentoCerdas; cerdas: number; eliminadasHoy: number } {
   const reglas = leerConfig().consumoCerdas;
   const hoyDia = kilosDeHoy(registroDeHoy(reglas.diaCambio, false), reglas);
 
@@ -274,6 +278,8 @@ export function calcularConsumoCerdas(): { gestacion: ConsumoAlimentoCerdas; lac
 
   return {
     cerdas: hoyDia.cerdas.g + hoyDia.cerdas.pre + hoyDia.cerdas.lac,
+    // Eliminadas hoy que alcanzaron a comer (sus kilos de hoy siguen contando)
+    eliminadasHoy: hoyDia.eliminadas,
     gestacion: armar(reglas.codigoGestacion, [
       { texto: "Gestación y otros estados", cerdas: hoyDia.cerdas.g, kg: hoyDia.kg.g },
     ]),
