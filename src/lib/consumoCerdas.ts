@@ -120,13 +120,13 @@ function kilosDeHoy(dia: RegistroDia, reglas: { gestacion: number; preparto: num
   const kg: Record<Regla, number> = { g: 0, pre: 0, lac: 0, x: 0 };
   const cerdas: Record<Regla, number> = { g: 0, pre: 0, lac: 0, x: 0 };
   const racion: Record<Regla, number> = { g: reglas.gestacion, pre: reglas.preparto, lac: reglas.lactancia, x: 0 };
-  // Una cerda eliminada no cuenta (eliminar es para registros de prueba o errores;
-  // la que sale de la granja se registra con "Baja" y esa sí cuenta lo que comió)
+  // El conteo de cerdas es solo de las que existen ahora; los kilos sí incluyen
+  // lo que ya comió hoy una cerda eliminada
   const existentes = new Set(leerCerdas().map((c) => c.id));
   for (const [id, e] of Object.entries(dia.cerdas)) {
-    if (!existentes.has(id)) continue;
     kg[e.am] += racion[e.am] / 2;
     kg[e.pm] += racion[e.pm] / 2;
+    if (!existentes.has(id)) continue;
     // Cuenta en la regla de su estado actual (o la de la mañana si ya no come)
     cerdas[e.pm !== "x" ? e.pm : e.am]++;
   }
