@@ -5,6 +5,7 @@ import PagoFactura, { PagoCredito } from "@/components/PagoFactura";
 import { calcularInventario, codigoDe, leerCerdas, guardarCuentasPorPagar, guardarFacturas, leerCuentasPorPagar, leerFacturas, leerProductos, leerSalidas, saldoCuenta, saldoFactura, totalFactura } from "@/lib/datos";
 import { useMemo, useState, type FormEvent } from "react";
 import ModuloPage from "@/components/ModuloPage";
+import Cotizaciones from "@/components/Cotizaciones";
 import { Boton, Campo, Entrada, IconoMas, SeccionDesplegable, Selector, Vacio, EntradaPesos, CLASE_SELECTOR } from "@/components/ui";
 import SelectorApp from "@/components/SelectorApp";
 import {
@@ -259,6 +260,8 @@ export default function ContabilidadPage() {
       <CreditoPorLote version={version} />
 
       <ContabilidadLotes version={version} />
+
+      <Cotizaciones />
 
       {datos && datos.porCategoria.length > 0 && (
         <SeccionDesplegable titulo="Gastos por categoría" cantidad={datos.porCategoria.length}>

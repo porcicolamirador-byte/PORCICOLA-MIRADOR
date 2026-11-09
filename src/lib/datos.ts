@@ -26,6 +26,7 @@ export const CLAVES = {
   salidas: "bodega-salidas",
   config: "config-granja",
   corrales: "corrales",
+  cotizaciones: "contabilidad-cotizaciones",
 } as const;
 
 /* ═════════════════════ Tipos ═════════════════════ */
@@ -651,6 +652,41 @@ export const leerCuentasPorPagar = () =>
   leer<CuentaPorPagar[]>(CLAVES.cuentasPagar, []).map((c) => ({ ...c, abonos: Array.isArray(c.abonos) ? c.abonos : [] }));
 export const guardarCuentasPorPagar = (c: CuentaPorPagar[]) => escribir(CLAVES.cuentasPagar, c);
 export const saldoCuenta = (c: CuentaPorPagar) => Math.max(0, (Number(c.total) || 0) - c.abonos.reduce((s, a) => s + (Number(a.monto) || 0), 0));
+
+/* ───────────── Cotizaciones de lechones ───────────── */
+
+export interface Cotizacion {
+  id: string;
+  /** COT-0001, COT-0002, … */
+  numero: string;
+  fecha: string;
+  validezDias: number;
+  cliente: { nombre: string; documento?: string; telefono?: string; ubicacion?: string };
+  loteId: string;
+  /** Código y nombre del lote al momento de cotizar */
+  loteTexto: string;
+  cantidad: number;
+  edadDias: number;
+  pesoPromedio?: number;
+  valorUnitario: number;
+  /** Descuento en porcentaje */
+  descuento?: number;
+  condiciones: string;
+  observaciones?: string;
+}
+
+export const leerCotizaciones = () => leer<Cotizacion[]>(CLAVES.cotizaciones, []);
+export const guardarCotizaciones = (c: Cotizacion[]) => escribir(CLAVES.cotizaciones, c);
+export const totalesCotizacion = (c: Pick<Cotizacion, "cantidad" | "valorUnitario" | "descuento">) => {
+  const subtotal = Math.round((Number(c.cantidad) || 0) * (Number(c.valorUnitario) || 0));
+  const descuento = Math.round((subtotal * Math.min(100, Math.max(0, Number(c.descuento) || 0))) / 100);
+  return { subtotal, descuento, total: subtotal - descuento };
+};
+/** Siguiente número de cotización */
+export function siguienteCotizacion(): string {
+  const max = leerCotizaciones().reduce((m, c) => Math.max(m, Number(/COT-(\d+)/.exec(c.numero)?.[1] ?? 0)), 0);
+  return `COT-${String(max + 1).padStart(4, "0")}`;
+}
 
 /** Abono (de factura de Bodega o de gasto a crédito) ligado a un gasto de Contabilidad */
 export interface AbonoDeMovimiento {

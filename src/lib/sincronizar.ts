@@ -27,6 +27,7 @@ const LISTAS = new Set([
   "tratamientos",
   "contabilidad-movimientos",
   "contabilidad-cuentas-pagar",
+  "contabilidad-cotizaciones",
   "monitoreo-lecturas",
   "bioseguridad-visitas",
   "bodega-productos",
