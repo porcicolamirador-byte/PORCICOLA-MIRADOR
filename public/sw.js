@@ -209,23 +209,42 @@ self.addEventListener("activate", (event) => {
 
 /* ─────────────── Peticiones ─────────────── */
 
+/** ¿Es una pantalla (HTML)? Los datos de navegación (RSC) nunca se muestran como pantalla */
+const esHtml = (res) => Boolean(res) && (res.headers.get("Content-Type") || "").includes("text/html");
+
+/** Copia de una pantalla guardada, solo si es HTML (las que no lo son se descartan) */
+async function pantallaGuardada(cache, ruta) {
+  const res = await cache.match(ruta, { ignoreVary: true });
+  if (!res) return undefined;
+  if (esHtml(res)) return res;
+  await cache.delete(ruta, { ignoreVary: true }).catch(() => undefined);
+  return undefined;
+}
+
+/** Los datos de navegación se guardan con una clave propia para no mezclarse con la pantalla */
+const claveRsc = (url) => {
+  const u = new URL(url.href);
+  u.searchParams.set("__rsc", "1");
+  return u.pathname + u.search;
+};
+
 async function plantillaCerda(cache, pathname) {
   if (!pathname.startsWith("/cerda/")) return undefined;
   const ruta = pathname.replace(/\/+$/, "").endsWith("/parto") ? "/cerda/_/parto" : "/cerda/_";
-  return cache.match(ruta, { ignoreVary: true });
+  return pantallaGuardada(cache, ruta);
 }
 
 async function navegar(event, request, url) {
   const cache = await caches.open(CACHE);
   // Con copia guardada de esta versión: se abre al instante (los datos viven en el
   // teléfono) y la pantalla se actualiza en segundo plano para la próxima vez.
-  const copia = await cache.match(url.pathname, { ignoreVary: true, ignoreSearch: true });
+  const copia = await pantallaGuardada(cache, url.pathname);
   if (copia) {
     if (!sinRed()) {
       event.waitUntil(
         fetch(request)
           .then(limpia)
-          .then((res) => (res.ok ? cache.put(url.pathname, res.clone()) : undefined))
+          .then((res) => (res.ok && esHtml(res) ? cache.put(url.pathname, res.clone()) : undefined))
           .catch(() => undefined)
       );
     }
@@ -236,15 +255,15 @@ async function navegar(event, request, url) {
     const res = await limpia(await redConEspera(request));
     // Un error del servidor (500, 502…) se trata como si no hubiera conexión
     if (res.status >= 500) throw new Error(`servidor ${res.status}`);
-    if (res.ok) cache.put(url.pathname, res.clone());
+    if (res.ok && esHtml(res)) cache.put(url.pathname, res.clone());
     return res;
   } catch {
+    const otra = await caches.match(url.pathname, { ignoreVary: true });
     const guardada =
-      (await cache.match(url.pathname, { ignoreVary: true, ignoreSearch: true })) ||
+      (await pantallaGuardada(cache, url.pathname)) ||
       (await plantillaCerda(cache, url.pathname)) ||
-      (await caches.match(url.pathname, { ignoreVary: true, ignoreSearch: true })) ||
-      (await cache.match("/dashboard", { ignoreVary: true })) ||
-      (await caches.match("/dashboard", { ignoreVary: true }));
+      (esHtml(otra) ? otra : undefined) ||
+      (await pantallaGuardada(cache, "/dashboard"));
     if (guardada) return guardada;
     return new Response(
       '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
@@ -273,15 +292,15 @@ async function redPrimero(request) {
 }
 
 /** Copia guardada al instante y actualización en segundo plano */
-async function guardadaYActualizar(event, request) {
+async function guardadaYActualizar(event, request, clave = request) {
   const cache = await caches.open(CACHE);
-  const guardada = await cache.match(request, { ignoreVary: true });
+  const guardada = await cache.match(clave, { ignoreVary: true });
   if (!guardada && sinRed()) return Response.error();
   // Sin copia guardada no se espera a una red lenta: si tarda, Next.js abre la
   // pantalla completa, que sale al instante de la copia guardada
   const red = (guardada ? fetch(request) : redConEspera(request, ESPERA_RSC_MS))
     .then((res) => {
-      if (res.ok && res.type === "basic") return cache.put(request, res.clone()).then(() => res);
+      if (res.ok && res.type === "basic") return cache.put(clave, res.clone()).then(() => res);
       return res;
     })
     .catch(() => undefined);
@@ -328,8 +347,10 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(navegar(event, request, url));
   } else if (url.pathname.startsWith("/_next/static/")) {
     event.respondWith(cachePrimero(request));
-  } else if (esRsc || esImagen) {
-    // Cambiar de pantalla y volver atrás sin esperar a la red
+  } else if (esRsc) {
+    // Cambiar de pantalla y volver atrás sin esperar a la red (clave aparte de la pantalla)
+    event.respondWith(guardadaYActualizar(event, request, claveRsc(url)));
+  } else if (esImagen) {
     event.respondWith(guardadaYActualizar(event, request));
   } else {
     event.respondWith(redPrimero(request));
