@@ -80,7 +80,6 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
   const regVacunacion = historial.find((r) => r.tipo === 'Vacunación');
   const regDesparasitacion = historial.find((r) => r.tipo === 'Desparasitación');
 
-  const tieneParto = historial.some((r) => r.tipo === 'Parto');
   const tieneAborto = historial.some((r) => r.tipo === 'Aborto');
   const tieneNuevaInseminacion = historial.filter((r) => r.tipo === 'Inseminación').length > 1;
 
@@ -89,6 +88,7 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
 
     // Confirmación de gestación en dos momentos; al confirmar, la alerta desaparece
     const ia = regInseminacion as Registro & { confirmacion1?: string; confirmacion2?: string };
+    // Ya parió (o abortó) después de esta inseminación: se quitan las alertas de la gestación
     const cerrada = historial.some((r) => ['Parto', 'Aborto'].includes(r.tipo || '') && (r.fecha || '') >= (ia.fecha || ''));
     const confirmacionAntigua = historial.some((r) => r.tipo === 'Confirmación de Gestación' && (r.fecha || '') >= (ia.fecha || ''));
     for (const c of CONFIRMACIONES_GESTACION) {
@@ -106,7 +106,7 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
       }
     }
 
-    if (diasDesdeInseminacion >= 70 && diasDesdeInseminacion <= 90) {
+    if (!cerrada && diasDesdeInseminacion >= 70 && diasDesdeInseminacion <= 90) {
       tareas.push({
         id: cerda.id,
         tipo: 'Desparasitación gestacional',
@@ -117,7 +117,7 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
       });
     }
 
-    if (diasDesdeInseminacion >= 100 && diasDesdeInseminacion <= 109) {
+    if (!cerrada && diasDesdeInseminacion >= 100 && diasDesdeInseminacion <= 109) {
       tareas.push({
         id: cerda.id,
         tipo: 'Monitoreo preparto',
@@ -128,7 +128,7 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
       });
     }
 
-    if (diasDesdeInseminacion >= 105 && diasDesdeInseminacion <= 110) {
+    if (!cerrada && diasDesdeInseminacion >= 105 && diasDesdeInseminacion <= 110) {
       tareas.push({
         id: cerda.id,
         tipo: 'Traslado a maternidad',
@@ -139,7 +139,7 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
       });
     }
 
-    if (diasDesdeInseminacion >= 110 && diasDesdeInseminacion <= 114) {
+    if (!cerrada && diasDesdeInseminacion >= 110 && diasDesdeInseminacion <= 114) {
       tareas.push({
         id: cerda.id,
         tipo: 'Parto próximo',
@@ -150,7 +150,7 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
       });
     }
 
-    if (diasDesdeInseminacion >= 115 && !tieneParto) {
+    if (!cerrada && diasDesdeInseminacion >= 115) {
       tareas.push({
         id: cerda.id,
         tipo: 'Parto retrasado',
