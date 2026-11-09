@@ -25,6 +25,8 @@ import {
   leerMovimientos,
   loteDelParto,
   lotesDeParto,
+  leerLotes,
+  guardarLotes,
   nombreLote,
   nuevoId,
   useVersionDatos,
@@ -208,6 +210,8 @@ export default function CerdaDetalle() {
   const [tipo, setTipo] = useState("Inseminación");
   const [fecha, setFecha] = useState("");
   const [descripcion, setDescripcion] = useState("");
+  // Destete: lechones que pasan al lote (los demás murieron antes del destete)
+  const [destetadosTxt, setDestetadosTxt] = useState("");
   const [valorGenetica, setValorGenetica] = useState("");
   const [geneticaEnContabilidad, setGeneticaEnContabilidad] = useState(true);
   const [pagoGenetica, setPagoGenetica] = useState<"contado" | "credito">("contado");
@@ -385,6 +389,17 @@ export default function CerdaDetalle() {
     if (r?.movimientoId || r?.cuentaId) quitarGastoGenetica({ movimientoId: r.movimientoId, cuentaId: r.cuentaId });
     // El lote de engorde creado con ese parto se borra junto con el parto
     if (r?.tipo === "Parto" && r.codigoParto) eliminarLotesDePartos({ codigos: [String(r.codigoParto)] });
+    // Al borrar un destete, los lechones que se descontaron vuelven al lote
+    const aj = r?.tipo === "Destete" ? (r.ajusteLote as { loteId: string; cantidad: number } | undefined) : undefined;
+    if (aj) {
+      guardarLotes(
+        leerLotes().map((l) => {
+          if (l.id !== aj.loteId) return l;
+          const i = l.mortalidad.findIndex((m) => m.fecha === r.fecha && m.cantidad === aj.cantidad && m.causa === "Muertes antes del destete");
+          return { ...l, vivos: l.vivos + aj.cantidad, mortalidad: i >= 0 ? l.mortalidad.filter((_, k) => k !== i) : l.mortalidad };
+        }),
+      );
+    }
   }
 
   async function pedirEliminarRegistro(index: number) {
@@ -499,6 +514,12 @@ export default function CerdaDetalle() {
       default:
         return "Activa";
     }
+  }
+
+  /** Lote del último parto (para el destete) */
+  function loteUltimoParto() {
+    const p = registros.find((r) => r.tipo === "Parto");
+    return p?.codigoParto ? loteDelParto(String(p.codigoParto)) : undefined;
   }
 
   function agregarRegistro() {
@@ -644,6 +665,25 @@ export default function CerdaDetalle() {
       nuevo.mensaje = `Destete entre ${f21} y ${f28}`;
     }
 
+    // Destete: cuántos lechones pasan; los que faltan quedan como muertes en el lote
+    let ajusteLote: { loteId: string; cantidad: number } | null = null;
+    if (tipo === "Destete") {
+      const lote = loteUltimoParto();
+      const maximo = lote ? lote.vivos : Number(ultimoParto?.vivos ?? NaN);
+      const n = Number(destetadosTxt);
+      if (destetadosTxt.trim() === "" || !Number.isInteger(n) || n < 0) {
+        mostrarAviso("Ingresa cuántos lechones se destetan");
+        return;
+      }
+      if (Number.isFinite(maximo) && n > maximo) {
+        mostrarAviso(`No pueden ser más de ${maximo} lechones${lote ? ` (los que hay en ${nombreLote(lote)})` : ""}`);
+        return;
+      }
+      nuevo.destetados = n;
+      if (lote && n < lote.vivos) ajusteLote = { loteId: lote.id, cantidad: lote.vivos - n };
+      if (ajusteLote) nuevo.ajusteLote = ajusteLote;
+    }
+
     if (tipo === "Destete" && !ultimoDestete) {
       const d = parsearFechaLocal(fecha);
       d.setDate(d.getDate() + 3);
@@ -660,6 +700,15 @@ export default function CerdaDetalle() {
     }
 
     guardar([nuevo, ...registros]);
+    if (ajusteLote) {
+      const { loteId, cantidad } = ajusteLote;
+      guardarLotes(
+        leerLotes().map((l) =>
+          l.id === loteId ? { ...l, vivos: Math.max(0, l.vivos - cantidad), mortalidad: [...l.mortalidad, { fecha, cantidad, causa: "Muertes antes del destete" }] } : l,
+        ),
+      );
+    }
+    setDestetadosTxt("");
     // La genética comprada ya quedó en esta inseminación
     if (tipo === "Inseminación" && pendiente) guardarPendiente(null);
     setMostrarForm(false);
@@ -1482,7 +1531,13 @@ export default function CerdaDetalle() {
                   <label className="text-sm text-gray-600 font-medium">Tipo de registro</label>
                   <SelectorApp
                     valor={tipo}
-                    onCambiar={setTipo}
+                    onCambiar={(v) => {
+                      setTipo(v);
+                      if (v === "Destete") {
+                        const vivos = loteUltimoParto()?.vivos ?? registros.find((r) => r.tipo === "Parto")?.vivos;
+                        setDestetadosTxt(vivos != null ? String(vivos) : "");
+                      }
+                    }}
                     titulo="Tipo de registro"
                     opciones={["Inseminación", "Compra de genética", "Celo", "Parto", "Destete", "Aborto", "Baja", "Tratamiento", "Evento"].map((t) => ({ valor: t, texto: t }))}
                     className="w-full max-w-[320px]"
@@ -1526,6 +1581,30 @@ export default function CerdaDetalle() {
                     )}
                   </div>
                 )}
+                {tipo === "Destete" && (() => {
+                  const lote = loteUltimoParto();
+                  const parto = registros.find((r) => r.tipo === "Parto");
+                  const n = Number(destetadosTxt);
+                  const faltan = lote && destetadosTxt.trim() !== "" && Number.isFinite(n) ? lote.vivos - n : 0;
+                  return (
+                    <div>
+                      <label className="block text-sm text-gray-600 font-medium">Lechones destetados *</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={destetadosTxt}
+                        onChange={(e) => setDestetadosTxt(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                        placeholder={lote ? String(lote.vivos) : "Cantidad"}
+                        className="mt-1 w-full max-w-[160px] px-4 py-2 rounded-2xl bg-gray-100 border border-gray-300 text-black outline-none box-border"
+                      />
+                      <p className="mt-1.5 text-xs text-gray-500">
+                        {parto?.vivos != null ? `Nacieron ${parto.vivos} vivos` : ""}
+                        {lote ? `${parto?.vivos != null ? " · " : ""}en ${nombreLote(lote)} hay ${lote.vivos}` : ""}
+                      </p>
+                      {faltan > 0 && <p className="mt-1 text-xs font-semibold text-rose-600">{faltan} quedarán como muertes antes del destete en el lote</p>}
+                    </div>
+                  );
+                })()}
                 {(tipo === "Inseminación" || tipo === "Compra de genética") && (
                   <div>
                     <label className="block text-sm text-gray-600 font-medium">Valor de la genética *</label>
