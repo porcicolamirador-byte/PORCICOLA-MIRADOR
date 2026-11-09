@@ -80,8 +80,8 @@ export default function RegistrarParto() {
   const [tipoParto, setTipoParto] = useState("Normal");
   const [asistidoPor, setAsistidoPor] = useState("");
   const [vivos, setVivos] = useState("");
-  const [muertos, setMuertos] = useState("");
-  const [momias, setMomias] = useState("");
+  const [muertos, setMuertos] = useState("0");
+  const [momias, setMomias] = useState("0");
   const [pesoPromedio, setPesoPromedio] = useState("1.25");
   const [pesoCerda, setPesoCerda] = useState("");
   const [estadoSalud, setEstadoSalud] = useState("Buena");
@@ -118,22 +118,21 @@ export default function RegistrarParto() {
       return setError("Revisar Ciclo Reproductivo: faltan días de gestación");
     }
 
-    // Todos los datos son obligatorios, menos "Asistido por"
+    // Obligatorios: hora, tipo, vivos, peso promedio, peso y salud de la cerda.
+    // Muertos y momias (0 si se dejan vacíos), asistido por y observaciones son opcionales
     if (!horaInicio) return setError("Escribe la hora de inicio del parto");
     if (!tipoParto) return setError("Elige el tipo de parto");
     const nVivos = aNumero(vivos);
     if (nVivos === null || nVivos < 0) return setError("Indica cuántos lechones nacieron vivos");
-    const nMuertosTxt = aNumero(muertos);
-    if (nMuertosTxt === null || nMuertosTxt < 0) return setError("Indica cuántos nacieron muertos (0 si ninguno)");
-    const nMomiasTxt = aNumero(momias);
-    if (nMomiasTxt === null || nMomiasTxt < 0) return setError("Indica cuántas momias hubo (0 si ninguna)");
+    const nMuertosTxt = muertos.trim() === "" ? 0 : aNumero(muertos);
+    if (nMuertosTxt === null || nMuertosTxt < 0) return setError("Revisa la cantidad de muertos");
+    const nMomiasTxt = momias.trim() === "" ? 0 : aNumero(momias);
+    if (nMomiasTxt === null || nMomiasTxt < 0) return setError("Revisa la cantidad de momias");
     const nPeso = aNumero(pesoPromedio);
     if (nPeso === null || !(nPeso > 0)) return setError("Escribe el peso promedio de los lechones");
-    if (!observacionesLechones.trim()) return setError("Escribe las observaciones de los lechones");
     const nPesoCerda = aNumero(pesoCerda);
     if (nPesoCerda === null || !(nPesoCerda > 0)) return setError("Escribe el peso de la cerda");
     if (!estadoSalud) return setError("Elige el estado de salud de la cerda");
-    if (!observaciones.trim()) return setError("Escribe las observaciones del parto");
     const nMuertos = Math.max(0, nMuertosTxt);
     const nMomias = Math.max(0, nMomiasTxt);
 
@@ -240,11 +239,11 @@ export default function RegistrarParto() {
                 <input type="tel" inputMode="numeric" value={vivos}
                   onChange={(e) => { setVivos(e.target.value.replace(/\D/g, "")); setError(""); }} className={inputBase} />
               </Campo>
-              <Campo etiqueta="Muertos *">
+              <Campo etiqueta="Muertos">
                 <input type="tel" inputMode="numeric" value={muertos}
                   onChange={(e) => setMuertos(e.target.value.replace(/\D/g, ""))} className={inputBase} />
               </Campo>
-              <Campo etiqueta="Momias *">
+              <Campo etiqueta="Momias">
                 <input type="tel" inputMode="numeric" value={momias}
                   onChange={(e) => setMomias(e.target.value.replace(/\D/g, ""))} className={inputBase} />
               </Campo>
@@ -272,7 +271,7 @@ export default function RegistrarParto() {
               </div>
             </div>
             <div className="mt-3">
-              <Campo etiqueta="Observaciones de los lechones *">
+              <Campo etiqueta="Observaciones de los lechones">
                 <textarea value={observacionesLechones} onChange={(e) => setObservacionesLechones(e.target.value)}
                   placeholder="Tamaño, vitalidad, malformaciones…"
                   className="h-20 w-full resize-none rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-base outline-none focus:ring-2 focus:ring-sky-200" />
@@ -291,7 +290,7 @@ export default function RegistrarParto() {
               </Campo>
             </div>
             <div className="mt-3">
-              <Campo etiqueta="Observaciones del parto *">
+              <Campo etiqueta="Observaciones del parto">
                 <textarea value={observaciones} onChange={(e) => setObservaciones(e.target.value)}
                   placeholder="Duración, complicaciones, medicamentos…"
                   className="h-20 w-full resize-none rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-base outline-none focus:ring-2 focus:ring-sky-200" />
