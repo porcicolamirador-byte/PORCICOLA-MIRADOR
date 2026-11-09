@@ -1612,8 +1612,7 @@ function TarjetaConsumoCerdas() {
             <span className="shrink-0 rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 ring-1 ring-sky-200">Aprox.</span>
           </span>
           <span className="block truncate text-xs text-slate-500">
-            {datos.cerdas} {datos.cerdas === 1 ? "cerda" : "cerdas"} · {kgTexto(kgDia)} hoy
-            {datos.eliminadasHoy > 0 ? ` (incluye lo que comió ${datos.eliminadasHoy === 1 ? "1 eliminada" : `${datos.eliminadasHoy} eliminadas`} hoy)` : ""}
+            {datos.cerdas} {datos.cerdas === 1 ? "cerda" : "cerdas"} · {kgTexto(kgDia)} al día
           </span>
         </span>
         <span className="shrink-0 text-right">
@@ -1645,7 +1644,7 @@ function TarjetaConsumoCerdas() {
 }
 
 /** El alimento llegó a 0 en bodega: se revisa (depende de la condición corporal de cada cerda) */
-const agotado = (a: ConsumoAlimentoCerdas) => a.existenciaKg !== null && a.existenciaKg <= 0.01;
+const agotado = (a: ConsumoAlimentoCerdas) => a.kgDia > 0 && a.existenciaKg !== null && a.existenciaKg <= 0.01;
 /** Queda para unos 2 días o menos: se avisa en naranja */
 const porAgotarse = (a: ConsumoAlimentoCerdas) => a.dias !== null && a.dias <= 2;
 

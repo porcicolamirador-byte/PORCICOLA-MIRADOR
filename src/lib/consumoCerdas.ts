@@ -276,16 +276,18 @@ export function calcularConsumoCerdas(): { gestacion: ConsumoAlimentoCerdas; lac
     };
   };
 
+  // Al día, al mes y cuánto alcanza: con las cerdas que hay ahora y su estado actual
+  // (lo de hoy de una cerda eliminada o dada de baja ya no cuenta para lo que viene)
+  const n = contarCerdas(reglas.diaCambio);
   return {
-    cerdas: hoyDia.cerdas.g + hoyDia.cerdas.pre + hoyDia.cerdas.lac,
-    // Eliminadas hoy que alcanzaron a comer (sus kilos de hoy siguen contando)
+    cerdas: n.gestacion + n.preparto + n.lactando,
     eliminadasHoy: hoyDia.eliminadas,
     gestacion: armar(reglas.codigoGestacion, [
-      { texto: "Gestación y otros estados", cerdas: hoyDia.cerdas.g, kg: hoyDia.kg.g },
+      { texto: "Gestación y otros estados", cerdas: n.gestacion, kg: n.gestacion * reglas.gestacion },
     ]),
     lactancia: armar(reglas.codigoLactancia, [
-      { texto: `Pre-parto (día ${reglas.diaCambio} al parto)`, cerdas: hoyDia.cerdas.pre, kg: hoyDia.kg.pre },
-      { texto: "Lactancia (parto al destete)", cerdas: hoyDia.cerdas.lac, kg: hoyDia.kg.lac },
+      { texto: `Pre-parto (día ${reglas.diaCambio} al parto)`, cerdas: n.preparto, kg: n.preparto * reglas.preparto },
+      { texto: "Lactancia (parto al destete)", cerdas: n.lactando, kg: n.lactando * reglas.lactancia },
     ]),
   };
 }
