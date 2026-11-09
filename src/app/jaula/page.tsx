@@ -7,7 +7,7 @@
  * La jaula queda guardada en la ficha de la cerda (campo "Jaula").
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type TouchEvent as ToqueReact } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import Modal from "@/components/Modal";
@@ -218,6 +218,87 @@ export default function JaulaPage() {
     setElegida(cerdaOrigen && datos?.porJaula.get(codigo)?.c.id !== cerdaOrigen ? cerdaOrigen : "");
   };
 
+  /*
+   * Arrastrar una cerda: mantener presionada su jaula (medio segundo) y, sin soltar,
+   * llevarla a una jaula libre. Las ocupadas se marcan en rojo y no la reciben.
+   */
+  type Arrastre = { cerda: string; granja: string; desde: string; x: number; y: number; sobre: string | null };
+  const [arrastre, setArrastre] = useState<Arrastre | null>(null);
+  const arrastreRef = useRef<Arrastre | null>(null);
+  const pulsacion = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null);
+  const sinClick = useRef(false);
+  const ponerArrastre = (a: Arrastre | null) => {
+    arrastreRef.current = a;
+    setArrastre(a);
+  };
+  const cancelarPulsacion = () => {
+    if (pulsacion.current) clearTimeout(pulsacion.current.timer);
+    pulsacion.current = null;
+  };
+  const iniciarPulsacion = (e: ToqueReact, codigo: string) => {
+    const x = datos?.porJaula.get(codigo);
+    if (!x || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    cancelarPulsacion();
+    pulsacion.current = {
+      x: t.clientX,
+      y: t.clientY,
+      timer: setTimeout(() => {
+        const p = pulsacion.current;
+        pulsacion.current = null;
+        if (!p) return;
+        sinClick.current = true;
+        try {
+          navigator.vibrate?.(15);
+        } catch {}
+        ponerArrastre({ cerda: x.c.id, granja: x.granja, desde: codigo, x: p.x, y: p.y, sobre: codigo });
+      }, 450),
+    };
+  };
+  const moverPulsacion = (e: ToqueReact) => {
+    const p = pulsacion.current;
+    if (!p) return;
+    const t = e.touches[0];
+    // Si el dedo se mueve antes de tiempo es un scroll: no se arrastra
+    if (Math.abs(t.clientX - p.x) > 10 || Math.abs(t.clientY - p.y) > 10) cancelarPulsacion();
+  };
+  const activo = arrastre !== null;
+  useEffect(() => {
+    if (!activo) return;
+    const jaulaEn = (x: number, y: number) => (document.elementFromPoint(x, y)?.closest("[data-jaula]") as HTMLElement | null)?.dataset.jaula ?? null;
+    const mover = (e: TouchEvent) => {
+      e.preventDefault(); // mientras se arrastra la pantalla no se desplaza
+      const t = e.touches[0];
+      const a = arrastreRef.current;
+      if (!t || !a) return;
+      // Cerca del borde de arriba o de abajo la pantalla se desplaza sola
+      if (t.clientY < 90) window.scrollBy(0, -14);
+      else if (t.clientY > window.innerHeight - 90) window.scrollBy(0, 14);
+      ponerArrastre({ ...a, x: t.clientX, y: t.clientY, sobre: jaulaEn(t.clientX, t.clientY) });
+    };
+    const soltar = () => {
+      const a = arrastreRef.current;
+      ponerArrastre(null);
+      setTimeout(() => (sinClick.current = false), 350);
+      if (!a || !a.sobre || a.sobre === a.desde) return;
+      if (datos?.porJaula.has(a.sobre)) return; // ocupada: no se mueve
+      asignar(a.sobre, a.cerda, a.granja);
+    };
+    const cancelar = () => {
+      ponerArrastre(null);
+      setTimeout(() => (sinClick.current = false), 350);
+    };
+    document.addEventListener("touchmove", mover, { passive: false });
+    document.addEventListener("touchend", soltar);
+    document.addEventListener("touchcancel", cancelar);
+    return () => {
+      document.removeEventListener("touchmove", mover);
+      document.removeEventListener("touchend", soltar);
+      document.removeEventListener("touchcancel", cancelar);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activo]);
+
   const ocupante = jaulaSel ? datos?.porJaula.get(jaulaSel) : undefined;
 
   // Pantalla inicial: los dos módulos
@@ -360,7 +441,7 @@ export default function JaulaPage() {
         onTouchEnd={(e) => {
           const ini = toque.current;
           toque.current = null;
-          if (!ini) return;
+          if (!ini || sinClick.current || arrastreRef.current) return;
           const t = e.changedTouches[0];
           const dx = t.clientX - ini.x;
           const dy = t.clientY - ini.y;
@@ -382,9 +463,26 @@ export default function JaulaPage() {
                   <li key={codigo}>
                     <button
                       type="button"
-                      onClick={() => abrirJaula(codigo)}
+                      data-jaula={codigo}
+                      onClick={() => {
+                        if (sinClick.current) return;
+                        abrirJaula(codigo);
+                      }}
+                      onTouchStart={(e) => iniciarPulsacion(e, codigo)}
+                      onTouchMove={moverPulsacion}
+                      onTouchEnd={cancelarPulsacion}
+                      onContextMenu={(e) => e.preventDefault()}
+                      style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}
                       className={`flex w-full items-center gap-2 rounded-xl px-2.5 text-left transition active:scale-[0.98] ${grande ? "h-20" : "h-10"} ${
-                        x ? "bg-amber-50 ring-1 ring-amber-200" : "border border-dashed border-slate-200 bg-slate-50"
+                        arrastre && arrastre.sobre === codigo && codigo !== arrastre.desde
+                          ? x
+                            ? "bg-rose-50 ring-2 ring-rose-400"
+                            : "bg-emerald-50 ring-2 ring-emerald-500"
+                          : arrastre && arrastre.desde === codigo
+                            ? "border border-dashed border-amber-300 bg-amber-50/40 opacity-50"
+                            : x
+                              ? "bg-amber-50 ring-1 ring-amber-200"
+                              : "border border-dashed border-slate-200 bg-slate-50"
                       }`}
                     >
                       <span className={`shrink-0 font-bold tabular-nums text-slate-400 ${grande ? "text-xs" : "text-[10px]"}`}>{codigo}</span>
@@ -405,6 +503,19 @@ export default function JaulaPage() {
           </section>
         ))}
       </div>
+
+      {arrastre && (
+        <div
+          className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-[130%] rounded-2xl bg-amber-500 px-4 py-2 text-center shadow-xl ring-2 ring-white"
+          style={{ left: arrastre.x, top: arrastre.y }}
+          aria-hidden="true"
+        >
+          <p className="arete-id text-lg font-black tabular-nums leading-tight text-white">{arrastre.cerda}</p>
+          <p className="text-[10px] font-semibold text-amber-50">
+            {arrastre.sobre && arrastre.sobre !== arrastre.desde ? (datos?.porJaula.has(arrastre.sobre) ? `${arrastre.sobre} ocupada` : `→ ${arrastre.sobre}`) : `desde ${arrastre.desde}`}
+          </p>
+        </div>
+      )}
 
       {jaulaSel && (() => {
         // Trasladar: de gestación se pasa a lactancia y de lactancia a gestación
