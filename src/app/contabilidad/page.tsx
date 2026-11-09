@@ -82,7 +82,11 @@ export default function ContabilidadPage() {
         .reduce<Record<string, number>>((acc, m) => ({ ...acc, [m.categoria]: (acc[m.categoria] ?? 0) + m.monto }), {})
     ).sort((a, b) => b[1] - a[1]);
     // Lo comprado a crédito no cuenta hasta que se paga: cada abono entra como gasto
-    return { movs, ingresos, gastos, porCategoria };
+    // Balance general: todos los movimientos de la granja, de todos los meses
+    const todos = leerMovimientos();
+    const ingresosTotal = todos.filter((m) => m.tipo === "ingreso").reduce((s, m) => s + m.monto, 0);
+    const gastosTotal = todos.filter((m) => m.tipo === "gasto").reduce((s, m) => s + m.monto, 0);
+    return { movs, ingresos, gastos, porCategoria, ingresosTotal, gastosTotal };
   }, [version, mes]);
 
   const eliminar = async (id: string) => {
@@ -228,6 +232,27 @@ export default function ContabilidadPage() {
             </div>
           ))}
         </div>
+        {/* Balance general: desde el primer movimiento hasta hoy */}
+        {datos && (() => {
+          const general = datos.ingresosTotal - datos.gastosTotal;
+          return (
+            <>
+              <p className="border-t border-slate-100 bg-slate-50 px-3 pt-2 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Balance general</p>
+              <div className="grid grid-cols-3 divide-x divide-slate-100 bg-slate-50">
+                {[
+                  { t: "Ingresos", v: formatoPesos(datos.ingresosTotal), c: "text-sky-700" },
+                  { t: "Gastos", v: formatoPesos(datos.gastosTotal), c: "text-slate-900" },
+                  { t: "Balance", v: formatoPesos(general), c: general >= 0 ? "text-sky-700" : "text-rose-600" },
+                ].map((x) => (
+                  <div key={x.t} className="min-w-0 px-2 pb-2.5 pt-1 text-center">
+                    <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{x.t}</p>
+                    <p className={`truncate text-[15px] font-bold tabular-nums ${x.c}`}>{x.v}</p>
+                  </div>
+                ))}
+              </div>
+            </>
+          );
+        })()}
       </section>
 
       <FacturasCredito version={version} />
