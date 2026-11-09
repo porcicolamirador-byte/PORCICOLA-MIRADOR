@@ -227,6 +227,9 @@ export default function JaulaPage() {
   const arrastreRef = useRef<Arrastre | null>(null);
   const pulsacion = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null);
   const sinClick = useRef(false);
+  // Elemento donde empezó el toque: el teléfono le sigue mandando los movimientos aunque
+  // salga de la pantalla al cambiar de área, así que se escucha ahí
+  const origenToque = useRef<EventTarget | null>(null);
   const ponerArrastre = (a: Arrastre | null) => {
     arrastreRef.current = a;
     setArrastre(a);
@@ -240,6 +243,7 @@ export default function JaulaPage() {
     if (!x || e.touches.length !== 1) return;
     const t = e.touches[0];
     cancelarPulsacion();
+    origenToque.current = e.target;
     pulsacion.current = {
       x: t.clientX,
       y: t.clientY,
@@ -267,13 +271,11 @@ export default function JaulaPage() {
   const areaRef = useRef(area);
   areaRef.current = area;
   const borde = useRef<{ lado: "izq" | "der"; timer: ReturnType<typeof setTimeout> } | null>(null);
-  const [bordeActivo, setBordeActivo] = useState<"izq" | "der" | null>(null);
   useEffect(() => {
     if (!activo) return;
     const quitarBorde = () => {
       if (borde.current) clearTimeout(borde.current.timer);
       borde.current = null;
-      setBordeActivo(null);
     };
     const revisarBorde = (x: number) => {
       const lado = x < 40 ? "izq" : x > window.innerWidth - 40 ? "der" : null;
@@ -282,7 +284,6 @@ export default function JaulaPage() {
       if (!lado || !destino) return quitarBorde();
       if (borde.current?.lado === lado) return;
       quitarBorde();
-      setBordeActivo(lado);
       borde.current = {
         lado,
         timer: setTimeout(() => {
@@ -292,8 +293,7 @@ export default function JaulaPage() {
           } catch {}
           // Hay que salir del borde para volver a cambiar
           borde.current = { lado, timer: setTimeout(() => {}, 0) };
-          setBordeActivo(null);
-        }, 650),
+            }, 650),
       };
     };
     const jaulaEn = (x: number, y: number) => (document.elementFromPoint(x, y)?.closest("[data-jaula]") as HTMLElement | null)?.dataset.jaula ?? null;
@@ -322,13 +322,29 @@ export default function JaulaPage() {
       ponerArrastre(null);
       setTimeout(() => (sinClick.current = false), 350);
     };
-    document.addEventListener("touchmove", mover, { passive: false });
-    document.addEventListener("touchend", soltar);
-    document.addEventListener("touchcancel", cancelar);
+    // Se escucha en el elemento tocado (sigue recibiendo el toque aunque deje de verse)
+    // y en el documento; cada evento se atiende una sola vez
+    const vistos = new WeakSet<Event>();
+    const una = (f: (e: TouchEvent) => void) => (e: Event) => {
+      if (vistos.has(e)) return;
+      vistos.add(e);
+      f(e as TouchEvent);
+    };
+    const hMover = una(mover);
+    const hSoltar = una(soltar);
+    const hCancelar = una(cancelar);
+    const destinos: EventTarget[] = [document, ...(origenToque.current ? [origenToque.current] : [])];
+    for (const d of destinos) {
+      d.addEventListener("touchmove", hMover, { passive: false });
+      d.addEventListener("touchend", hSoltar);
+      d.addEventListener("touchcancel", hCancelar);
+    }
     return () => {
-      document.removeEventListener("touchmove", mover);
-      document.removeEventListener("touchend", soltar);
-      document.removeEventListener("touchcancel", cancelar);
+      for (const d of destinos) {
+        d.removeEventListener("touchmove", hMover);
+        d.removeEventListener("touchend", hSoltar);
+        d.removeEventListener("touchcancel", hCancelar);
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activo]);
@@ -538,18 +554,6 @@ export default function JaulaPage() {
         ))}
       </div>
 
-      {arrastre && (area === "gestacion" || area === "lactancia") && (
-        <div
-          className={`pointer-events-none fixed inset-y-0 z-40 flex w-10 items-center justify-center ${area === "gestacion" ? "right-0" : "left-0"} ${
-            bordeActivo ? "bg-sky-600/90" : "bg-sky-600/25"
-          } transition-colors`}
-          aria-hidden="true"
-        >
-          <span className="whitespace-nowrap text-[11px] font-bold uppercase tracking-wider text-white [writing-mode:vertical-rl]">
-            {area === "gestacion" ? "Lactancia ›" : "‹ Gestación"}
-          </span>
-        </div>
-      )}
       {arrastre && (
         <div
           className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-[130%] rounded-2xl bg-amber-500 px-4 py-2 text-center shadow-xl ring-2 ring-white"
