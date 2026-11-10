@@ -143,6 +143,7 @@ function NuevaCotizacion({ onCerrar }: { onCerrar: () => void }) {
   const [documento, setDocumento] = useState("");
   const [telefono, setTelefono] = useState("");
   const [ubicacion, setUbicacion] = useState("");
+  const [correo, setCorreo] = useState("");
   const [fecha, setFecha] = useState(hoy());
   const [validez, setValidez] = useState(String(VALIDEZ_COTIZACION_DIAS));
   const [condiciones, setCondiciones] = useState(CONDICIONES_COTIZACION);
@@ -179,7 +180,7 @@ function NuevaCotizacion({ onCerrar }: { onCerrar: () => void }) {
       numero: siguienteCotizacion(),
       fecha,
       validezDias: dias,
-      cliente: { nombre: nombre.trim(), documento: documento.trim() || undefined, telefono: telefono.trim() || undefined, ubicacion: ubicacion.trim() || undefined },
+      cliente: { nombre: nombre.trim(), documento: documento.trim() || undefined, telefono: telefono.trim() || undefined, ubicacion: ubicacion.trim() || undefined, correo: correo.trim() || undefined },
       loteId: lote.id,
       loteTexto: nombreLote(lote),
       cantidad: n,
@@ -243,14 +244,17 @@ function NuevaCotizacion({ onCerrar }: { onCerrar: () => void }) {
         </Campo>
         <div className="grid grid-cols-2 gap-3">
           <Campo etiqueta="C.C. o NIT">
-            <Entrada value={documento} onChange={setDocumento} />
+            <Entrada value={documento} onChange={setDocumento} placeholder="2222222" />
           </Campo>
           <Campo etiqueta="Teléfono">
-            <Entrada inputMode="numeric" value={telefono} onChange={setTelefono} />
+            <Entrada inputMode="numeric" value={telefono} onChange={setTelefono} placeholder="0000000" />
           </Campo>
         </div>
-        <Campo etiqueta="Municipio o dirección">
-          <Entrada value={ubicacion} onChange={setUbicacion} />
+        <Campo etiqueta="Dirección">
+          <Entrada value={ubicacion} onChange={setUbicacion} placeholder="N/A" />
+        </Campo>
+        <Campo etiqueta="Correo">
+          <Entrada value={correo} onChange={setCorreo} placeholder="N/A" />
         </Campo>
 
         <div className="grid grid-cols-2 gap-3">

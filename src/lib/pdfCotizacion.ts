@@ -23,7 +23,7 @@ export interface DatosPdfCotizacion {
   fecha: string;
   validaHasta: string;
   validezDias: number;
-  cliente: { nombre: string; documento?: string; telefono?: string; ubicacion?: string };
+  cliente: { nombre: string; documento?: string; telefono?: string; ubicacion?: string; correo?: string };
   lote: string;
   descripcion: string;
   detalle: string;
@@ -88,9 +88,11 @@ export function generarPdfCotizacion(d: DatosPdfCotizacion): Blob {
   const wCaja = (UTIL - 10) / 2;
   const cli = [
     { t: d.cliente.nombre, negrita: true },
-    ...(d.cliente.documento ? [{ t: d.cliente.documento }] : []),
-    ...(d.cliente.telefono ? [{ t: `Tel. ${d.cliente.telefono}` }] : []),
-    ...(d.cliente.ubicacion ? [{ t: d.cliente.ubicacion }] : []),
+    // Lo que no se llenó sale con un valor genérico
+    { t: `C.C./NIT ${d.cliente.documento || "2222222"}` },
+    { t: `Tel. ${d.cliente.telefono || "0000000"}` },
+    { t: `Dirección: ${d.cliente.ubicacion || "N/A"}` },
+    { t: `Correo: ${d.cliente.correo || "N/A"}` },
   ];
   // Vendedor: los datos de la asociación
   const vend = [

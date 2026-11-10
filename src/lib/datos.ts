@@ -661,7 +661,7 @@ export interface Cotizacion {
   numero: string;
   fecha: string;
   validezDias: number;
-  cliente: { nombre: string; documento?: string; telefono?: string; ubicacion?: string };
+  cliente: { nombre: string; documento?: string; telefono?: string; ubicacion?: string; correo?: string };
   loteId: string;
   /** Código y nombre del lote al momento de cotizar */
   loteTexto: string;
