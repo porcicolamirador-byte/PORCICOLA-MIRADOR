@@ -388,3 +388,41 @@ self.addEventListener("message", (event) => {
     );
   }
 });
+
+/* ───────────── Notificaciones (llegan aunque la app esté cerrada) ───────────── */
+
+self.addEventListener("push", (event) => {
+  let d = {};
+  try {
+    d = event.data ? event.data.json() : {};
+  } catch {
+    d = { title: "Porcícola El Mirador", body: event.data ? event.data.text() : "" };
+  }
+  event.waitUntil(
+    self.registration.showNotification(d.title || "Porcícola El Mirador", {
+      body: d.body || "",
+      tag: d.tag || undefined,
+      icon: "/images/logo.png",
+      badge: "/images/logo.png",
+      data: { url: d.url || "/tareas" },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = new URL((event.notification.data && event.notification.data.url) || "/tareas", self.location.origin).href;
+  event.waitUntil(
+    (async () => {
+      const ventanas = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const v of ventanas) {
+        if ("focus" in v) {
+          await v.focus();
+          if ("navigate" in v) return v.navigate(url);
+          return;
+        }
+      }
+      return self.clients.openWindow(url);
+    })()
+  );
+});

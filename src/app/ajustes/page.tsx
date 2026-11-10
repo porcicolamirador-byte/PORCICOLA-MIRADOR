@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Boton, Campo, Chevron, Entrada, Tarjeta, Interruptor } from "@/components/ui";
 import Modal from "@/components/Modal";
+import TarjetaNotificaciones from "@/components/TarjetaNotificaciones";
 import { aplicarTema, temaGuardado } from "@/lib/tema";
 import DescargaSinConexion from "@/components/DescargaSinConexion";
 import { activarFaceId, CLAVE_FACEID_APP, faceIdActivo } from "@/lib/faceid";
@@ -148,6 +149,7 @@ export default function AjustesPage() {
       {perfil && <EstadoNube />}
       {/* Granja en uso: cambiar nombre o eliminarla */}
       {perfil && puedeCrearGranjas(perfil) && <TarjetaGranja version={version} esAdmin={perfil.rol === "admin"} onRespaldo={exportar} />}
+      {perfil && <TarjetaNotificaciones />}
       {perfil && (
         <div className="flex items-center gap-3 rounded-3xl bg-white p-4 ring-1 ring-slate-200/80">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-100 text-base font-bold text-sky-800" aria-hidden="true">

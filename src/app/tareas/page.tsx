@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Chevron, Vacio } from "@/components/ui";
@@ -8,6 +8,8 @@ import { confirmarGestacion, leerCerdas, useVersionDatos } from "@/lib/datos";
 import ConfirmarHierro from "@/components/ConfirmarHierro";
 import { confirmar } from "@/components/Dialogo";
 import { calcularTareasPendientes } from "@/utils/pendingTasks";
+import { cambiarGranja, granjaActual, leerGranjas, sincronizar } from "@/lib/sincronizar";
+import { puedeVerGranja } from "@/lib/nube";
 
 type Prioridad = "todas" | "critica" | "alta" | "media" | "baja";
 
@@ -25,6 +27,19 @@ export default function TareasPage() {
   const version = useVersionDatos();
   const [filtro, setFiltro] = useState<Prioridad>("todas");
   const [hierro, setHierro] = useState<string | null>(null);
+
+  // Desde una notificación: abre la granja de la alerta
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("granja");
+    if (!id) return;
+    if (id !== granjaActual() && puedeVerGranja(id) && leerGranjas().some((g) => g.id === id)) {
+      cambiarGranja(id);
+      void sincronizar();
+      window.location.replace("/tareas");
+      return;
+    }
+    window.history.replaceState(null, "", "/tareas");
+  }, []);
 
   const tareas = useMemo(() => {
     if (version < 0) return null;
