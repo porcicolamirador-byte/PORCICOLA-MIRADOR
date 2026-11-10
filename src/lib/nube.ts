@@ -31,6 +31,8 @@ export interface PerfilNube {
   permisos: Partial<Record<PermisoNube, boolean>>;
   /** Granjas a las que entra (null o vacío de campo = todas, incluidas las nuevas) */
   granjas?: string[] | null;
+  /** Granjas de las que recibe notificaciones (null = todas sus granjas) */
+  notificaciones_granjas?: string[] | null;
   /** Módulos del Dashboard desactivados para este usuario (vacío = todos activos; el administrador siempre ve todos) */
   modulos_ocultos?: string[];
   /** Solo para el administrador: módulos desactivados para todos los demás */
@@ -246,12 +248,12 @@ export function puede(permiso: PermisoNube): boolean {
 
 export const listarUsuarios = () => llamarFuncion<{ usuarios: PerfilNube[] }>("usuarios", { accion: "listar" }).then((r) => r.usuarios);
 
-export const crearUsuario = (datos: { usuario: string; nombre: string; pin: string; rol?: PerfilNube["rol"]; permisos?: PerfilNube["permisos"]; granjas?: string[] | null }) =>
+export const crearUsuario = (datos: { usuario: string; nombre: string; pin: string; rol?: PerfilNube["rol"]; permisos?: PerfilNube["permisos"]; granjas?: string[] | null; notificaciones_granjas?: string[] | null }) =>
   llamarFuncion<{ usuario: PerfilNube }>("usuarios", { accion: "crear", ...datos }).then((r) => r.usuario);
 
 export const actualizarUsuario = (
   id: string,
-  cambios: Partial<Pick<PerfilNube, "nombre" | "rol" | "permisos" | "activo" | "granjas" | "modulos_ocultos">> & { pin?: string },
+  cambios: Partial<Pick<PerfilNube, "nombre" | "rol" | "permisos" | "activo" | "granjas" | "modulos_ocultos" | "notificaciones_granjas">> & { pin?: string },
 ) => llamarFuncion<{ usuario: PerfilNube }>("usuarios", { accion: "actualizar", id, ...cambios }).then((r) => r.usuario);
 
 /** Módulos del Dashboard desactivados para todos los usuarios (el administrador siempre los ve) */

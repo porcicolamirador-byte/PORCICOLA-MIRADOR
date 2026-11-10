@@ -218,6 +218,15 @@ function EditorUsuario({
   const [todasGranjas, setTodasGranjas] = useState(!Array.isArray(usuario?.granjas));
   const [granjasSel, setGranjasSel] = useState<string[]>(Array.isArray(usuario?.granjas) ? usuario!.granjas! : []);
   const listaGranjas = leerGranjas();
+  // Notificaciones: de qué granjas recibe alertas (null = de todas las suyas)
+  const [notifSel, setNotifSel] = useState<string[] | null>(Array.isArray(usuario?.notificaciones_granjas) ? usuario!.notificaciones_granjas! : null);
+  const granjasDelUsuario = rol === "admin" || todasGranjas ? listaGranjas : listaGranjas.filter((g) => granjasSel.includes(g.id));
+  const notifActiva = (id: string) => notifSel === null || notifSel.includes(id);
+  const cambiarNotif = (id: string, v: boolean) => {
+    const actuales = granjasDelUsuario.map((g) => g.id).filter(notifActiva);
+    const nuevas = v ? [...new Set([...actuales, id])] : actuales.filter((x) => x !== id);
+    setNotifSel(granjasDelUsuario.every((g) => nuevas.includes(g.id)) ? null : nuevas);
+  };
   const [activo, setActivo] = useState(usuario?.activo !== false);
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
@@ -231,6 +240,9 @@ function EditorUsuario({
     if ((nuevo || pin) && !/^\d{6}$/.test(pin)) return setError("El PIN debe tener 6 números.");
     if (rol === "trabajador" && !todasGranjas && granjasSel.length === 0) return setError("Elige al menos una granja o marca «Todas las granjas».");
     const granjas = rol === "admin" || todasGranjas ? null : granjasSel;
+    // Solo granjas a las que tiene acceso; si quedan todas, null
+    const notificaciones_granjas =
+      notifSel === null ? null : granjasDelUsuario.every((g) => notifSel.includes(g.id)) ? null : notifSel.filter((id) => granjasDelUsuario.some((g) => g.id === id));
     if (!nuevo && usuario && usuario.activo !== false && !activo) {
       const ok = await confirmar({
         titulo: `Desactivar a ${usuario.nombre}`,
@@ -244,7 +256,7 @@ function EditorUsuario({
     setOcupado(true);
     try {
       if (nuevo) {
-        const u = await crearUsuario({ usuario: nombreUsuario, nombre: nombre.trim(), pin, rol, permisos, granjas });
+        const u = await crearUsuario({ usuario: nombreUsuario, nombre: nombre.trim(), pin, rol, permisos, granjas, notificaciones_granjas });
         registrarLog([{ accion: "Creación", modulo: "Usuarios", detalle: `Usuario @${u.usuario} (${u.nombre}) · ${u.rol === "admin" ? "administrador" : "usuario"}` }]);
         onGuardado(u, true);
         await avisar({ titulo: "Usuario creado", mensaje: `Comparte con ${u.nombre} su usuario "${u.usuario}" y su PIN. Podrá entrar desde su teléfono.` });
@@ -254,6 +266,7 @@ function EditorUsuario({
           rol,
           permisos,
           granjas,
+          notificaciones_granjas,
           activo,
           ...(pin ? { pin } : {}),
         });
@@ -363,6 +376,23 @@ function EditorUsuario({
             <p className="mt-1.5 px-1 text-[11px] text-slate-500">
               {todasGranjas ? "Entra a todas las granjas y puede crear granjas nuevas." : "Solo ve y registra datos en las granjas elegidas. Las granjas nuevas no se le agregan solas."}
             </p>
+          </div>
+        )}
+
+        {granjasDelUsuario.length > 0 && (
+          <div>
+            <span className="mb-1.5 block text-[13px] font-medium text-slate-700">Notificaciones de alertas</span>
+            <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200">
+              {granjasDelUsuario.map((g) => (
+                <li key={g.id}>
+                  <label className="flex cursor-pointer items-center gap-3 px-3.5 py-2.5">
+                    <span className="min-w-0 flex-1 truncate text-[15px] text-slate-800">{g.nombre}</span>
+                    <Interruptor activo={notifActiva(g.id)} onCambiar={(v) => cambiarNotif(g.id, v)} />
+                  </label>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1.5 px-1 text-[11px] text-slate-500">Recibe a las 7:30 a. m. el aviso de alertas pendientes de las granjas marcadas (si las activó en su teléfono).</p>
           </div>
         )}
 

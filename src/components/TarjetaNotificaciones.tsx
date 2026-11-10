@@ -6,8 +6,8 @@ import { avisar } from "@/components/Dialogo";
 import { activarNotificaciones, desactivarNotificaciones, estadoNotificaciones, probarNotificaciones, type EstadoNotificaciones } from "@/lib/notificaciones";
 
 const TEXTO: Record<EstadoNotificaciones, string> = {
-  activas: "Activas en este teléfono. Te llega un resumen de las alertas a las 6 a. m. y un aviso inmediato de las urgentes, aunque la app esté cerrada.",
-  inactivas: "Recibe las alertas de tus granjas en este teléfono aunque la app esté cerrada: resumen a las 6 a. m. y avisos urgentes al momento.",
+  activas: "Activas en este teléfono. Todos los días a las 7:30 a. m. te avisa si hay alertas por atender en tus granjas, aunque la app esté cerrada.",
+  inactivas: "Recibe en este teléfono, todos los días a las 7:30 a. m., el aviso de alertas por atender en tus granjas, aunque la app esté cerrada.",
   bloqueadas: "Están bloqueadas para esta app. Actívalas en Ajustes del iPhone › Notificaciones › El Mirador y vuelve aquí.",
   instalar: "Para recibirlas en iPhone, primero instala la app: en Safari toca Compartir › Agregar a pantalla de inicio, y ábrela desde ese ícono.",
   "no-soportado": "Este navegador no permite notificaciones. Actualiza el iPhone (iOS 16.4 o más reciente) y abre la app desde la pantalla de inicio.",

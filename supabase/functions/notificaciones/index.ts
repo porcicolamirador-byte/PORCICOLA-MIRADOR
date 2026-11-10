@@ -1,12 +1,11 @@
 // Notificaciones de la app (Web Push) con las alertas de cada granja.
 // Acciones:
 //   { accion: "prueba" }      → con sesión: manda 3 notificaciones de prueba (cada 15 s) a los teléfonos del usuario
-//   { accion: "resumen" }     → programada (6 a. m.): resumen de alertas del día por granja
-//   { accion: "urgentes" }    → programada (cada hora): alertas críticas nuevas, una sola vez por día
+//   { accion: "diario" }      → programada (7:30 a. m.): "Tienes alertas por atender en …" si hay alertas
 // Las programadas llevan el encabezado x-cron con el secreto guardado en push_config.
 import webpush from "npm:web-push@3.6.7";
 import { admin, CORS, json, usuarioDeLaPeticion } from "../_compartido/comun.ts";
-import { alertasDeGranja, GRANJA_BASE, type Alerta, type Documento } from "./motor/alertas.ts";
+import { alertasDeGranja, GRANJA_BASE, type Documento } from "./motor/alertas.ts";
 
 interface Suscripcion {
   id: string;
@@ -19,6 +18,7 @@ interface Perfil {
   id: string;
   rol: string;
   granjas: string[] | null;
+  notificaciones_granjas: string[] | null;
   activo: boolean;
 }
 interface Aviso {
@@ -70,67 +70,46 @@ function granjasDe(docs: Documento[]) {
   return granjas;
 }
 
+const NOMBRE_APP = "Porcícola El Mirador";
 const puedeVer = (p: Perfil, granja: string) => p.rol === "admin" || p.granjas === null || p.granjas.includes(granja);
-const linea = (a: Alerta) => `• Cerda ${a.cerda} · ${a.tipo}`;
+/** Granjas de las que el usuario recibe notificaciones (las suyas, filtradas por lo que eligió el administrador) */
+const granjasANotificar = <G extends { id: string }>(p: Perfil, granjas: G[]) =>
+  granjas.filter((g) => puedeVer(p, g.id) && (p.notificaciones_granjas === null || p.notificaciones_granjas.includes(g.id)));
 
-/** Fecha de hoy en Colombia (el motor ya deja Date en hora de Colombia) */
-const hoyColombia = () => new Date().toISOString().slice(0, 10);
+const lista = (nombres: string[]) => (nombres.length <= 1 ? nombres.join("") : `${nombres.slice(0, -1).join(", ")} y ${nombres[nombres.length - 1]}`);
 
-async function programada(accion: "resumen" | "urgentes") {
+/** Aviso diario (7:30 a. m.): una sola notificación por usuario si hay alertas pendientes */
+async function diario() {
   const docs = await todosLosDocumentos();
   const granjas = granjasDe(docs);
-  const { data: perfiles } = await admin.from("perfiles").select("id, rol, granjas, activo").eq("activo", true);
+  const { data: perfiles } = await admin.from("perfiles").select("id, rol, granjas, notificaciones_granjas, activo").eq("activo", true);
   const { data: subs } = await admin.from("suscripciones_push").select("id, usuario_id, endpoint, p256dh, auth");
   if (!subs?.length || !perfiles?.length) return { enviados: 0 };
   const porUsuario = new Map<string, Suscripcion[]>();
   for (const s of subs as Suscripcion[]) porUsuario.set(s.usuario_id, [...(porUsuario.get(s.usuario_id) ?? []), s]);
-
-  // Alertas de cada granja (una sola vez)
   const alertas = new Map(granjas.map((g) => [g.id, alertasDeGranja(docs, g.id)]));
-  const hoy = hoyColombia();
-
-  // Urgentes: solo las críticas que no se hayan avisado hoy
-  const nuevas = new Map<string, Alerta[]>();
-  if (accion === "urgentes") {
-    for (const g of granjas) {
-      const criticas = (alertas.get(g.id) ?? []).filter((a) => a.prioridad === "critica");
-      const lista: Alerta[] = [];
-      for (const a of criticas) {
-        const clave = `${hoy}:${g.id}:${a.cerda}:${a.tipo}`;
-        const { error } = await admin.from("push_enviados").insert({ clave });
-        if (!error) lista.push(a); // si ya existía, ya se avisó hoy
-      }
-      nuevas.set(g.id, lista);
-    }
-    await admin.from("push_enviados").delete().lt("enviado_en", new Date(Date.now() - 30 * 86400000).toISOString());
-  }
 
   let enviados = 0;
   for (const p of perfiles as Perfil[]) {
     const suyas = porUsuario.get(p.id);
     if (!suyas?.length) continue;
-    for (const g of granjas) {
-      if (!puedeVer(p, g.id)) continue;
-      const avisos: Aviso[] = [];
-      if (accion === "resumen") {
-        const lista = alertas.get(g.id) ?? [];
-        if (!lista.length) continue;
-        const orden = { critica: 0, alta: 1, media: 2, baja: 3 } as Record<string, number>;
-        const ordenadas = [...lista].sort((a, b) => (orden[a.prioridad] ?? 9) - (orden[b.prioridad] ?? 9));
-        const resto = ordenadas.length - 4;
-        avisos.push({
-          title: `${lista.length} ${lista.length === 1 ? "alerta" : "alertas"} hoy · ${g.nombre}`,
-          body: ordenadas.slice(0, 4).map(linea).join("\n") + (resto > 0 ? `\ny ${resto} más` : ""),
-          tag: `resumen-${g.id}`,
-          url: `/tareas?granja=${encodeURIComponent(g.id)}`,
-        });
-      } else {
-        for (const a of nuevas.get(g.id) ?? []) {
-          avisos.push({ title: `⚠️ Cerda ${a.cerda} · ${a.tipo}`, body: `${g.nombre}: ${a.descripcion}`, tag: `urgente-${g.id}-${a.cerda}-${a.tipo}`, url: `/tareas?granja=${encodeURIComponent(g.id)}` });
-        }
-      }
-      for (const aviso of avisos) for (const s of suyas) if (await enviar(s, aviso)) enviados++;
-    }
+    const elegidas = granjasANotificar(p, granjas);
+    const conAlertas = elegidas.filter((g) => (alertas.get(g.id)?.length ?? 0) > 0);
+    if (!conAlertas.length) continue;
+    // Si recibe de todas las granjas, el aviso habla de la app; si no, nombra sus granjas con alertas
+    const todas = elegidas.length === granjas.length && granjas.length > 1;
+    const donde = todas ? NOMBRE_APP : lista(conAlertas.map((g) => g.nombre));
+    const detalle = conAlertas.map((g) => {
+      const n = alertas.get(g.id)!.length;
+      return `${g.nombre}: ${n} ${n === 1 ? "alerta" : "alertas"}`;
+    });
+    const aviso: Aviso = {
+      title: `Tienes alertas por atender en ${donde}`,
+      body: detalle.join(" · "),
+      tag: "alertas-diarias",
+      url: conAlertas.length === 1 ? `/tareas?granja=${encodeURIComponent(conAlertas[0].id)}` : "/tareas",
+    };
+    for (const s of suyas) if (await enviar(s, aviso)) enviados++;
   }
   return { enviados };
 }
@@ -148,9 +127,9 @@ Deno.serve(async (req) => {
   try {
     const config = await configurar();
 
-    if (accion === "resumen" || accion === "urgentes") {
+    if (accion === "diario") {
       if (req.headers.get("x-cron") !== config.cron_secreto) return json({ error: "No autorizado" }, 401);
-      return json(await programada(accion));
+      return json(await diario());
     }
 
     const yo = await usuarioDeLaPeticion(req);
