@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { guardarConRegistro, registrarLog, sinRegistro } from "@/lib/log";
 import type { Cerda, Registro } from "@/utils/pendingTasks";
-import { CLAVE_EXISTENCIAS, CLAVE_PRESTAMOS, granjaActual, leerGranjas } from "@/lib/sincronizar";
+import { CLAVE_EXISTENCIAS, CLAVE_JAULAS, CLAVE_PRESTAMOS, granjaActual, leerGranjas } from "@/lib/sincronizar";
 import { leerConfig as leerConfigGranja } from "@/lib/config";
 
 /* ═════════════════════ Claves de almacenamiento ═════════════════════
@@ -394,6 +394,27 @@ export function crearLoteDesdeParto(datos: {
 }
 
 /** Lotes creados automáticamente desde un parto (por código de parto) */
+/**
+ * Lotes nacidos de un parto: los primeros días los lechones están con la madre en
+ * la jaula de lactancia, así que no necesitan corral. Pasado ese tiempo hay que
+ * asignarles uno (también se puede asignar antes).
+ */
+export const DIAS_JAULA_LACTANCIA = 40;
+export const diasEnLactancia = (l: Lote) => Math.max(0, diasEntre(l.fechaIngreso, hoy()));
+export const loteEnJaulaLactancia = (l: Lote) => !!l.origen && !l.corralId && l.activo && diasEnLactancia(l) < DIAS_JAULA_LACTANCIA;
+/** Jaula de la madre del lote en el mapa de jaulas (vacío si no tiene) */
+export function jaulaDeMadre(l: Lote): string {
+  if (!l.origen?.cerdaId) return "";
+  try {
+    const mapa = JSON.parse(localStorage.getItem(CLAVE_JAULAS) || "[]") as { id: string; cerdaId?: string; granja?: string }[];
+    const e = Array.isArray(mapa) ? mapa.find((x) => x && x.cerdaId === l.origen?.cerdaId && x.granja === granjaActual()) : undefined;
+    if (e) return e.id;
+  } catch {
+    // sin mapa
+  }
+  const c = leerCerdas().find((x) => x.id === l.origen?.cerdaId) as { jaula?: unknown } | undefined;
+  return c?.jaula ? String(c.jaula) : "";
+}
 export const lotesDeParto = (codigoParto: string) => leerLotes().filter((l) => l.origen?.codigoParto === codigoParto);
 
 /**

@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Boton, Campo, Chips, Dato, Entrada, EntradaPesos, IconoMas, SeccionDesplegable, Selector, Vacio } from "@/components/ui";
 import {
+  DIAS_JAULA_LACTANCIA,
+  diasEnLactancia,
+  jaulaDeMadre,
+  loteEnJaulaLactancia,
   diasEntre,
   formatoFecha,
   hierroAplicado,
@@ -667,7 +671,28 @@ const CERDA_MANUAL = "0000";
 const ICONOS_ACCION: Record<Accion, string> = { resumen: "🐖", pesaje: "⚖️", muerte: "⚠️", alimento: "🥣", editarAlimento: "✏️", corral: "🏚️", gasto: "💊" };
 
 /** Espacio que muestra el corral guardado del lote */
-function TarjetaCorral({ corral, onCambiar }: { corral?: Corral; onCambiar?: () => void }) {
+function TarjetaCorral({ corral, onCambiar, lote }: { corral?: Corral; onCambiar?: () => void; lote?: Lote }) {
+  // Lote de un parto en sus primeros días: los lechones están con la madre en la jaula de lactancia
+  if (!corral && lote && loteEnJaulaLactancia(lote)) {
+    const jaula = jaulaDeMadre(lote);
+    const faltan = DIAS_JAULA_LACTANCIA - diasEnLactancia(lote);
+    return (
+      <div className="flex items-center gap-3 rounded-xl bg-amber-50 px-3 py-2 ring-1 ring-amber-200">
+        <span className="flex h-9 min-w-[3.25rem] shrink-0 items-center justify-center rounded-lg bg-white px-2 text-sm font-bold tabular-nums text-amber-800 ring-1 ring-amber-200">
+          {jaula || "🍼"}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-700/80">Jaula de lactancia</p>
+          <p className="truncate text-sm font-semibold text-slate-900">Con la madre · {faltan} {faltan === 1 ? "día" : "días"} para asignar corral</p>
+        </div>
+        {onCambiar && (
+          <button type="button" onClick={onCambiar} className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold text-amber-800 active:bg-amber-100">
+            Asignar
+          </button>
+        )}
+      </div>
+    );
+  }
   if (!corral) {
     return (
       <div className="flex items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2">
@@ -733,6 +758,9 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
   const edad = edadMesesDias(lote.fechaIngreso, fechaFin);
   const corrales = leerCorrales().sort((a, b) => a.codigo.localeCompare(b.codigo, "es", { numeric: true }));
   const corral = corrales.find((c) => c.id === lote.corralId);
+  // Sin corral solo se puede registrar mientras el lote está en la jaula de lactancia (40 días desde el parto)
+  const enLactancia = loteEnJaulaLactancia(lote);
+  const puedeRegistrar = !!corral || enLactancia;
   // Productos de bodega: los que tienen existencia primero; sin existencia aparecen desactivados
   // Al editar, lo que ya se había descontado con este registro cuenta como disponible
   const inventario = esAlimento && !legado ? calcularInventario({ excluirSalida: registroEdit?.salidaId }) : [];
@@ -915,7 +943,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
     >
       {accion === "resumen" ? (
         <div className="flex flex-col gap-4">
-          <TarjetaCorral corral={corral} onCambiar={lote.activo ? () => setAccion("corral") : undefined} />
+          <TarjetaCorral corral={corral} lote={lote} onCambiar={lote.activo ? () => setAccion("corral") : undefined} />
           {lote.origen && (() => {
             const hierro = hierroAplicado(lote);
             return !hierro && lote.activo ? (
@@ -993,13 +1021,13 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
           {lote.activo && (
             <div className="flex flex-col gap-2">
               <div className="flex gap-2">
-                <Boton onClick={() => setAccion("alimento")} disabled={!corral} className="flex-1 py-3">
+                <Boton onClick={() => setAccion("alimento")} disabled={!puedeRegistrar} className="flex-1 py-3">
                   Registrar alimento
                 </Boton>
                 <button
                   type="button"
                   onClick={() => setAccion("gasto")}
-                  disabled={!corral}
+                  disabled={!puedeRegistrar}
                   aria-label="Agregar otro gasto (medicamentos, vacunas…)"
                   className="flex w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-900 text-white transition active:scale-95 disabled:opacity-40"
                 >
@@ -1009,11 +1037,11 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                 </button>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                <Boton variante="suave" onClick={() => setAccion("corral")} className={corral ? "" : "ring-2 ring-sky-600"}>
-                  <span className="truncate">{corral ? corral.codigo : "Corral"}</span>
+                <Boton variante="suave" onClick={() => setAccion("corral")} className={puedeRegistrar ? "" : "ring-2 ring-sky-600"}>
+                  <span className="truncate">{corral ? corral.codigo : enLactancia ? jaulaDeMadre(lote) || "Lactancia" : "Corral"}</span>
                 </Boton>
-                <Boton variante="suave" onClick={() => setAccion("pesaje")} disabled={!corral}>Pesaje</Boton>
-                <Boton variante="suave" onClick={() => setAccion("muerte")} disabled={!corral}>Muerte</Boton>
+                <Boton variante="suave" onClick={() => setAccion("pesaje")} disabled={!puedeRegistrar}>Pesaje</Boton>
+                <Boton variante="suave" onClick={() => setAccion("muerte")} disabled={!puedeRegistrar}>Muerte</Boton>
               </div>
             </div>
           )}
@@ -1175,7 +1203,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
 
           <div className="flex flex-wrap justify-center gap-2 pt-1">
             {lote.activo ? (
-              <Boton variante="secundario" onClick={cerrarLote} disabled={!corral}>Liquidación total del lote</Boton>
+              <Boton variante="secundario" onClick={cerrarLote} disabled={!puedeRegistrar}>Liquidación total del lote</Boton>
             ) : (
               <Boton variante="secundario" onClick={reabrir}>Reabrir lote</Boton>
             )}
@@ -1200,7 +1228,7 @@ function DetalleLote({ lote, onCerrar }: { lote: Lote; onCerrar: () => void }) {
                 <button
                   type="button"
                   onClick={() => (leerConfig().claveLotesActiva ? setPedirClave(true) : void eliminar())}
-                  disabled={!corral}
+                  disabled={!puedeRegistrar}
                   className="shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold text-rose-600 ring-1 ring-rose-200 transition active:bg-rose-50 disabled:opacity-50"
                 >
                   Eliminar lote
