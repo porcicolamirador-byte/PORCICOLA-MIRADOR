@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { guardarConRegistro, registrarLog, sinRegistro } from "@/lib/log";
+import { borrarConRegistro, guardarConRegistro, registrarLog, sinRegistro } from "@/lib/log";
 import type { Cerda, Registro } from "@/utils/pendingTasks";
 import { CLAVE_EXISTENCIAS, CLAVE_JAULAS, CLAVE_PRESTAMOS, granjaActual, leerGranjas } from "@/lib/sincronizar";
 import { leerConfig as leerConfigGranja } from "@/lib/config";
@@ -2238,6 +2238,66 @@ export function eliminarAplicacion(loteId: string, aplicacionId: string) {
   const ap = leerLotes().find((l) => l.id === loteId)?.aplicaciones?.find((a) => a.id === aplicacionId);
   if (ap?.tratamientoId) guardarTratamientos(leerTratamientos().filter((t) => t.id !== ap.tratamientoId));
   guardarLotes(leerLotes().map((l) => (l.id === loteId ? { ...l, aplicaciones: (l.aplicaciones ?? []).filter((a) => a.id !== aplicacionId) } : l)));
+}
+
+/**
+ * Cambia el ID (nombre) de una cerda en todo: su historial, los códigos de parto,
+ * los lotes que nacieron de ella, tratamientos, contabilidad (genética, gastos de
+ * la madre y textos), cuentas a crédito, mapa de jaulas y consumo del día.
+ * La ficha de la cerda la guarda quien llama.
+ */
+export function renombrarCerda(viejo: string, nuevo: string) {
+  if (!viejo || !nuevo || viejo === nuevo) return;
+  const esc = viejo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // Códigos de parto (3496-P1) y textos como "cerda 3496"
+  const codigo = new RegExp(`(^|[^\\w-])${esc}(?=-P\\d)`, "g");
+  const enTexto = new RegExp(`([Cc]erda )${esc}(?![\\w-])`, "g");
+  const tx = <T,>(s: T): T => (typeof s === "string" ? (s.replace(codigo, `$1${nuevo}`).replace(enTexto, `$1${nuevo}`) as T) : s);
+
+  // Historial: pasa a la clave de la cerda nueva
+  const historial = leerHistorial(viejo).map((r) => {
+    const x = r as RegistroCerda & { codigoParto?: unknown; descripcion?: unknown; mensaje?: unknown };
+    return { ...x, ...(x.codigoParto !== undefined ? { codigoParto: tx(x.codigoParto) } : {}), ...(x.descripcion !== undefined ? { descripcion: tx(x.descripcion) } : {}) } as RegistroCerda;
+  });
+  if (historial.length) guardarHistorial(nuevo, [...historial, ...leerHistorial(nuevo)]);
+  if (localStorage.getItem(CLAVES.historial(viejo)) !== null) borrarConRegistro(CLAVES.historial(viejo));
+
+  // Lotes nacidos de sus partos
+  const lotes = leerLotes();
+  if (lotes.some((l) => l.origen?.cerdaId === viejo))
+    guardarLotes(
+      lotes.map((l) =>
+        l.origen?.cerdaId === viejo ? { ...l, nombre: tx(l.nombre), origen: { cerdaId: nuevo, codigoParto: tx(l.origen.codigoParto) } } : l,
+      ),
+    );
+
+  // Tratamientos de la cerda
+  const tratamientos = leerTratamientos();
+  if (tratamientos.some((t) => t.objetivo === "cerda" && t.objetivoId === viejo))
+    guardarTratamientos(tratamientos.map((t) => (t.objetivo === "cerda" && t.objetivoId === viejo ? { ...t, objetivoId: nuevo } : t)));
+
+  // Contabilidad: movimientos de la cerda y textos que la nombran (también de sus lotes)
+  const movs = leerMovimientos();
+  const movsNuevos = movs.map((m) => {
+    const d = tx(m.descripcion);
+    return m.cerdaId === viejo || d !== m.descripcion ? { ...m, descripcion: d, ...(m.cerdaId === viejo ? { cerdaId: nuevo } : {}) } : m;
+  });
+  if (movsNuevos.some((m, i) => m !== movs[i])) guardarMovimientos(movsNuevos);
+  const cuentas = leerCuentasPorPagar();
+  const cuentasNuevas = cuentas.map((c) => (tx(c.descripcion) !== c.descripcion ? { ...c, descripcion: tx(c.descripcion) } : c));
+  if (cuentasNuevas.some((c, i) => c !== cuentas[i])) guardarCuentasPorPagar(cuentasNuevas);
+
+  // Mapa de jaulas (común a todas las granjas)
+  const mapa = leer<{ id: string; cerdaId?: string; granja?: string }[]>(CLAVE_JAULAS, []);
+  if (mapa.some((e) => e?.cerdaId === viejo && e.granja === granjaActual()))
+    escribir(CLAVE_JAULAS, mapa.map((e) => (e?.cerdaId === viejo && e.granja === granjaActual() ? { ...e, cerdaId: nuevo } : e)));
+
+  // Consumo de alimento del día
+  const dia = leer<{ fecha?: string; cerdas?: Record<string, unknown> } | null>("consumo-cerdas-dia", null);
+  if (dia?.cerdas && viejo in dia.cerdas) {
+    const { [viejo]: valor, ...resto } = dia.cerdas;
+    escribir("consumo-cerdas-dia", { ...dia, cerdas: { ...resto, [nuevo]: valor } });
+  }
 }
 
 /** Marca la 1.ª o 2.ª confirmación de gestación en la última inseminación de la cerda */

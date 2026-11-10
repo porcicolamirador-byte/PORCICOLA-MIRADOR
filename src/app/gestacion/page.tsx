@@ -10,7 +10,7 @@ import { avisar, confirmar } from "@/components/Dialogo";
 import { puede } from "@/lib/nube";
 import { leerConfig } from "@/lib/config";
 import { largoPinLocal, mensajePin, verificarPinPropio } from "@/lib/bloqueo";
-import { eliminarLotesDePartos, useVersionDatos } from "@/lib/datos";
+import { eliminarLotesDePartos, renombrarCerda, useVersionDatos } from "@/lib/datos";
 
 const ESTADOS = [
   "Todos",
@@ -468,9 +468,14 @@ export default function Gestacion() {
 
       if (!ok) return;
 
+      const anterior = cerdas[editIndex];
+      // Si cambió el ID, se cambia en historial, lotes, contabilidad, jaulas y reportes
+      if (anterior?.id && anterior.id !== idMayus) renombrarCerda(anterior.id, idMayus);
+
       const nuevas = [...cerdas];
 
-      nuevas[editIndex] = nueva;
+      // Se conservan los demás datos de la ficha (jaula, genética, etc.)
+      nuevas[editIndex] = { ...anterior, ...nueva, estado: anterior?.estado ?? nueva.estado };
 
       guardar(nuevas);
     } else {
