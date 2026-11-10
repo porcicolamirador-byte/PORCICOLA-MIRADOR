@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import Modal from "@/components/Modal";
+import PedirNotificaciones from "@/components/PedirNotificaciones";
 import { Boton, Campo, Entrada } from "@/components/ui";
 import { puedeCrearGranjas, puedeVerGranja } from "@/lib/nube";
 import { cambiarGranja, crearGranja, granjaActual, leerGranjas, nombreGranjaActual, sincronizar } from "@/lib/sincronizar";
@@ -304,6 +305,7 @@ export default function Dashboard() {
 
   return (
     <PageShell bgColor={COLOR_PAGINA} className="flex flex-col">
+      <PedirNotificaciones />
       <div className="mx-auto flex max-w-xl flex-1 flex-col gap-5 pb-44">
         <Header
           title={granjaNombre}
