@@ -4,7 +4,7 @@ import { registrarLog } from "@/lib/log";
 import { useRef, useState, type ChangeEvent, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
-import { Boton, Campo, Chevron, Entrada, Tarjeta, Interruptor } from "@/components/ui";
+import { Boton, Campo, Chevron, Entrada, SeccionDesplegable, Tarjeta, Interruptor } from "@/components/ui";
 import Modal from "@/components/Modal";
 import TarjetaNotificaciones from "@/components/TarjetaNotificaciones";
 import { aplicarTema, temaGuardado } from "@/lib/tema";
@@ -380,7 +380,8 @@ function TarjetaGranja({ version, esAdmin, onRespaldo }: { version: number; esAd
 
   return (
     <>
-      <Tarjeta titulo="Granja abierta">
+      <SeccionDesplegable titulo={`Granja abierta · ${actual}`}>
+        <div className="bg-white p-1.5">
         <div className="mb-3 flex items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-800">{ICONO_GRANJA_AJ}</span>
           <span className="min-w-0 flex-1">
@@ -419,7 +420,8 @@ function TarjetaGranja({ version, esAdmin, onRespaldo }: { version: number; esAd
           </Boton>
         )}
         {principal && esAdmin && <p className="mt-2 text-[11px] text-slate-400">La granja principal no se puede eliminar; solo cambiarle el nombre.</p>}
-      </Tarjeta>
+        </div>
+      </SeccionDesplegable>
 
       {abierta === "nombre" && (
         <Modal abierta etiqueta="Ajustes · Granja" titulo="Cambiar nombre" subtitulo={actual} icono={ICONO_GRANJA_AJ} onCerrar={() => setAbierta(null)}>

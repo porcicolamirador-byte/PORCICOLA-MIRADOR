@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Boton, Tarjeta } from "@/components/ui";
+import { Boton, SeccionDesplegable } from "@/components/ui";
 import { avisar } from "@/components/Dialogo";
 import { activarNotificaciones, desactivarNotificaciones, estadoNotificaciones, probarNotificaciones, type EstadoNotificaciones } from "@/lib/notificaciones";
 
@@ -34,7 +34,8 @@ export default function TarjetaNotificaciones() {
 
   if (!estado) return null;
   return (
-    <Tarjeta titulo="Notificaciones">
+    <SeccionDesplegable titulo={`Notificaciones · ${estado === "activas" ? "activas" : "desactivadas"}`}>
+      <div className="bg-white p-1.5">
       <div className="mb-3 flex items-start gap-3">
         <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${estado === "activas" ? "bg-sky-100 text-sky-800" : "bg-slate-100 text-slate-500"}`}>
           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -69,6 +70,7 @@ export default function TarjetaNotificaciones() {
       {estado === "activas" && (
         <p className="mt-2 text-[11px] leading-snug text-slate-400">La prueba envía 3 notificaciones, una cada 15 segundos: cierra la app después de la primera para comprobar que llegan.</p>
       )}
-    </Tarjeta>
+      </div>
+    </SeccionDesplegable>
   );
 }
