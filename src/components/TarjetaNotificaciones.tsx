@@ -66,6 +66,9 @@ export default function TarjetaNotificaciones() {
           </Boton>
         </div>
       )}
+      {estado === "activas" && (
+        <p className="mt-2 text-[11px] leading-snug text-slate-400">La prueba envía 3 notificaciones, una cada 15 segundos: cierra la app después de la primera para comprobar que llegan.</p>
+      )}
     </Tarjeta>
   );
 }

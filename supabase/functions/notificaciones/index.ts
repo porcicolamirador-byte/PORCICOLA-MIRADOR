@@ -1,6 +1,6 @@
 // Notificaciones de la app (Web Push) con las alertas de cada granja.
 // Acciones:
-//   { accion: "prueba" }      → con sesión: manda una notificación de prueba a los teléfonos del usuario
+//   { accion: "prueba" }      → con sesión: manda 3 notificaciones de prueba (cada 15 s) a los teléfonos del usuario
 //   { accion: "resumen" }     → programada (6 a. m.): resumen de alertas del día por granja
 //   { accion: "urgentes" }    → programada (cada hora): alertas críticas nuevas, una sola vez por día
 // Las programadas llevan el encabezado x-cron con el secreto guardado en push_config.
@@ -157,12 +157,29 @@ Deno.serve(async (req) => {
     if (!yo) return json({ error: "Sesión no válida" }, 401);
 
     if (accion === "prueba") {
+      // 3 notificaciones, una cada 15 segundos, para probar con la app cerrada
       const { data: subs } = await admin.from("suscripciones_push").select("id, usuario_id, endpoint, p256dh, auth").eq("usuario_id", yo.id);
-      let enviados = 0;
-      for (const s of (subs ?? []) as Suscripcion[]) {
-        if (await enviar(s, { title: "Notificaciones activadas ✅", body: "Así te llegarán las alertas de la granja, aunque la app esté cerrada.", tag: "prueba", url: "/tareas" })) enviados++;
-      }
-      return json({ enviados });
+      const lista = (subs ?? []) as Suscripcion[];
+      const mandar = async (n: number) => {
+        for (const s of lista) {
+          await enviar(s, {
+            title: `Prueba ${n} de 3 ✅`,
+            body: n === 1 ? "Cierra la app: en 15 segundos llega la siguiente." : n === 2 ? "Llegó con la app cerrada. Falta una más en 15 segundos." : "¡Listo! Así te llegarán las alertas de la granja.",
+            tag: `prueba-${n}-${Date.now()}`,
+            url: "/tareas",
+          });
+        }
+      };
+      await mandar(1);
+      const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      const resto = (async () => {
+        await espera(15000);
+        await mandar(2);
+        await espera(15000);
+        await mandar(3);
+      })();
+      (globalThis as unknown as { EdgeRuntime?: { waitUntil: (p: Promise<unknown>) => void } }).EdgeRuntime?.waitUntil(resto);
+      return json({ enviados: lista.length, programadas: 2 });
     }
     return json({ error: "Acción desconocida" }, 400);
   } catch (e) {
