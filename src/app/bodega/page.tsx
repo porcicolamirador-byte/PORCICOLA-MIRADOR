@@ -806,11 +806,6 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
   const quitarMovimiento = async (m: (typeof movimientos)[number]) => {
     if (!puede("bodega")) return void avisarSinPermisoBodega();
     if (m.salidaId) return quitarSalida(m.salidaId);
-    if (m.facturaId) {
-      const f = leerFacturas().find((x) => x.id === m.facturaId);
-      if (f) await eliminarFacturaConAviso(f);
-      return;
-    }
     if (m.prestamoId && m.devolucionId) {
       if (!(await confirmar({ titulo: "Eliminar devolución", mensaje: `Se quitará la devolución de ${fmt(m.cantidad)} ${p.unidad}. El préstamo vuelve a quedar como deuda en las dos granjas.`, aceptar: "Eliminar", destructivo: true }))) return;
       const r = eliminarDevolucion(m.prestamoId, m.devolucionId);
@@ -876,7 +871,7 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
                         {formatoFecha(m.fecha)}
                         {m.hora && <span className="block text-[10px]">{formatoHora(m.hora)}</span>}
                       </span>
-                      {(m.salidaId ? !esConsumoAutomatico(m.salidaId) || puedeQuitarConsumoAuto() : !!(m.facturaId || m.prestamoId)) && (
+                      {(m.salidaId ? !esConsumoAutomatico(m.salidaId) || puedeQuitarConsumoAuto() : !!m.prestamoId) && (
                         <button
                           type="button"
                           onClick={() => void quitarMovimiento(m)}
@@ -1438,6 +1433,15 @@ function DetalleFacturaGasto({ id, onCerrar }: { id: string; onCerrar: () => voi
 
 /** Elimina una factura con sus avisos (no deja existencias negativas). Devuelve true si se eliminó */
 async function eliminarFacturaConAviso(f: Factura): Promise<boolean> {
+  // Solo si de esta factura no ha salido nada (consumos de lotes, salidas, consumo automático…)
+  const usadas = trazabilidadSalidas().filter((t) => t.partes.some((x) => x.factura.id === f.id && x.cantidad > 1e-9));
+  if (usadas.length) {
+    await avisar({
+      titulo: "No se puede eliminar",
+      mensaje: `De esta factura ya hay ${usadas.length} ${usadas.length === 1 ? "salida registrada" : "salidas registradas"}. Para eliminarla, primero elimina esas salidas.`,
+    });
+    return false;
+  }
   // No se permite si ya se consumió parte de lo que entró con esta factura
   const inventario = calcularInventario();
   const quedarianNegativos = f.lineas
