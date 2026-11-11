@@ -19,7 +19,7 @@ import {
 /** Días después del parto para el destete en el calendario */
 const DIAS_DESTETE = 21;
 
-type Tipo = "parto" | "estimado" | "destete";
+type Tipo = "parto" | "estimado" | "destete" | "desteteEstimado";
 
 interface EventoDia {
   tipo: Tipo;
@@ -33,10 +33,17 @@ const ESTILO: Record<Tipo, { punto: string; celda: string; etiqueta: string; tex
   parto: { punto: "bg-fuchsia-500", celda: "bg-fuchsia-500 text-white", etiqueta: "Parto registrado", texto: "text-fuchsia-700" },
   estimado: { punto: "bg-blue-500", celda: "bg-blue-500 text-white", etiqueta: "Parto estimado", texto: "text-blue-700" },
   destete: { punto: "bg-amber-400", celda: "bg-amber-400 text-amber-950", etiqueta: `Destete (día ${DIAS_DESTETE})`, texto: "text-amber-700" },
+  // Destete de un parto que aún no se registra: círculo amarillo sin relleno (fecha aproximada)
+  desteteEstimado: {
+    punto: "bg-white ring-[1.5px] ring-amber-400",
+    celda: "ring-2 ring-inset ring-amber-400 text-amber-800",
+    etiqueta: "Destete estimado",
+    texto: "text-amber-700",
+  },
 };
-const ORDEN: Tipo[] = ["parto", "estimado", "destete"];
+const ORDEN: Tipo[] = ["parto", "estimado", "destete", "desteteEstimado"];
 /** Mismos colores de las marcas del calendario (verde, azul y amarillo) */
-const COLOR_BARRA: Record<Tipo, string> = { parto: "#d946ef", estimado: "#3b82f6", destete: "#f59e0b" };
+const COLOR_BARRA: Record<Tipo, string> = { parto: "#d946ef", estimado: "#3b82f6", destete: "#f59e0b", desteteEstimado: "#fcd34d" };
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 const DIAS_SEMANA = ["L", "M", "M", "J", "V", "S", "D"];
@@ -83,7 +90,7 @@ function calcularEventos(): Map<string, EventoDia[]> {
         const parto = sumarDias(ia, diasGestacion);
         agregar(parto, { tipo: "estimado", cerdaId: cerda.id, nombre, detalle: `Inseminada el ${formatoFecha(ia)}` });
         agregar(sumarDias(parto, DIAS_DESTETE), {
-          tipo: "destete",
+          tipo: "desteteEstimado",
           cerdaId: cerda.id,
           nombre,
           detalle: `Día ${DIAS_DESTETE} del parto estimado (${formatoFecha(parto)})`,
@@ -246,7 +253,7 @@ export default function CalendarioPage() {
                 <span
                   className={`flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-semibold tabular-nums ${
                     principal ? ESTILO[principal].celda : esHoy ? "bg-slate-100 text-slate-900" : "text-slate-800"
-                  } ${elegido ? "ring-2 ring-slate-900 ring-offset-1" : ""}`}
+                  } ${elegido ? "outline outline-2 outline-offset-2 outline-slate-900" : ""}`}
                 >
                   {dia}
                 </span>
