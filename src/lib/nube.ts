@@ -21,7 +21,7 @@ export interface SesionNube {
   user_id: string;
 }
 
-export type PermisoNube = "eliminar" | "bodega" | "ajustes" | "contabilidad";
+export type PermisoNube = "eliminar" | "bodega" | "ajustes" | "contabilidad" | "consumoAuto";
 
 export interface PerfilNube {
   id: string;

@@ -19,6 +19,7 @@ const PERMISOS: { clave: PermisoNube; nombre: string; detalle: string }[] = [
   { clave: "eliminar", nombre: "Eliminar", detalle: "Borrar cerdas, lotes, registros, facturas…" },
   { clave: "bodega", nombre: "Bodega", detalle: "Cargar facturas y registrar salidas" },
   { clave: "contabilidad", nombre: "Contabilidad", detalle: "Ver y registrar ingresos y gastos" },
+  { clave: "consumoAuto", nombre: "Eliminar consumo automático", detalle: "Borrar en Bodega el descuento diario de alimento de las cerdas" },
   { clave: "ajustes", nombre: "Ajustes protegidos", detalle: "Entrar a esta sección" },
 ];
 

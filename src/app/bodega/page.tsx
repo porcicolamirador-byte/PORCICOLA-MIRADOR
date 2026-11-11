@@ -6,11 +6,11 @@ import ModuloPage from "@/components/ModuloPage";
 import { Boton, Campo, Chevron, Chips, Entrada, IconoMas, Insignia, SeccionDesplegable, Selector, Vacio, EntradaPesos, CLASE_SELECTOR } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
 import CampoFactura from "@/components/CampoFactura";
-import { perfilGuardado, puede } from "@/lib/nube";
+import { puede } from "@/lib/nube";
 
 /** Consumo automático de alimento (cerdas): solo el administrador lo puede eliminar */
 const esConsumoAutomatico = (salidaId?: string) => !!salidaId && salidaId.startsWith("auto-");
-const esAdministrador = () => perfilGuardado()?.rol === "admin";
+const puedeQuitarConsumoAuto = () => puede("consumoAuto");
 import DialogoClave from "@/components/DialogoClave";
 import { leerConfig } from "@/lib/config";
 import Modal from "@/components/Modal";
@@ -67,6 +67,7 @@ import {
   type Factura,
   type ProductoBodega,
   eliminarSalida,
+  anularConsumoAutomatico,
   kgDeCantidad,
   leerCorrales,
   leerLotes,
@@ -731,7 +732,12 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
   };
 
   const quitarSalida = async (salidaId: string) => {
-    if (esConsumoAutomatico(salidaId) && !esAdministrador()) return;
+    if (esConsumoAutomatico(salidaId)) {
+      if (!puedeQuitarConsumoAuto()) return;
+      if (!(await confirmar({ titulo: "Eliminar consumo automático", mensaje: "Ese día ya no se descontará alimento de las cerdas y la cantidad vuelve a la existencia.", aceptar: "Eliminar", destructivo: true }))) return;
+      anularConsumoAutomatico(salidaId);
+      return;
+    }
     if (!(await confirmar({ titulo: "Eliminar salida", mensaje: "La cantidad volverá a sumar a la existencia. Si fue consumo de un lote, también se quita de su alimento.", aceptar: "Eliminar", destructivo: true }))) return;
     eliminarSalida(salidaId);
   };
@@ -788,7 +794,7 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
                         {formatoFecha(m.fecha)}
                         {m.hora && <span className="block text-[10px]">{formatoHora(m.hora)}</span>}
                       </span>
-                      {m.salidaId && (!esConsumoAutomatico(m.salidaId) || esAdministrador()) && (
+                      {m.salidaId && (!esConsumoAutomatico(m.salidaId) || puedeQuitarConsumoAuto()) && (
                         <button
                           type="button"
                           onClick={() => quitarSalida(m.salidaId!)}

@@ -592,6 +592,8 @@ export interface SalidaBodega {
   loteId?: string;
   /** Consumo automático de cerdas: cantidad que tocaba ese día (en la unidad del producto) */
   plan?: number;
+  /** Consumo automático eliminado: queda en 0 para que no se vuelva a crear ese día */
+  anulada?: boolean;
 }
 
 /* ═════════════════════ Corrales ═════════════════════ */
@@ -835,6 +837,7 @@ export function trazabilidadSalidas(): TrazaSalida[] {
   const salidas = [...leerSalidas()].sort((a, b) => `${a.fecha} ${a.hora ?? "00:00"}`.localeCompare(`${b.fecha} ${b.hora ?? "00:00"}`) || (a.id < b.id ? -1 : 1));
   const resultado: TrazaSalida[] = [];
   for (const sd of salidas) {
+    if (sd.anulada) continue;
     const p = porId.get(sd.productoId);
     if (!p) continue;
     const fk = factorKg(p);
@@ -1951,6 +1954,11 @@ export function eliminarGastoLote(loteId: string, gastoId: string) {
   }
   if (quitar.size) guardarMovimientos(leerMovimientos().filter((m) => !quitar.has(m.id)));
   guardarLotes(leerLotes().map((l) => (l.id === loteId ? { ...l, gastos: (l.gastos ?? []).filter((g) => g.id !== gastoId) } : l)));
+}
+
+/** Elimina un consumo automático de cerdas: queda anulado (en 0) para que no se vuelva a crear ese día */
+export function anularConsumoAutomatico(salidaId: string) {
+  guardarSalidas(leerSalidas().map((s) => (s.id === salidaId ? { ...s, cantidad: 0, plan: 0, anulada: true } : s)));
 }
 
 export function eliminarSalida(salidaId: string) {

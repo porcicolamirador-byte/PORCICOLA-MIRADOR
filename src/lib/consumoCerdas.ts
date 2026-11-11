@@ -202,6 +202,8 @@ export function aplicarDescuentoCerdas() {
         const id = prefijo + f;
         const esHoy = f === hoyIso;
         const previa = porId.get(id);
+        // Eliminado a mano: ese día ya no se descuenta
+        if (previa?.anulada) continue;
         if (!esHoy && previa) {
           // Día pasado que quedó corto porque no había existencia: se completa lo que tocaba
           const plan = planDe(previa, factorKg(producto));

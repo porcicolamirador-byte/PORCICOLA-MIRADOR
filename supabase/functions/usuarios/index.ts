@@ -9,7 +9,7 @@
 //   { accion: "yo" }   → perfil del usuario que llama (cualquier usuario activo)
 import { admin, contrasenaDe, publico, correoDe, CORS, json, PIN_ENTRADA, PIN_VALIDO, usuarioDeLaPeticion, USUARIO_VALIDO } from "../_compartido/comun.ts";
 
-const PERMISOS = ["eliminar", "bodega", "ajustes", "contabilidad"] as const;
+const PERMISOS = ["eliminar", "bodega", "ajustes", "contabilidad", "consumoAuto"] as const;
 /** null = todas las granjas (incluidas las nuevas); lista = solo esas */
 const limpiarGranjas = (g: unknown): string[] | null =>
   Array.isArray(g) ? [...new Set(g.filter((x): x is string => typeof x === "string" && /^[a-z0-9]{1,40}$/i.test(x)))].slice(0, 50) : null;
