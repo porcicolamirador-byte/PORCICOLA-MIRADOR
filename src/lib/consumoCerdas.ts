@@ -8,7 +8,7 @@
  */
 
 import { guardarConfig, leerConfig } from "@/lib/config";
-import { reemplazarClave } from "@/lib/sincronizar";
+import { datosAlDia, reemplazarClave } from "@/lib/sincronizar";
 import {
   calcularInventario,
   codigoDe,
@@ -170,6 +170,8 @@ export const esSalidaAutomatica = (s: SalidaBodega) => s.id.startsWith("auto-cg-
  */
 export function aplicarDescuentoCerdas() {
   if (typeof window === "undefined") return;
+  // Con internet, se espera a bajar los datos de la nube (evita contar cerdas ya eliminadas)
+  if (!datosAlDia()) return;
   try {
     const reglas = leerConfig().consumoCerdas;
     if (!reglas.descontarGestacion) return;

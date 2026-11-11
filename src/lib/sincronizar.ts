@@ -433,6 +433,15 @@ function clavesLocales(): string[] {
 let enCurso: Promise<void> | null = null;
 
 /** Sube lo pendiente y baja lo nuevo. Se puede llamar seguido: no se encima. */
+/** ¿Ya se bajaron los datos de la nube desde que se abrió la app? */
+let bajadoEnEstaSesion = false;
+/**
+ * Los cálculos automáticos (consumo de las cerdas) esperan a tener los datos al día:
+ * un teléfono con datos viejos no debe contar cerdas que ya se eliminaron en otro.
+ * Sin internet se permite con lo que hay en el teléfono.
+ */
+export const datosAlDia = () => bajadoEnEstaSesion || (typeof navigator !== "undefined" && !navigator.onLine);
+
 export function sincronizar(): Promise<void> {
   if (enCurso) return enCurso;
   const p = ejecutarSincronizacion();
@@ -485,6 +494,7 @@ function ejecutarSincronizacion(): Promise<void> {
 
       await subir();
       await bajar();
+      bajadoEnEstaSesion = true;
       await subirRegistro().catch(() => {});
       guardarMeta({ ...leerMeta(), ultima: new Date().toISOString() });
       if (ultimoError && Object.keys(leerCola()).length === 0) ponerEstado("al-dia", ultimoError);
