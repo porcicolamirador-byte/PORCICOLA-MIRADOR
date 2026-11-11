@@ -1072,12 +1072,9 @@ export default function CerdaDetalle() {
               onClick={() => {
                 const j = jaulaDeCerda(cerda).trim().toUpperCase();
                 const area = j.startsWith("L-") ? "lactancia" : j.startsWith("G-") ? "gestacion" : "";
-                const q = new URLSearchParams({ cerda: String(cerda.id) });
-                if (area) {
-                  q.set("area", area);
-                  q.set("jaula", j);
-                }
-                router.push(`/jaula?${q.toString()}`);
+                // Ya tiene jaula: solo se abre el mapa en su área. Sin jaula: se abre para ubicarla
+                if (area) router.push(`/jaula?area=${area}`);
+                else router.push(`/jaula?${new URLSearchParams({ cerda: String(cerda.id) }).toString()}`);
               }}
               className="flex w-full items-center justify-between rounded-md bg-gray-100 p-1 text-left active:bg-gray-200"
             >
