@@ -907,6 +907,7 @@ export function calcularInventario(opciones: { incluirInactivos?: boolean; exclu
     }
   }
   for (const sd of salidas) {
+    if (sd.anulada) continue; // consumo automático eliminado: no se muestra ni descuenta
     const p = porId.get(sd.productoId);
     if (!p) continue;
     const cantidad = Number(sd.cantidad) || 0;
