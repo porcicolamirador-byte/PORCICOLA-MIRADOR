@@ -41,7 +41,7 @@ const areasDe = (j: ConfigJaulas): Record<Area, ConfigArea> => ({
 });
 
 /** Ocupante de una jaula (de esta granja o de otra) */
-type Ocupante = { c: { id: string; jaula?: unknown }; estado: string; granja: string; granjaNombre: string; propia: boolean };
+type Ocupante = { c: { id: string; jaula?: unknown; raza?: unknown }; estado: string; granja: string; granjaNombre: string; propia: boolean };
 /** Entrada del mapa común: id = código de la jaula */
 interface EntradaMapa {
   id: string;
@@ -50,6 +50,8 @@ interface EntradaMapa {
   granjaNombre: string;
   estado: string;
   fecha: string;
+  /** Raza de la cerda (para verla desde otras granjas) */
+  raza?: string;
 }
 function leerMapa(): EntradaMapa[] {
   try {
@@ -68,13 +70,18 @@ const guardarMapa = (m: EntradaMapa[]) => {
   } catch {}
   guardarConRegistro(CLAVE_JAULAS, [...m, ...extra]);
 };
-const entradaMapa = (jaula: string, cerdaId: string, granja: string, estado: string): EntradaMapa => ({
+const razaDe = (cerdaId: string) => {
+  const r = (leerCerdas().find((c) => c.id === cerdaId) as { raza?: unknown } | undefined)?.raza;
+  return typeof r === "string" ? r : "";
+};
+const entradaMapa = (jaula: string, cerdaId: string, granja: string, estado: string, raza = ""): EntradaMapa => ({
   id: jaula,
   cerdaId,
   granja,
   granjaNombre: leerGranjas().find((g) => g.id === granja)?.nombre ?? granja,
   estado,
   fecha: new Date().toISOString(),
+  ...(raza ? { raza } : {}),
 });
 
 const codigoJaula = (prefijo: string, n: number) => `${prefijo}-${String(n).padStart(2, "0")}`;
@@ -128,7 +135,7 @@ export default function JaulaPage() {
         porJaula.set(e.id, x);
         jaulaDe.set(e.cerdaId, e.id);
       } else {
-        porJaula.set(e.id, { c: { id: e.cerdaId }, estado: e.estado || "", granja: e.granja, granjaNombre: e.granjaNombre || "otra granja", propia: false });
+        porJaula.set(e.id, { c: { id: e.cerdaId, raza: e.raza }, estado: e.estado || "", granja: e.granja, granjaNombre: e.granjaNombre || "otra granja", propia: false });
       }
     }
     return { cerdas, porJaula, jaulaDe, granja };
@@ -152,9 +159,17 @@ export default function JaulaPage() {
       if (!j || !/^[GL]-\d{2}$/.test(j)) continue;
       if (nuevo.some((e) => e.granja === granja && e.cerdaId === x.c.id)) continue;
       if (nuevo.some((e) => e.id === j)) continue;
-      nuevo = [...nuevo, entradaMapa(j, x.c.id, granja, x.estado)];
+      nuevo = [...nuevo, entradaMapa(j, x.c.id, granja, x.estado, razaDe(x.c.id))];
       cambio = true;
     }
+    // Las cerdas de esta granja ya ubicadas guardan su raza para que la vean las otras granjas
+    nuevo = nuevo.map((e) => {
+      if (e.granja !== granja) return e;
+      const raza = razaDe(e.cerdaId);
+      if (!raza || e.raza === raza) return e;
+      cambio = true;
+      return { ...e, raza };
+    });
     if (cambio) guardarMapa(nuevo);
   }, [datos]);
 
@@ -184,7 +199,7 @@ export default function JaulaPage() {
     if (cerdaId) {
       const propia = granjaCerda === granja;
       const estado = propia ? datos?.cerdas.find((x) => x.c.id === cerdaId)?.estado ?? "" : (leerMapa().find((e) => e.cerdaId === cerdaId && e.granja === granjaCerda)?.estado ?? "");
-      const e = entradaMapa(jaula, cerdaId, granjaCerda, estado);
+      const e = entradaMapa(jaula, cerdaId, granjaCerda, estado, propia ? razaDe(cerdaId) : leerMapa().find((x) => x.cerdaId === cerdaId && x.granja === granjaCerda)?.raza ?? "");
       if (!propia) e.granjaNombre = leerMapa().find((x) => x.cerdaId === cerdaId && x.granja === granjaCerda)?.granjaNombre ?? e.granjaNombre;
       mapa = [...mapa, e];
     }
@@ -538,7 +553,12 @@ export default function JaulaPage() {
                       <span className={`shrink-0 font-bold tabular-nums text-slate-400 ${grande ? "text-xs" : "text-[10px]"}`}>{codigo}</span>
                       {x ? (
                         <span className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
-                          <span className={`arete-id truncate font-black tabular-nums text-amber-950 ${grande ? "text-xl" : "text-sm"}`}>{x.c.id}</span>
+                          <span className="flex min-w-0 flex-col items-end leading-tight">
+                            <span className={`arete-id max-w-full truncate font-black tabular-nums text-amber-950 ${grande ? "text-xl" : "text-sm"}`}>{x.c.id}</span>
+                            {typeof x.c.raza === "string" && x.c.raza && (
+                              <span className={`max-w-full truncate font-medium text-amber-800/80 ${grande ? "text-[11px]" : "text-[9px]"}`}>{x.c.raza}</span>
+                            )}
+                          </span>
                           <span className={`h-2 w-2 shrink-0 rounded-full ${color}`} aria-label={x.estado} />
                           {!x.propia && <span className="sr-only">{x.granjaNombre}</span>}
                         </span>
@@ -574,7 +594,7 @@ export default function JaulaPage() {
         const destinos = Array.from({ length: cfgOtra.porFila * cfgOtra.filas }, (_, i) => codigoJaula(cfgOtra.prefijo, i + 1));
         const libres = destinos.filter((j) => !datos?.porJaula.has(j));
         return (
-          <Modal abierta etiqueta={cfg.titulo} titulo={`Jaula ${jaulaSel}`} subtitulo={ocupante ? `Cerda ${ocupante.c.id}${ocupante.estado ? ` · ${ocupante.estado}` : ""}${ocupante.propia ? "" : ` · ${ocupante.granjaNombre}`}` : "Libre"} onCerrar={() => setJaulaSel(null)}>
+          <Modal abierta etiqueta={cfg.titulo} titulo={`Jaula ${jaulaSel}`} subtitulo={ocupante ? `Cerda ${ocupante.c.id}${typeof ocupante.c.raza === "string" && ocupante.c.raza ? ` · ${ocupante.c.raza}` : ""}${ocupante.estado ? ` · ${ocupante.estado}` : ""}${ocupante.propia ? "" : ` · ${ocupante.granjaNombre}`}` : "Libre"} onCerrar={() => setJaulaSel(null)}>
             {ocupante ? (
               <div className="flex flex-col gap-3">
                 {!trasladando ? (
