@@ -13,6 +13,7 @@ import ModuloPage from "@/components/ModuloPage";
 import Modal from "@/components/Modal";
 import SelectorApp from "@/components/SelectorApp";
 import { Boton } from "@/components/ui";
+import { confirmar } from "@/components/Dialogo";
 import { JAULAS_POR_DEFECTO, type ConfigJaulas } from "@/lib/config";
 import { leerFormaJaulas } from "@/lib/jaulas";
 import { estadoDeCerda, guardarCerdas, leerCerdas, leerHistorial, notificarCambio, useVersionDatos } from "@/lib/datos";
@@ -192,6 +193,24 @@ export default function JaulaPage() {
    * Ubica una cerda en la jaula (una cerda por jaula: si estaba en otra, se mueve).
    * cerdaId null = desocupar. "granjaCerda" permite mover una cerda de otra granja.
    */
+  /** Intercambia las cerdas de dos jaulas ocupadas */
+  const intercambiar = (jA: string, jB: string) => {
+    const granja = granjaActual();
+    const mapa = leerMapa();
+    const eA = mapa.find((e) => e.id === jA);
+    const eB = mapa.find((e) => e.id === jB);
+    if (!eA || !eB) return;
+    const ahora = new Date().toISOString();
+    guardarMapa([...mapa.filter((e) => e.id !== jA && e.id !== jB), { ...eA, id: jB, fecha: ahora }, { ...eB, id: jA, fecha: ahora }]);
+    const fichas = leerCerdas();
+    const nuevas = fichas.map((c) => {
+      if (eA.granja === granja && c.id === eA.cerdaId) return { ...c, jaula: jB };
+      if (eB.granja === granja && c.id === eB.cerdaId) return { ...c, jaula: jA };
+      return c;
+    });
+    guardarCerdas(nuevas);
+  };
+
   const asignar = (jaula: string, cerdaId: string | null, granjaCerda = granjaActual()) => {
     const granja = granjaActual();
     const anterior = leerMapa().find((e) => e.id === jaula);
@@ -329,7 +348,18 @@ export default function JaulaPage() {
       ponerArrastre(null);
       setTimeout(() => (sinClick.current = false), 350);
       if (!a || !a.sobre || a.sobre === a.desde) return;
-      if (datos?.porJaula.has(a.sobre)) return; // ocupada: no se mueve
+      const otra = datos?.porJaula.get(a.sobre);
+      if (otra) {
+        // Ocupada: se pregunta si se intercambian las dos cerdas
+        const desde = a.desde;
+        const hacia = a.sobre;
+        void confirmar({
+          titulo: "Mover cerdas",
+          mensaje: `¿Deseas mover estas cerdas? La ${a.cerda} pasa a ${hacia} y la ${otra.c.id} pasa a ${desde}.`,
+          aceptar: "Mover",
+        }).then((ok) => ok && intercambiar(desde, hacia));
+        return;
+      }
       asignar(a.sobre, a.cerda, a.granja);
     };
     const cancelar = () => {
@@ -541,7 +571,7 @@ export default function JaulaPage() {
                       className={`flex w-full items-center gap-2 rounded-xl px-2.5 text-left transition active:scale-[0.98] ${grande ? "h-20" : "h-10"} ${
                         arrastre && arrastre.sobre === codigo && codigo !== arrastre.desde
                           ? x
-                            ? "bg-rose-50 ring-2 ring-rose-400"
+                            ? "bg-sky-50 ring-2 ring-sky-500"
                             : "bg-emerald-50 ring-2 ring-emerald-500"
                           : arrastre && arrastre.desde === codigo
                             ? "border border-dashed border-amber-300 bg-amber-50/40 opacity-50"
@@ -582,7 +612,7 @@ export default function JaulaPage() {
         >
           <p className="arete-id text-lg font-black tabular-nums leading-tight text-white">{arrastre.cerda}</p>
           <p className="text-[10px] font-semibold text-amber-50">
-            {arrastre.sobre && arrastre.sobre !== arrastre.desde ? (datos?.porJaula.has(arrastre.sobre) ? `${arrastre.sobre} ocupada` : `→ ${arrastre.sobre}`) : `desde ${arrastre.desde}`}
+            {arrastre.sobre && arrastre.sobre !== arrastre.desde ? (datos?.porJaula.has(arrastre.sobre) ? `⇄ ${arrastre.sobre}` : `→ ${arrastre.sobre}`) : `desde ${arrastre.desde}`}
           </p>
         </div>
       )}
