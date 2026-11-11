@@ -777,6 +777,9 @@ export interface MovimientoInventario {
   detalle: string;
   facturaId?: string;
   salidaId?: string;
+  /** Préstamo entre granjas (y devolución, si es una) */
+  prestamoId?: string;
+  devolucionId?: string;
 }
 export interface ExistenciaProducto {
   producto: ProductoBodega;
@@ -940,6 +943,7 @@ export function calcularInventario(opciones: { incluirInactivos?: boolean; exclu
       cantidad,
       base: cantidad * factorKg(p),
       detalle: presto ? `Préstamo a ${pr.aNombre}` : `Préstamo de ${pr.deNombre}`,
+      prestamoId: pr.id,
       origen: p,
       precioBase: !presto && pr.valorUnitario > 0 ? pr.valorUnitario / factorKg(p) : undefined,
     });
@@ -952,6 +956,8 @@ export function calcularInventario(opciones: { incluirInactivos?: boolean; exclu
         cantidad: c,
         base: c * factorKg(p),
         detalle: presto ? `Devolución de ${pr.aNombre}` : `Devolución a ${pr.deNombre}`,
+        prestamoId: pr.id,
+        devolucionId: d.id,
         origen: p,
       });
     }
@@ -982,6 +988,8 @@ export function calcularInventario(opciones: { incluirInactivos?: boolean; exclu
         detalle: m.origen.id === producto.id ? m.detalle : `${m.detalle} · ${fmtNum(m.cantidad)} ${m.origen.unidad} de ${m.origen.nombre}`,
         facturaId: m.facturaId,
         salidaId: m.salidaId,
+        prestamoId: m.prestamoId,
+        devolucionId: m.devolucionId,
       }));
       movimientos.sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.hora ?? "").localeCompare(a.hora ?? ""));
       const neto = (l: typeof lista) => l.reduce((s, m) => s + (m.tipo === "entrada" ? m.base : -m.base), 0) / f;
@@ -1197,6 +1205,24 @@ const guardarPrestamos = (l: PrestamoBodega[]) => {
   const meds = leer<unknown[]>(CLAVE_PRESTAMOS, []).filter((p) => (p as { clase?: string })?.clase === "medicamento");
   escribir(CLAVE_PRESTAMOS, [...l, ...meds]);
 };
+
+/** Elimina un préstamo de producto (las dos bodegas vuelven a como estaban). Error si tiene devoluciones o pagos */
+export function eliminarPrestamo(id: string): string | null {
+  const pr = leerPrestamos().find((p) => p.id === id);
+  if (!pr) return "No se encontró el préstamo.";
+  if ((pr.devoluciones ?? []).length) return "Este préstamo ya tiene devoluciones o pagos. Elimina primero las devoluciones.";
+  guardarPrestamos(leerPrestamos().filter((p) => p.id !== id));
+  return null;
+}
+
+/** Elimina una devolución en producto de un préstamo: vuelve a quedar como deuda */
+export function eliminarDevolucion(prestamoId: string, devolucionId: string): string | null {
+  const lista = leerPrestamos();
+  const pr = lista.find((p) => p.id === prestamoId);
+  if (!pr || !(pr.devoluciones ?? []).some((d) => d.id === devolucionId)) return "No se encontró la devolución.";
+  guardarPrestamos(lista.map((p) => (p.id === prestamoId ? { ...p, devoluciones: p.devoluciones.filter((d) => d.id !== devolucionId) } : p)));
+  return null;
+}
 
 /* ───────────── Tomar prestado (existencias publicadas por cada granja) ───────────── */
 

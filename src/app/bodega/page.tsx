@@ -67,6 +67,8 @@ import {
   type Factura,
   type ProductoBodega,
   eliminarSalida,
+  eliminarPrestamo,
+  eliminarDevolucion,
   actualizarFactura,
   anularConsumoAutomatico,
   kgDeCantidad,
@@ -800,6 +802,28 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
     eliminarSalida(salidaId);
   };
 
+  /** Quitar cualquier movimiento de la lista: salida, factura, préstamo o devolución */
+  const quitarMovimiento = async (m: (typeof movimientos)[number]) => {
+    if (!puede("bodega")) return void avisarSinPermisoBodega();
+    if (m.salidaId) return quitarSalida(m.salidaId);
+    if (m.facturaId) {
+      const f = leerFacturas().find((x) => x.id === m.facturaId);
+      if (f) await eliminarFacturaConAviso(f);
+      return;
+    }
+    if (m.prestamoId && m.devolucionId) {
+      if (!(await confirmar({ titulo: "Eliminar devolución", mensaje: `Se quitará la devolución de ${fmt(m.cantidad)} ${p.unidad}. El préstamo vuelve a quedar como deuda en las dos granjas.`, aceptar: "Eliminar", destructivo: true }))) return;
+      const r = eliminarDevolucion(m.prestamoId, m.devolucionId);
+      if (r) await avisar({ titulo: "No se pudo eliminar", mensaje: r });
+      return;
+    }
+    if (m.prestamoId) {
+      if (!(await confirmar({ titulo: "Eliminar préstamo", mensaje: `Se quitará el préstamo de ${fmt(m.cantidad)} ${p.unidad} en las dos granjas: el producto vuelve a la bodega que lo prestó y desaparece la deuda.`, aceptar: "Eliminar", destructivo: true }))) return;
+      const r = eliminarPrestamo(m.prestamoId);
+      if (r) await avisar({ titulo: "No se puede eliminar", mensaje: r });
+    }
+  };
+
   return (
     <Modal
       abierta
@@ -852,11 +876,11 @@ function DetalleProducto({ item, onCerrar }: { item: ExistenciaProducto; onCerra
                         {formatoFecha(m.fecha)}
                         {m.hora && <span className="block text-[10px]">{formatoHora(m.hora)}</span>}
                       </span>
-                      {m.salidaId && (!esConsumoAutomatico(m.salidaId) || puedeQuitarConsumoAuto()) && (
+                      {(m.salidaId ? !esConsumoAutomatico(m.salidaId) || puedeQuitarConsumoAuto() : !!(m.facturaId || m.prestamoId)) && (
                         <button
                           type="button"
-                          onClick={() => quitarSalida(m.salidaId!)}
-                          aria-label="Eliminar salida"
+                          onClick={() => void quitarMovimiento(m)}
+                          aria-label="Eliminar movimiento"
                           className="rounded-full px-1.5 text-slate-400 hover:text-rose-600"
                         >
                           ✕
@@ -1412,36 +1436,41 @@ function DetalleFacturaGasto({ id, onCerrar }: { id: string; onCerrar: () => voi
 
 /* ───────────────────── Detalle de factura ───────────────────── */
 
+/** Elimina una factura con sus avisos (no deja existencias negativas). Devuelve true si se eliminó */
+async function eliminarFacturaConAviso(f: Factura): Promise<boolean> {
+  // No se permite si ya se consumió parte de lo que entró con esta factura
+  const inventario = calcularInventario();
+  const quedarianNegativos = f.lineas
+    .map((l) => {
+      const item = inventario.find((i) => i.producto.id === l.productoId);
+      return item && item.disponible - l.cantidad < 0 ? item.producto.nombre : null;
+    })
+    .filter(Boolean);
+  if (quedarianNegativos.length) {
+    await avisar({
+      titulo: "No se puede eliminar",
+      mensaje: `Ya se registraron salidas de ${quedarianNegativos.join(", ")}. Elimina primero esas salidas para no dejar existencias negativas.`,
+    });
+    return false;
+  }
+  if (
+    !(await confirmar({
+      titulo: `Eliminar factura ${f.numero}`,
+      mensaje: `Las existencias se descontarán${f.movimientoId ? " y se borrará el gasto de Contabilidad" : ""}${(f.abonos ?? []).length ? " y sus abonos" : ""}.`,
+      aceptar: "Eliminar",
+      destructivo: true,
+    }))
+  )
+    return false;
+  guardarFacturas(leerFacturas().filter((x) => x.id !== f.id));
+  const quitar = new Set([f.movimientoId, ...(f.abonos ?? []).map((a) => a.movimientoId)].filter(Boolean));
+  if (quitar.size) guardarMovimientos(leerMovimientos().filter((m) => !quitar.has(m.id)));
+  return true;
+}
+
 function DetalleFactura({ factura: f, productos, onCerrar, onEditar }: { factura: Factura; productos: ProductoBodega[]; onCerrar: () => void; onEditar: () => void }) {
   const eliminar = async () => {
-    // No se permite si ya se consumió parte de lo que entró con esta factura
-    const inventario = calcularInventario();
-    const quedarianNegativos = f.lineas
-      .map((l) => {
-        const item = inventario.find((i) => i.producto.id === l.productoId);
-        return item && item.disponible - l.cantidad < 0 ? item.producto.nombre : null;
-      })
-      .filter(Boolean);
-    if (quedarianNegativos.length) {
-      await avisar({
-        titulo: "No se puede eliminar",
-        mensaje: `Ya se registraron salidas de ${quedarianNegativos.join(", ")}. Elimina primero esas salidas para no dejar existencias negativas.`,
-      });
-      return;
-    }
-    if (
-      !(await confirmar({
-        titulo: `Eliminar factura ${f.numero}`,
-        mensaje: `Las existencias se descontarán${f.movimientoId ? " y se borrará el gasto de Contabilidad" : ""}.`,
-        aceptar: "Eliminar",
-        destructivo: true,
-      }))
-    )
-      return;
-    guardarFacturas(leerFacturas().filter((x) => x.id !== f.id));
-    const quitar = new Set([f.movimientoId, ...(f.abonos ?? []).map((a) => a.movimientoId)].filter(Boolean));
-    if (quitar.size) guardarMovimientos(leerMovimientos().filter((m) => !quitar.has(m.id)));
-    onCerrar();
+    if (await eliminarFacturaConAviso(f)) onCerrar();
   };
 
   const credito = f.pago === "credito";
