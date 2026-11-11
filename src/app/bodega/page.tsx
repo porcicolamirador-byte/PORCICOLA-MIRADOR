@@ -67,6 +67,7 @@ import {
   type Factura,
   type ProductoBodega,
   eliminarSalida,
+  actualizarFactura,
   anularConsumoAutomatico,
   kgDeCantidad,
   leerCorrales,
@@ -124,6 +125,7 @@ export default function BodegaPage() {
   };
   const [productoSel, setProductoSel] = useState<string | null>(null);
   const [facturaSel, setFacturaSel] = useState<string | null>(null);
+  const [editandoFactura, setEditandoFactura] = useState<Factura | null>(null);
   const [facturaGastoSel, setFacturaGastoSel] = useState<string | null>(null);
 
   // Una sola vez: los artículos de la bodega anterior pasan al catálogo
@@ -424,7 +426,28 @@ export default function BodegaPage() {
       )}
       {producto && <DetalleProducto item={producto} onCerrar={() => setProductoSel(null)} />}
       {factura && datos && (
-        <DetalleFactura factura={factura} productos={datos.productos} onCerrar={() => setFacturaSel(null)} />
+        <DetalleFactura
+          factura={factura}
+          productos={datos.productos}
+          onCerrar={() => setFacturaSel(null)}
+          onEditar={() => {
+            if (!puede("bodega")) return void avisarSinPermisoBodega();
+            setEditandoFactura(factura);
+            setFacturaSel(null);
+          }}
+        />
+      )}
+      {editandoFactura && datos && (
+        <NuevaFactura
+          abierta
+          editar={editandoFactura}
+          productos={datos.productos}
+          facturas={datos.facturas}
+          onCerrar={() => {
+            setEditandoFactura(null);
+            setFacturaSel(null);
+          }}
+        />
       )}
       {facturaGastoSel && <DetalleFacturaGasto id={facturaGastoSel} onCerrar={() => setFacturaGastoSel(null)} />}
     </ModuloPage>
@@ -447,11 +470,14 @@ function NuevaFactura({
   productos,
   facturas,
   onCerrar,
+  editar,
 }: {
   abierta: boolean;
   productos: ProductoBodega[];
   facturas: Factura[];
   onCerrar: () => void;
+  /** Factura a editar (si no, es nueva) */
+  editar?: Factura;
 }) {
   const [numero, setNumero] = useState("");
   const [proveedor, setProveedor] = useState("");
@@ -461,6 +487,19 @@ function NuevaFactura({
   const [comoGasto, setComoGasto] = useState(true);
   const [pago, setPago] = useState<"" | "contado" | "credito">("");
   const [error, setError] = useState("");
+
+  // Al editar: el formulario arranca con los datos de la factura
+  useEffect(() => {
+    if (!abierta || !editar) return;
+    setNumero(editar.numero);
+    setProveedor(editar.proveedor ?? "");
+    setFecha(editar.fecha);
+    setNota(editar.nota ?? "");
+    setLineas(editar.lineas.map((l) => ({ clave: nuevoId(), productoId: l.productoId, cantidad: String(l.cantidad).replace(".", ","), valor: String(Math.round(l.valorUnitario)) })));
+    setComoGasto(editar.registrarGasto ?? Boolean(editar.movimientoId));
+    setPago(editar.pago ?? "contado");
+    setError("");
+  }, [abierta, editar]);
 
   const ordenados = [...productos].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
   const unidadDe = (id: string) => productos.find((p) => p.id === id)?.unidad ?? "";
@@ -498,6 +537,25 @@ function NuevaFactura({
     if (!pago) return setError("Selecciona el método de pago: contado o crédito.");
     const ids = validas.map((l) => l.productoId);
     if (new Set(ids).size !== ids.length) return setError("Un producto está repetido; súmalo en una sola línea.");
+    if (editar) {
+      const primeroEd = productos.find((p) => p.id === validas[0].productoId);
+      const r = actualizarFactura(
+        editar.id,
+        {
+          numero: n,
+          proveedor: proveedor.trim() || undefined,
+          fecha,
+          nota: nota.trim() || undefined,
+          lineas: validas.map((l) => ({ productoId: l.productoId, cantidad: num(l.cantidad), valorUnitario: num(l.valor) })),
+          pago,
+          registrarGasto: comoGasto,
+        },
+        primeroEd ? CATEGORIA_GASTO[primeroEd.categoria] : "Otros gastos",
+      );
+      if (r) return setError(r);
+      cerrar();
+      return;
+    }
     const repetida = facturas.find(
       (f) => f.numero.toLowerCase() === n.toLowerCase() && (f.proveedor ?? "").toLowerCase() === proveedor.trim().toLowerCase()
     );
@@ -556,8 +614,8 @@ function NuevaFactura({
     <Modal
       abierta={abierta}
       etiqueta="Bodega"
-      titulo="Ingresar factura"
-      subtitulo="Compra de insumos"
+      titulo={editar ? `Editar factura ${editar.numero}` : "Ingresar factura"}
+      subtitulo={editar ? "Al cambiar precios se recalculan los costos" : "Compra de insumos"}
       icono="🧾"
       onCerrar={cerrar}
     >
@@ -679,7 +737,7 @@ function NuevaFactura({
 
         {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
         <Boton type="submit" className="mt-1 w-full py-3">
-          Guardar factura
+          {editar ? "Guardar cambios" : "Guardar factura"}
         </Boton>
       </form>
     </Modal>
@@ -1354,7 +1412,7 @@ function DetalleFacturaGasto({ id, onCerrar }: { id: string; onCerrar: () => voi
 
 /* ───────────────────── Detalle de factura ───────────────────── */
 
-function DetalleFactura({ factura: f, productos, onCerrar }: { factura: Factura; productos: ProductoBodega[]; onCerrar: () => void }) {
+function DetalleFactura({ factura: f, productos, onCerrar, onEditar }: { factura: Factura; productos: ProductoBodega[]; onCerrar: () => void; onEditar: () => void }) {
   const eliminar = async () => {
     // No se permite si ya se consumió parte de lo que entró con esta factura
     const inventario = calcularInventario();
@@ -1435,9 +1493,14 @@ function DetalleFactura({ factura: f, productos, onCerrar }: { factura: Factura;
             {credito ? "Cada abono se registra como gasto en Contabilidad." : "Registrada como gasto en Contabilidad."}
           </p>
         )}
-        <button type="button" onClick={eliminar} className="self-center rounded-full px-4 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50">
-          Eliminar factura
-        </button>
+        <div className="flex items-center justify-center gap-2">
+          <button type="button" onClick={onEditar} className="rounded-full px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50">
+            Editar factura
+          </button>
+          <button type="button" onClick={eliminar} className="rounded-full px-4 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50">
+            Eliminar factura
+          </button>
+        </div>
       </div>
     </Modal>
   );

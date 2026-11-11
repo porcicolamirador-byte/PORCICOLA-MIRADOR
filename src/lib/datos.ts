@@ -1601,6 +1601,96 @@ export function registrarConsumoLote(datos: { loteId: string; productoId: string
 const categoriaContable = (c: CategoriaBodega) =>
   c === "Alimento" ? "Alimento" : c === "Medicamentos" || c === "Vacunas" ? "Medicamentos y vacunas" : "Otros gastos";
 
+/**
+ * Vuelve a calcular el costo del alimento que salió a los lotes según las facturas
+ * de las que salió (primero en entrar, primero en salir). Se usa al editar una factura.
+ * Solo toca lo que salió con factura; lo que salió sin existencia sigue su propio ajuste.
+ * Devuelve cuántos registros de alimento cambiaron.
+ */
+export function recalcularCostosAlimento(): number {
+  const porSalida = new Map(trazabilidadSalidas().map((t) => [t.salida.id, t]));
+  let cambios = 0;
+  const lotes = leerLotes().map((l) => {
+    let cambia = false;
+    const alimento = l.alimento.map((a) => {
+      const t = a.salidaId ? porSalida.get(a.salidaId) : undefined;
+      if (!t || (a.sinExistencia ?? 0) > 1e-9 || t.sinFactura > 1e-6) return a;
+      const costo = Math.round(t.valor);
+      if (costo === Math.round(Number(a.costo) || 0)) return a;
+      cambia = true;
+      cambios++;
+      return { ...a, costo };
+    });
+    return cambia ? { ...l, alimento } : l;
+  });
+  if (cambios) guardarLotes(lotes);
+  return cambios;
+}
+
+/**
+ * Edita una factura: número, proveedor, fecha, nota, productos, precios y pago.
+ * Ajusta su gasto en Contabilidad y recalcula el costo del alimento de los lotes.
+ * Devuelve un texto de error o null.
+ */
+export function actualizarFactura(
+  id: string,
+  d: Pick<Factura, "numero" | "proveedor" | "fecha" | "nota" | "lineas" | "pago" | "registrarGasto">,
+  categoriaGasto: string,
+): string | null {
+  const facturas = leerFacturas();
+  const vieja = facturas.find((f) => f.id === id);
+  if (!vieja) return "No se encontró la factura.";
+  const nueva: Factura = { ...vieja, ...d };
+  const total = totalFactura(nueva);
+  const abonado = abonadoFactura(vieja);
+  if (d.pago === "credito" && total + 0.5 < abonado) return `El total no puede quedar por debajo de lo ya abonado (${formatoPesos(abonado)}).`;
+  if (vieja.pago === "credito" && d.pago === "contado" && abonado > 0) return "Esta factura ya tiene abonos: no se puede pasar a contado. Págala completa desde la factura.";
+
+  // No se puede quitar de bodega más de lo que queda (lo demás ya salió)
+  const inventario = calcularInventario();
+  const cantidadDe = (f: Factura, productoId: string) => f.lineas.filter((l) => l.productoId === productoId).reduce((t, l) => t + (Number(l.cantidad) || 0), 0);
+  for (const productoId of new Set([...vieja.lineas, ...nueva.lineas].map((l) => l.productoId))) {
+    const baja = cantidadDe(vieja, productoId) - cantidadDe(nueva, productoId);
+    if (baja <= 1e-9) continue;
+    const item = inventario.find((i) => i.producto.id === productoId);
+    if (item && item.disponible - baja < -1e-9) return `Ya salió parte de ${item.producto.nombre}: no puedes bajar la cantidad más de lo que queda en bodega (${Math.max(0, item.disponible).toLocaleString("es-CO", { maximumFractionDigits: 2 })} ${item.producto.unidad}).`;
+  }
+
+  // Gasto en Contabilidad
+  let movs = leerMovimientos();
+  const descripcion = `Factura ${nueva.numero}${nueva.proveedor ? ` · ${nueva.proveedor}` : ""}`;
+  if (nueva.pago === "contado") {
+    if (nueva.registrarGasto && total > 0) {
+      if (vieja.movimientoId && movs.some((m) => m.id === vieja.movimientoId)) {
+        movs = movs.map((m) => (m.id === vieja.movimientoId ? { ...m, fecha: nueva.fecha, monto: total, descripcion, categoria: categoriaGasto } : m));
+      } else {
+        const movimientoId = nuevoId();
+        movs = [...movs, { id: movimientoId, fecha: nueva.fecha, tipo: "gasto", categoria: categoriaGasto, descripcion, monto: total }];
+        nueva.movimientoId = movimientoId;
+      }
+    } else if (vieja.movimientoId) {
+      movs = movs.filter((m) => m.id !== vieja.movimientoId);
+      delete nueva.movimientoId;
+    }
+    delete nueva.abonos;
+  } else {
+    // A crédito: el gasto entra con cada abono
+    if (vieja.pago !== "credito" && vieja.movimientoId) {
+      movs = movs.filter((m) => m.id !== vieja.movimientoId);
+      delete nueva.movimientoId;
+    }
+    nueva.abonos = vieja.abonos ?? [];
+    // Los abonos ya registrados toman el número nuevo en su descripción
+    const ids = new Set(nueva.abonos.map((a) => a.movimientoId).filter(Boolean));
+    if (vieja.numero !== nueva.numero) movs = movs.map((m) => (ids.has(m.id) ? { ...m, descripcion: m.descripcion.replace(`Factura ${vieja.numero}`, `Factura ${nueva.numero}`) } : m));
+  }
+  guardarMovimientos(movs);
+  guardarFacturas(facturas.map((f) => (f.id === id ? nueva : f)));
+  recalcularCostosAlimento();
+  recontabilizarSinExistencia(nueva);
+  return null;
+}
+
 export function recontabilizarSinExistencia(factura: Factura): number {
   const productos = leerProductos();
   const porId = new Map(productos.map((p) => [p.id, p]));
