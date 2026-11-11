@@ -248,6 +248,8 @@ export default function Gestacion() {
         return "Baja";
       case "Celo":
         return "Celo";
+      case "Repetición de celo":
+        return "Próxima a Celo";
       case "Tratamiento":
         return "Tratamiento";
       default:

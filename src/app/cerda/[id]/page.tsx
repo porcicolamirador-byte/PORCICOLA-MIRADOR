@@ -96,6 +96,8 @@ function obtenerColorPorTipo(tipo: string): string {
       return "bg-orange-500";
     case "Celo":
       return "bg-yellow-500";
+    case "Repetición de celo":
+      return "bg-orange-500";
     case "Aborto":
       return "bg-pink-500";
     case "Baja":
@@ -123,6 +125,7 @@ const TIPOS_HISTORIAL = [
   "Genética no usada",
   "Confirmación de Gestación",
   "Celo",
+  "Repetición de celo",
   "Parto",
   "Destete",
   "Aborto",
@@ -145,6 +148,8 @@ function infoTipo(tipo: string): { icono: string; fondo: string; borde: string; 
       return { icono: "✅", fondo: "bg-blue-100", borde: "border-blue-100", texto: "text-blue-800" };
     case "Celo":
       return { icono: "🔥", fondo: "bg-amber-100", borde: "border-amber-100", texto: "text-amber-800" };
+    case "Repetición de celo":
+      return { icono: "🔁", fondo: "bg-orange-100", borde: "border-orange-100", texto: "text-orange-800" };
     case "Parto":
       return { icono: "🐷", fondo: "bg-sky-100", borde: "border-sky-100", texto: "text-sky-800" };
     case "Destete":
@@ -509,6 +514,8 @@ export default function CerdaDetalle() {
         return "Baja";
       case "Celo":
         return "Celo";
+      case "Repetición de celo":
+        return "Próxima a Celo";
       case "Tratamiento":
         return "Tratamiento";
       default:
@@ -561,6 +568,26 @@ export default function CerdaDetalle() {
         mostrarAviso("Revisar Ciclo Reproductivo");
         return;
       }
+    }
+
+    // Repetición de celo: solo entre 15 y 45 días después de una inseminación que no terminó en parto ni aborto
+    if (tipo === "Repetición de celo") {
+      const cerrada = ultimaInseminacion
+        ? registros.some((r) => ["Parto", "Aborto", "Repetición de celo"].includes(r.tipo) && r.fecha >= ultimaInseminacion.fecha)
+        : true;
+      if (!ultimaInseminacion || cerrada) {
+        mostrarAviso("La repetición de celo se registra después de una inseminación");
+        return;
+      }
+      if (diasDesdeInseminacion === null || diasDesdeInseminacion < 15 || diasDesdeInseminacion > 45) {
+        mostrarAviso("La repetición de celo se registra entre 15 y 45 días después de la inseminación");
+        return;
+      }
+    }
+
+    if (ultimoTipo === "Repetición de celo" && ["Parto", "Destete"].includes(tipo)) {
+      mostrarAviso("Revisar Ciclo Reproductivo");
+      return;
     }
 
     if (ultimoTipo === "Celo") {
@@ -693,6 +720,12 @@ export default function CerdaDetalle() {
 
     if (tipo === "Celo") {
       nuevo.mensaje = "Revisar Celo";
+    }
+
+    if (tipo === "Repetición de celo") {
+      const d = parsearFechaLocal(fecha);
+      d.setDate(d.getDate() + 21);
+      nuevo.mensaje = `Ciclo reiniciado · próximo celo ${formatearFechaCorta(fechaLocalISO(d))}`;
     }
 
     if (tipo === "Evento") {
@@ -1209,7 +1242,7 @@ export default function CerdaDetalle() {
           // Confirmación de gestación pendiente (1.ª día 18–24, 2.ª día 40–44)
           const ia = registros.find((x) => x.tipo === "Inseminación");
           const diasIa = ia?.fecha ? calcularDiasEntre(ia.fecha, fechaLocalISO(new Date())) : null;
-          const cerradaIa = ia ? registros.some((x) => ["Parto", "Aborto"].includes(x.tipo) && x.fecha >= ia.fecha) : true;
+          const cerradaIa = ia ? registros.some((x) => ["Parto", "Aborto", "Repetición de celo"].includes(x.tipo) && x.fecha >= ia.fecha) : true;
           const porConfirmar =
             ia && diasIa !== null && !cerradaIa
               ? CONFIRMACIONES_GESTACION.find((c) => diasIa >= c.desde && diasIa <= c.hasta && !(c.etapa === 1 ? ia.confirmacion1 : ia.confirmacion2))
@@ -1539,7 +1572,7 @@ export default function CerdaDetalle() {
                       }
                     }}
                     titulo="Tipo de registro"
-                    opciones={["Inseminación", "Compra de genética", "Celo", "Parto", "Destete", "Aborto", "Baja", "Tratamiento", "Evento"].map((t) => ({ valor: t, texto: t }))}
+                    opciones={["Inseminación", "Compra de genética", "Celo", "Repetición de celo", "Parto", "Destete", "Aborto", "Baja", "Tratamiento", "Evento"].map((t) => ({ valor: t, texto: t }))}
                     className="w-full max-w-[320px]"
                     claseBoton={"mt-1 rounded-2xl bg-gray-100 border border-gray-300 px-4 py-2 text-base text-black"}
                   />

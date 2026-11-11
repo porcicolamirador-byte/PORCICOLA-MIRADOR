@@ -37,6 +37,7 @@ export type TipoEvento =
   | "Parto"
   | "Destete"
   | "Celo"
+  | "Repetición de celo"
   | "Aborto"
   | "Tratamiento"
   | "Vacunación"

@@ -89,7 +89,7 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
     // Confirmación de gestación en dos momentos; al confirmar, la alerta desaparece
     const ia = regInseminacion as Registro & { confirmacion1?: string; confirmacion2?: string };
     // Ya parió (o abortó) después de esta inseminación: se quitan las alertas de la gestación
-    const cerrada = historial.some((r) => ['Parto', 'Aborto'].includes(r.tipo || '') && (r.fecha || '') >= (ia.fecha || ''));
+    const cerrada = historial.some((r) => ['Parto', 'Aborto', 'Repetición de celo'].includes(r.tipo || '') && (r.fecha || '') >= (ia.fecha || ''));
     const confirmacionAntigua = historial.some((r) => r.tipo === 'Confirmación de Gestación' && (r.fecha || '') >= (ia.fecha || ''));
     for (const c of CONFIRMACIONES_GESTACION) {
       const hecha = c.etapa === 1 ? ia.confirmacion1 : ia.confirmacion2;
@@ -244,6 +244,24 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
         descripcion: 'Monitorear aparición de celo postdestete',
         dias: diasDesdeDestete,
         fecha: regDestete.fecha,
+      });
+    }
+  }
+
+  // Repetición de celo: el ciclo se reinicia y el próximo celo llega hacia el día 21.
+  // Alerta desde el día 17 hasta registrar celo o inseminación; días 21 y 22 en crítica.
+  const regRepeticion = historial.find((r) => r.tipo === 'Repetición de celo');
+  if (regRepeticion) {
+    const diasRep = calcularDiasEntre(regRepeticion.fecha || hoy, hoy);
+    const atendida = historial.some((r) => ['Celo', 'Inseminación', 'Parto', 'Aborto', 'Baja'].includes(r.tipo || '') && (r.fecha || '') > (regRepeticion.fecha || ''));
+    if (!atendida && diasRep >= 17 && diasRep <= 22) {
+      tareas.push({
+        id: cerda.id,
+        tipo: 'Celo esperado (repetición)',
+        prioridad: diasRep >= 21 ? 'critica' : 'alta',
+        descripcion: diasRep >= 21 ? 'Día 21 tras la repetición: revisar celo e inseminar' : `Día ${diasRep} tras la repetición: vigilar celo (día 21)`,
+        dias: diasRep,
+        fecha: regRepeticion.fecha,
       });
     }
   }

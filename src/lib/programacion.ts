@@ -50,7 +50,9 @@ export const ESTILO: Record<Clase, { icono: string; fondo: string; texto: string
   destete: { icono: "🍼", fondo: "bg-orange-100", texto: "text-orange-800" },
 };
 
-const REPRO = ["Inseminación", "Confirmación de Gestación", "Parto", "Destete", "Celo", "Aborto"];
+const REPRO = ["Inseminación", "Confirmación de Gestación", "Parto", "Destete", "Celo", "Repetición de celo", "Aborto"];
+/** Tras una repetición de celo el próximo celo llega hacia el día 21 (se vigila del 17 al 22) */
+const CELO_TRAS_REPETICION = [17, 22] as const;
 
 function nombreDe(c: CerdaDatos) {
   return typeof c.nombre === "string" && c.nombre.trim() ? `${c.id} · ${c.nombre}` : `Cerda ${c.id}`;
@@ -92,6 +94,17 @@ export function calcularProgramacion(fechaHoy: string) {
           detalle: `Celo detectado el ${formatoFecha(f)}`,
           fecha: f,
           hasta: sumarDias(f, VENTANA_IA_TRAS_CELO),
+        });
+        break;
+
+      case "Repetición de celo":
+        eventos.push({
+          ...base,
+          clase: "vigilar",
+          titulo: "Vigilar celo",
+          detalle: `Repetición de celo el ${formatoFecha(f)} · celo esperado hacia el día 21`,
+          fecha: sumarDias(f, CELO_TRAS_REPETICION[0]),
+          hasta: sumarDias(f, CELO_TRAS_REPETICION[1]),
         });
         break;
 
@@ -269,6 +282,13 @@ export function calcularPlan(fechaHoy: string): PlanProgramacion {
         const hasta = sumarDias(f, VENTANA_IA_TRAS_CELO);
         t.accion = { icono: "🧬", titulo: "Inseminar", detalle: `En celo desde el ${formatoFecha(f)}`, fecha: f, hasta };
         pendientes.push({ tarjeta: t, desde: f, hasta });
+        break;
+      }
+      case "Repetición de celo": {
+        const desde = sumarDias(f, CELO_TRAS_REPETICION[0]);
+        const hasta = sumarDias(f, CELO_TRAS_REPETICION[1]);
+        t.accion = { icono: "🔁", titulo: "Celo esperado", detalle: `Repetición de celo el ${formatoFecha(f)} · día 17 a 22`, fecha: desde, hasta };
+        pendientes.push({ tarjeta: t, desde, hasta });
         break;
       }
       case "Destete":
