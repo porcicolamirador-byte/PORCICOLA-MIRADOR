@@ -38,7 +38,7 @@ const enEspera: Solicitud[] = [];
 export function confirmar(opciones: OpcionesDialogo): Promise<boolean> {
   const permiso = opciones.requiere === undefined ? (opciones.destructivo ? "eliminar" : null) : opciones.requiere;
   if (permiso && !puede(permiso)) {
-    const nombres: Record<PermisoNube, string> = { eliminar: "eliminar", bodega: "usar la bodega", contabilidad: "usar contabilidad", ajustes: "cambiar los ajustes" };
+    const nombres: Record<PermisoNube, string> = { eliminar: "eliminar", bodega: "usar la bodega", contabilidad: "usar contabilidad", ajustes: "cambiar los ajustes", consumoAuto: "eliminar el consumo automático" };
     return avisar({ titulo: "Sin permiso", mensaje: `Tu usuario no tiene permiso para ${nombres[permiso]}. Pídeselo al administrador.` }).then(() => false);
   }
   return new Promise((responder) => {
