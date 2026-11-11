@@ -594,6 +594,8 @@ export interface SalidaBodega {
   plan?: number;
   /** Consumo automático eliminado: queda en 0 para que no se vuelva a crear ese día */
   anulada?: boolean;
+  /** Consumo automático que se había eliminado y se vuelve a calcular (entró una factura) */
+  reactivada?: boolean;
 }
 
 /* ═════════════════════ Corrales ═════════════════════ */
@@ -2076,6 +2078,23 @@ export function eliminarGastoLote(loteId: string, gastoId: string) {
 /** Elimina un consumo automático de cerdas: queda anulado (en 0) para que no se vuelva a crear ese día */
 export function anularConsumoAutomatico(salidaId: string) {
   guardarSalidas(leerSalidas().map((s) => (s.id === salidaId ? { ...s, cantidad: 0, plan: 0, anulada: true } : s)));
+}
+
+/**
+ * Al ingresar (o editar) una factura, los consumos automáticos de cerdas que se habían
+ * eliminado desde la fecha de la factura en adelante, de esos mismos productos, se vuelven
+ * a calcular: ahora sí hay alimento para descontar esos días.
+ */
+export function reactivarConsumoAutomatico(productoIds: string[], desde: string): number {
+  const ids = new Set(productoIds);
+  let n = 0;
+  const lista = leerSalidas().map((s) => {
+    if (!s.anulada || !(s.id.startsWith("auto-cg-") || s.id.startsWith("auto-cl-")) || s.fecha < desde || !ids.has(s.productoId)) return s;
+    n++;
+    return { ...s, anulada: false, reactivada: true };
+  });
+  if (n) guardarSalidas(lista);
+  return n;
 }
 
 export function eliminarSalida(salidaId: string) {

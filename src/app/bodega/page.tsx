@@ -60,6 +60,7 @@ import {
   totalFactura,
   trazabilidadSalidas,
   recontabilizarSinExistencia,
+  reactivarConsumoAutomatico,
   saldoFactura,
   useVersionDatos,
   type CategoriaBodega,
@@ -555,6 +556,7 @@ function NuevaFactura({
         primeroEd ? CATEGORIA_GASTO[primeroEd.categoria] : "Otros gastos",
       );
       if (r) return setError(r);
+      reactivarConsumoAutomatico(validas.map((l) => l.productoId), fecha);
       cerrar();
       return;
     }
@@ -601,6 +603,8 @@ function NuevaFactura({
       factura.movimientoId = movimientoId;
     }
     guardarFacturas([...leerFacturas(), factura]);
+    // Los consumos automáticos eliminados desde la fecha de la factura se vuelven a calcular
+    reactivarConsumoAutomatico(factura.lineas.map((l) => l.productoId), factura.fecha);
     // Si había salidas sin existencia de estos productos y el precio cambió, se revaloran
     const corregidos = recontabilizarSinExistencia(factura);
     cerrar();

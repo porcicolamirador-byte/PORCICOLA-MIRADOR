@@ -206,6 +206,13 @@ export function aplicarDescuentoCerdas() {
         const previa = porId.get(id);
         // Eliminado a mano: ese día ya no se descuenta
         if (previa?.anulada) continue;
+        if (!esHoy && previa?.reactivada) {
+          // Se había eliminado y entró una factura: se descuenta lo de ese día
+          const { reactivada: _r, ...resto } = previa;
+          void _r;
+          cambios.set(id, { ...resto, productoId: producto.id, cantidad: porDia, plan: porDia, nota: `${nota.replace(/ · [\d.,]+ kg hoy$/, "")} · ${kgTexto(kgDia)}` });
+          continue;
+        }
         if (!esHoy && previa) {
           // Día pasado que quedó corto porque no había existencia: se completa lo que tocaba
           const plan = planDe(previa, factorKg(producto));
@@ -215,6 +222,12 @@ export function aplicarDescuentoCerdas() {
         // Se descuenta completo aunque la existencia quede en negativo: al ingresar la factura (aunque sea de fecha anterior) se compensa
         const cantidad = esHoy ? deHoyKg : porDia;
         if (esHoy && previa) {
+          if (previa.reactivada) {
+            const { reactivada: _r, ...resto } = previa;
+            void _r;
+            cambios.set(id, { ...resto, productoId: producto.id, cantidad, plan: cantidad, nota });
+            return;
+          }
           if (Math.abs((Number(previa.cantidad) || 0) - cantidad) < 0.0005 && previa.nota === nota && previa.productoId === producto.id) return;
           cambios.set(id, { ...previa, productoId: producto.id, cantidad, plan: cantidad, nota });
           return;
