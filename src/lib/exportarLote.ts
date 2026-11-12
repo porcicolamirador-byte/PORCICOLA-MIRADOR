@@ -81,7 +81,9 @@ export async function exportarContabilidadLote(lote: Lote, opciones: { incluirMa
     fechaGeneracion: formatoFecha(hoy()),
     logo,
   });
-  await entregarPdf(blob, `contabilidad-${(lote.codigo ?? "lote").toLowerCase()}-${hoy()}.pdf`);
+  // Nombre: "Reporte Contable LP-01 3496-P2" (cerda y parto si el lote viene de un parto)
+  const parto = lote.origen?.codigoParto || (lote.origen?.cerdaId ?? "");
+  await entregarPdf(blob, `Reporte Contable ${lote.codigo ?? "Lote"}${parto ? ` ${parto}` : ""}.pdf`.replace(/[\\/:*?"<>|]/g, "-"));
 }
 
 const numero = (n: number) => (Math.round(n * 100) / 100).toLocaleString("es-CO");
