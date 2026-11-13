@@ -138,10 +138,11 @@ function kilosDeHoy(dia: RegistroDia, reglas: { gestacion: number; preparto: num
 }
 
 /** Cerdas en cada regla hoy (día completo, para los días anteriores que faltan) */
-function contarCerdas(diaCambio: number) {
-  const hoyIso = hoy();
+function contarCerdas(diaCambio: number, fecha = hoy()) {
   const n: Record<Regla, number> = { g: 0, pre: 0, lac: 0, x: 0 };
-  for (const c of leerCerdas()) n[reglaDe(leerHistorial(c.id), diaCambio, hoyIso)]++;
+  // Estado de cada cerda ese día: solo cuentan los registros hasta esa fecha
+  // (un día pasado no se cobra con el estado de hoy, p. ej. lactancia por un parto posterior)
+  for (const c of leerCerdas()) n[reglaDe(leerHistorial(c.id).filter((r) => (r.fecha || "") <= fecha), diaCambio, fecha)]++;
   return { gestacion: n.g, preparto: n.pre, lactando: n.lac };
 }
 
@@ -184,21 +185,19 @@ export function aplicarDescuentoCerdas() {
     const porId = new Map(salidas.map((s) => [s.id, s]));
     const desde = reglas.descuentoDesde > sumarDias(hoyIso, -59) ? reglas.descuentoDesde : sumarDias(hoyIso, -59);
 
-    const cuenta = contarCerdas(reglas.diaCambio);
     const hoyDia = kilosDeHoy(registroDeHoy(reglas.diaCambio, true), reglas);
     const inventario = calcularInventario();
     const todos = leerProductos();
     const cambios = new Map<string, SalidaBodega>();
     const kgTexto = (n: number) => `${Math.round(n * 10) / 10} kg`;
 
-    const descontar = (codigo: string, prefijo: string, kgDia: number, kgHoy: number, nota: string) => {
+    const descontar = (codigo: string, prefijo: string, kgDiaDe: (fecha: string) => { kg: number; nota: string }, kgHoy: number, nota: string) => {
       const productos = todos.filter((p) => codigoDe(p) === codigo && p.activo !== false);
       const producto = productos.find((p) => p.unidad === "bultos") ?? productos[0];
       if (!producto) return;
       const item = inventario.find((i) => i.producto.id === producto.id);
       // Sin ninguna compra todavía no se descuenta: al ingresar la primera factura se ponen al día los días que faltan
       if (!item || item.sinCompras) return;
-      const porDia = Math.round((kgDia / factorKg(producto)) * 1000) / 1000;
       const deHoyKg = Math.round((kgHoy / factorKg(producto)) * 1000) / 1000;
       for (let f = desde; f <= hoyIso; f = sumarDias(f, 1)) {
         const id = prefijo + f;
@@ -206,11 +205,18 @@ export function aplicarDescuentoCerdas() {
         const previa = porId.get(id);
         // Eliminado a mano: ese día ya no se descuenta
         if (previa?.anulada) continue;
+        // Días pasados ya descontados no se recalculan (se evita contar cerdas en vano)
+        const calcular = !esHoy && (!previa || previa.reactivada);
+        const delDia = calcular ? kgDiaDe(f) : { kg: 0, nota };
+        const kgDia = delDia.kg;
+        // Los días pasados llevan las cerdas de ese día (no las de hoy)
+        const notaDia = `${delDia.nota.replace(/ · [\d.,]+ kg hoy$/, "")} · ${kgTexto(kgDia)}`;
+        const porDia = Math.round((kgDia / factorKg(producto)) * 1000) / 1000;
         if (!esHoy && previa?.reactivada) {
           // Se había eliminado y entró una factura: se descuenta lo de ese día
           const { reactivada: _r, ...resto } = previa;
           void _r;
-          cambios.set(id, { ...resto, productoId: producto.id, cantidad: porDia, plan: porDia, nota: `${nota.replace(/ · [\d.,]+ kg hoy$/, "")} · ${kgTexto(kgDia)}` });
+          cambios.set(id, { ...resto, productoId: producto.id, cantidad: porDia, plan: porDia, nota: notaDia });
           continue;
         }
         if (!esHoy && previa) {
@@ -233,21 +239,27 @@ export function aplicarDescuentoCerdas() {
           return;
         }
         if (cantidad <= 0) continue;
-        cambios.set(id, { id, productoId: producto.id, fecha: f, hora: "06:00", cantidad, plan: cantidad, nota: esHoy ? nota : `${nota.replace(/ · [\d.,]+ kg hoy$/, "")} · ${kgTexto(kgDia)}` });
+        cambios.set(id, { id, productoId: producto.id, fecha: f, hora: "06:00", cantidad, plan: cantidad, nota: esHoy ? nota : notaDia });
       }
     };
 
     descontar(
       reglas.codigoGestacion,
       PREFIJOS_AUTO.gestacion,
-      cuenta.gestacion * reglas.gestacion,
+      (f) => {
+        const c = contarCerdas(reglas.diaCambio, f);
+        return { kg: c.gestacion * reglas.gestacion, nota: `Consumo automático cerdas · ${c.gestacion} cerdas` };
+      },
       hoyDia.kg.g,
       `Consumo automático cerdas · ${hoyDia.cerdas.g} cerdas · ${kgTexto(hoyDia.kg.g)} hoy`,
     );
     descontar(
       reglas.codigoLactancia,
       PREFIJOS_AUTO.lactancia,
-      cuenta.preparto * reglas.preparto + cuenta.lactando * reglas.lactancia,
+      (f) => {
+        const c = contarCerdas(reglas.diaCambio, f);
+        return { kg: c.preparto * reglas.preparto + c.lactando * reglas.lactancia, nota: `Consumo automático lactancia · ${c.preparto} pre-parto + ${c.lactando} lactando` };
+      },
       hoyDia.kg.pre + hoyDia.kg.lac,
       `Consumo automático lactancia · ${hoyDia.cerdas.pre} pre-parto + ${hoyDia.cerdas.lac} lactando · ${kgTexto(hoyDia.kg.pre + hoyDia.kg.lac)} hoy`,
     );
