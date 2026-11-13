@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Boton, Campo, Entrada, Hoja, Insignia, Interruptor, Tarjeta, Vacio } from "@/components/ui";
 import { guardarConfigMqtt, normalizarUrl, type ConfigMqtt, type GranjaEnVivoEstado } from "@/lib/mqtt";
 
@@ -10,6 +10,12 @@ const COLORES = [
   { nombre: "Azul", hex: "#0000FF" },
   { nombre: "Blanco", hex: "#FFFFFF" },
 ];
+
+type Control = "led" | "rele" | "rgb";
+type Pendiente = { valor: boolean; id: number };
+
+/** Tiempo máximo para que el ESP32 confirme una orden */
+const ESPERA_CONFIRMACION = 6000;
 
 /** "hace 8 s", "hace 3 min"… */
 export function haceCuanto(ms: number) {
@@ -41,9 +47,61 @@ export default function GranjaEnVivo({ config, granja }: { config: ConfigMqtt | 
     return () => clearTimeout(t);
   }, [aviso]);
 
-  const ordenar = (tema: string, mensaje: string) => {
-    if (!granja.enviar(tema, mensaje)) setAviso("Sin conexión con el servidor. La orden no se envió.");
+  // Órdenes enviadas que el ESP32 todavía no confirma: el interruptor se mueve
+  // al instante y vuelve a su lugar si no llega la confirmación a tiempo
+  const [pendientes, setPendientes] = useState<Partial<Record<Control, Pendiente>>>({});
+  const pendientesRef = useRef(pendientes);
+  useEffect(() => {
+    pendientesRef.current = pendientes;
+  }, [pendientes]);
+
+  const rgbConfirmado = granja.rgb === null ? null : granja.rgb !== "off";
+
+  // Llega la confirmación del ESP32: se quita lo pendiente
+  useEffect(() => {
+    setPendientes((p) => {
+      const n = { ...p };
+      let cambio = false;
+      if (n.led && granja.ledAzul === n.led.valor) { delete n.led; cambio = true; }
+      if (n.rele && granja.rele === n.rele.valor) { delete n.rele; cambio = true; }
+      if (n.rgb && rgbConfirmado === n.rgb.valor) { delete n.rgb; cambio = true; }
+      return cambio ? n : p;
+    });
+  }, [granja.ledAzul, granja.rele, rgbConfirmado]);
+
+  /** Envía la orden y mueve el control de inmediato */
+  const ordenar = (control: Control, tema: string, mensaje: string, valor: boolean) => {
+    if (!granja.enviar(tema, mensaje)) {
+      setAviso("Sin conexión con el servidor. La orden no se envió.");
+      return;
+    }
+    const actual = { led: granja.ledAzul, rele: granja.rele, rgb: rgbConfirmado }[control];
+    if (actual === valor) {
+      // Ya está en ese estado (por ejemplo, otro color con el RGB encendido): nada que esperar
+      setPendientes((p) => {
+        if (!p[control]) return p;
+        const n = { ...p };
+        delete n[control];
+        return n;
+      });
+      return;
+    }
+    const id = Date.now() + Math.random();
+    setPendientes((p) => ({ ...p, [control]: { valor, id } }));
+    setTimeout(() => {
+      if (pendientesRef.current[control]?.id !== id) return;
+      setPendientes((p) => {
+        const n = { ...p };
+        delete n[control];
+        return n;
+      });
+      setAviso("El ESP32 no confirmó la orden. Revisa que esté encendido y conectado.");
+    }, ESPERA_CONFIRMACION);
   };
+
+  const valor = (c: Control, confirmado: boolean | null) => pendientes[c]?.valor ?? confirmado;
+  const estadoTexto = (c: Control, confirmado: boolean | null) =>
+    pendientes[c] ? "Enviando…" : confirmado === null ? "Estado desconocido" : confirmado ? "Encendido" : "Apagado";
 
   const botonConexion = (
     <button
@@ -71,6 +129,8 @@ export default function GranjaEnVivo({ config, granja }: { config: ConfigMqtt | 
 
   const sinDatosRecientes = granja.actualizado !== null && ahora - granja.actualizado > 60_000;
   const rgbEncendido = granja.rgb !== null && granja.rgb !== "off";
+  const ledVisible = valor("led", granja.ledAzul);
+  const releVisible = valor("rele", granja.rele);
 
   return (
     <>
@@ -115,19 +175,19 @@ export default function GranjaEnVivo({ config, granja }: { config: ConfigMqtt | 
                 <div className="flex min-w-0 items-center gap-3">
                   <span
                     aria-hidden="true"
-                    className={`h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-slate-200 ${granja.ledAzul ? "bg-sky-500" : "bg-slate-200"}`}
-                    style={granja.ledAzul ? { boxShadow: "0 0 10px #0ea5e9" } : undefined}
+                    className={`h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-slate-200 ${ledVisible ? "bg-sky-500" : "bg-slate-200"}`}
+                    style={ledVisible ? { boxShadow: "0 0 10px #0ea5e9" } : undefined}
                   />
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-slate-900">LED azul</p>
                     <p className="text-xs text-slate-500">
-                      {granja.ledAzul === null ? "Estado desconocido" : granja.ledAzul ? "Encendido" : "Apagado"}
+                      {estadoTexto("led", granja.ledAzul)}
                     </p>
                   </div>
                 </div>
                 <Interruptor
-                  activo={granja.ledAzul === true}
-                  onCambiar={(v) => ordenar("granja/led_azul/set", v ? "on" : "off")}
+                  activo={ledVisible === true}
+                  onCambiar={(v) => ordenar("led", "granja/led_azul/set", v ? "on" : "off", v)}
                 />
               </li>
 
@@ -135,19 +195,19 @@ export default function GranjaEnVivo({ config, granja }: { config: ConfigMqtt | 
                 <div className="flex min-w-0 items-center gap-3">
                   <span
                     aria-hidden="true"
-                    className={`h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-slate-200 ${granja.rele ? "bg-emerald-500" : "bg-slate-200"}`}
-                    style={granja.rele ? { boxShadow: "0 0 10px #10b981" } : undefined}
+                    className={`h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-slate-200 ${releVisible ? "bg-emerald-500" : "bg-slate-200"}`}
+                    style={releVisible ? { boxShadow: "0 0 10px #10b981" } : undefined}
                   />
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-slate-900">Relé</p>
                     <p className="text-xs text-slate-500">
-                      {granja.rele === null ? "Estado desconocido" : granja.rele ? "Encendido" : "Apagado"}
+                      {estadoTexto("rele", granja.rele)}
                     </p>
                   </div>
                 </div>
                 <Interruptor
-                  activo={granja.rele === true}
-                  onCambiar={(v) => ordenar("granja/rele/set", v ? "on" : "off")}
+                  activo={releVisible === true}
+                  onCambiar={(v) => ordenar("rele", "granja/rele/set", v ? "on" : "off", v)}
                 />
               </li>
 
@@ -165,18 +225,27 @@ export default function GranjaEnVivo({ config, granja }: { config: ConfigMqtt | 
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-slate-900">LED RGB de la placa</p>
                       <p className="text-xs text-slate-500">
-                        {granja.rgb === null ? "Estado desconocido" : rgbEncendido ? `Encendido · ${granja.rgb}` : "Apagado"}
+                        {pendientes.rgb
+                          ? "Enviando…"
+                          : granja.rgb === null
+                            ? "Estado desconocido"
+                            : rgbEncendido
+                              ? `Encendido · ${granja.rgb}`
+                              : "Apagado"}
                       </p>
                     </div>
                   </div>
-                  <Interruptor activo={rgbEncendido} onCambiar={(v) => ordenar("granja/rgb/set", v ? "on" : "off")} />
+                  <Interruptor
+                    activo={valor("rgb", rgbConfirmado) === true}
+                    onCambiar={(v) => ordenar("rgb", "granja/rgb/set", v ? "on" : "off", v)}
+                  />
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {COLORES.map((c) => (
                     <button
                       key={c.hex}
                       type="button"
-                      onClick={() => ordenar("granja/rgb/set", c.hex)}
+                      onClick={() => ordenar("rgb", "granja/rgb/set", c.hex, true)}
                       aria-label={`Color ${c.nombre}`}
                       className={`h-9 w-9 rounded-full ring-1 transition active:scale-90 ${
                         granja.rgb === c.hex ? "ring-2 ring-sky-600 ring-offset-2" : "ring-slate-300"
@@ -189,7 +258,7 @@ export default function GranjaEnVivo({ config, granja }: { config: ConfigMqtt | 
                     <input
                       type="color"
                       defaultValue="#0000FF"
-                      onChange={(e) => ordenar("granja/rgb/set", e.target.value.toUpperCase())}
+                      onChange={(e) => ordenar("rgb", "granja/rgb/set", e.target.value.toUpperCase(), true)}
                       className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                     />
                   </label>
