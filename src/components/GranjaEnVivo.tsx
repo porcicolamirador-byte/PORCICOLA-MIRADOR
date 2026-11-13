@@ -131,6 +131,26 @@ export default function GranjaEnVivo({ config, granja }: { config: ConfigMqtt | 
                 />
               </li>
 
+              <li className="flex items-center justify-between gap-3 py-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span
+                    aria-hidden="true"
+                    className={`h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-slate-200 ${granja.rele ? "bg-emerald-500" : "bg-slate-200"}`}
+                    style={granja.rele ? { boxShadow: "0 0 10px #10b981" } : undefined}
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-900">Relé</p>
+                    <p className="text-xs text-slate-500">
+                      {granja.rele === null ? "Estado desconocido" : granja.rele ? "Encendido" : "Apagado"}
+                    </p>
+                  </div>
+                </div>
+                <Interruptor
+                  activo={granja.rele === true}
+                  onCambiar={(v) => ordenar("granja/rele/set", v ? "on" : "off")}
+                />
+              </li>
+
               <li className="flex flex-col gap-3 pt-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">

@@ -9,10 +9,12 @@
  * Temas que publica el ESP32:
  *   granja/temperatura      "24.5" o "error"
  *   granja/led_azul/estado  "on" | "off"
+ *   granja/rele/estado      "on" | "off"
  *   granja/rgb/estado       "off" | "#RRGGBB"
  *   granja/conexion         "online" | "offline"
  * Temas que escucha el ESP32:
  *   granja/led_azul/set     "on" | "off"
+ *   granja/rele/set         "on" | "off"
  *   granja/rgb/set          "on" | "off" | "#RRGGBB"
  */
 
@@ -139,6 +141,7 @@ export type Granja = {
   sensorError: boolean;
   actualizado: number | null;
   ledAzul: boolean | null;
+  rele: boolean | null;
   /** "off" o un color "#RRGGBB"; null = todavía no se sabe */
   rgb: string | null;
 };
@@ -151,6 +154,7 @@ const INICIAL: Granja = {
   sensorError: false,
   actualizado: null,
   ledAzul: null,
+  rele: null,
   rgb: null,
 };
 
@@ -182,6 +186,8 @@ export function useGranjaEnVivo(config: ConfigMqtt | null) {
           }
           case "granja/led_azul/estado":
             return { ...e, ledAzul: msg === "on" };
+          case "granja/rele/estado":
+            return { ...e, rele: msg === "on" };
           case "granja/rgb/estado":
             return { ...e, rgb: msg === "off" ? "off" : msg.toUpperCase() };
           case "granja/conexion":
