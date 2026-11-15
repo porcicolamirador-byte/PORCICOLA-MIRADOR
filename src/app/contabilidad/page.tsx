@@ -3,9 +3,10 @@
 import Modal from "@/components/Modal";
 import PagoFactura, { PagoCredito } from "@/components/PagoFactura";
 import { calcularInventario, codigoDe, leerCerdas, guardarCuentasPorPagar, guardarFacturas, leerCuentasPorPagar, leerFacturas, leerProductos, leerSalidas, saldoCuenta, saldoFactura, totalFactura } from "@/lib/datos";
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import ModuloPage from "@/components/ModuloPage";
 import Cotizaciones from "@/components/Cotizaciones";
+import EstadoResultados, { calcularResultados, TituloGrupo } from "@/components/EstadoResultados";
 import { Boton, Campo, Entrada, IconoMas, SeccionDesplegable, Selector, Vacio, EntradaPesos, CLASE_SELECTOR } from "@/components/ui";
 import SelectorApp from "@/components/SelectorApp";
 import {
@@ -87,8 +88,49 @@ export default function ContabilidadPage() {
     const todos = leerMovimientos();
     const ingresosTotal = todos.filter((m) => m.tipo === "ingreso").reduce((s, m) => s + m.monto, 0);
     const gastosTotal = todos.filter((m) => m.tipo === "gasto").reduce((s, m) => s + m.monto, 0);
-    return { movs, ingresos, gastos, porCategoria, ingresosTotal, gastosTotal };
+    const anterior = moverMes(mes, -1);
+    return {
+      movs,
+      ingresos,
+      gastos,
+      porCategoria,
+      ingresosTotal,
+      gastosTotal,
+      resultadosMes: calcularResultados(movs),
+      resultadosAnterior: calcularResultados(todos.filter((m) => m.fecha.slice(0, 7) === anterior)),
+      resultadosTotal: calcularResultados(todos),
+    };
   }, [version, mes]);
+
+  // Vista profesional (estado de resultados) o la clásica; se recuerda en este teléfono
+  const [vista, setVistaEstado] = useState<"profesional" | "clasica">("profesional");
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("contabilidad-vista") === "clasica") setVistaEstado("clasica");
+    } catch {
+      // sin almacenamiento
+    }
+  }, []);
+  const setVista = (v: "profesional" | "clasica") => {
+    setVistaEstado(v);
+    try {
+      localStorage.setItem("contabilidad-vista", v);
+    } catch {
+      // sin almacenamiento: solo por esta vez
+    }
+  };
+  const selectorVista = (
+    <div className="flex justify-center">
+      <div className="flex rounded-xl bg-slate-100 p-0.5 text-[12px] font-semibold">
+        {(["profesional", "clasica"] as const).map((v) => (
+          <button key={v} type="button" onClick={() => setVista(v)}
+            className={`rounded-lg px-3.5 py-1.5 ${vista === v ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>
+            {v === "profesional" ? "Vista profesional" : "Vista clásica"}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 
   const eliminar = async (id: string) => {
     const mov = leerMovimientos().find((m) => m.id === id);
@@ -212,6 +254,41 @@ export default function ContabilidadPage() {
         </Boton>
       }
     >
+      {selectorVista}
+      {vista === "profesional" ? (
+        datos === null ? (
+          <div className="h-40 animate-pulse rounded-3xl bg-slate-100" />
+        ) : (
+          <>
+            <EstadoResultados
+              mesTexto={nombreMes(mes)}
+              onAnterior={() => setMes(moverMes(mes, -1))}
+              onSiguiente={() => setMes(moverMes(mes, 1))}
+              delMes={datos.resultadosMes}
+              mesAnterior={datos.resultadosAnterior}
+              acumulado={datos.resultadosTotal}
+            />
+            <TituloGrupo numero="1" titulo="Cuentas por pagar" texto="Facturas y gastos a crédito con proveedores" />
+            <FacturasCredito version={version} />
+            <CreditoPorLote version={version} />
+            <TituloGrupo numero="2" titulo="Centros de costo" texto="Costos, ingresos y utilidad de cada lote" />
+            <ContabilidadLotes version={version} />
+            <TituloGrupo numero="3" titulo="Ventas" texto="Cotizaciones a clientes" />
+            <Cotizaciones />
+            <TituloGrupo numero="4" titulo="Libro diario" texto={`Movimientos de ${nombreMes(mes).toLowerCase()}`} />
+            {leerMovimientos().length === 0 ? (
+              <Vacio
+                titulo="Sin movimientos"
+                texto="Registra ventas y gastos para conocer el balance de la granja."
+                accion={<Boton onClick={() => setNuevo(true)}>Registrar movimiento</Boton>}
+              />
+            ) : (
+              <MovimientosPeriodo version={version} mes={mes} onEliminar={eliminar} />
+            )}
+          </>
+        )
+      ) : (
+      <>
       {/* Resumen del mes: mes, ingresos, gastos y balance en una sola tarjeta */}
       <section className="overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200">
         <div className="flex items-center justify-between border-b border-slate-100 px-1.5 py-1">
@@ -294,6 +371,8 @@ export default function ContabilidadPage() {
         />
       ) : (
         <MovimientosPeriodo version={version} mes={mes} onEliminar={eliminar} />
+      )}
+      </>
       )}
 
       <NuevoMovimiento abierta={nuevo} onCerrar={() => setNuevo(false)} />
