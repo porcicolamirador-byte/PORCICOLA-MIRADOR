@@ -22,7 +22,12 @@ export interface PendingTask {
   confirmar?: 1 | 2;
   /** Botón para confirmar la aplicación de hierro (id del lote de la camada) */
   hierroLote?: string;
+  /** Botón para confirmar que se pidió el material genético (id del registro de destete o repetición) */
+  geneticaRegistro?: string;
 }
+
+/** Días después del destete o de la repetición en que se pide el material genético (5 días) */
+export const VENTANA_GENETICA = { desde: 2, hasta: 6 };
 
 /** Ventanas para confirmar la gestación (días después de la inseminación) */
 export const CONFIRMACIONES_GESTACION = [
@@ -232,6 +237,24 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
     }
   }
 
+  // Pedir el material genético: del día 2 al 6 después del destete o de la repetición.
+  // Se quita al confirmarla, al pasar los 5 días o si ya se inseminó.
+  const alertaGenetica = (reg: Registro, dias: number, de: string) => {
+    const r = reg as Registro & { id?: string; geneticaSolicitada?: string };
+    const inseminada = historial.some((x) => x.tipo === 'Inseminación' && (x.fecha || '') >= (reg.fecha || ''));
+    if (!r.geneticaSolicitada && !inseminada && dias >= VENTANA_GENETICA.desde && dias <= VENTANA_GENETICA.hasta) {
+      tareas.push({
+        id: cerda.id,
+        tipo: 'Solicitar material genético',
+        prioridad: 'media',
+        descripcion: `Día ${dias} ${de}: pedir la genética para inseminar`,
+        dias,
+        fecha: reg.fecha,
+        ...(r.id ? { geneticaRegistro: r.id } : {}),
+      });
+    }
+  };
+
   if (regDestete) {
     const diasDesdeDestete = calcularDiasEntre(regDestete.fecha || hoy, hoy);
     // Desde el destete se revisa el celo hasta el día 8, salvo que ya se registró celo o inseminación después
@@ -246,6 +269,19 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
         fecha: regDestete.fecha,
       });
     }
+    // Pasado el día 8 sin celo: crítica hasta que se registre algo
+    const atendidoDestete = historial.some((r) => ['Celo', 'Inseminación', 'Parto', 'Aborto', 'Baja', 'Repetición de celo'].includes(r.tipo || '') && (r.fecha || '') >= (regDestete.fecha || ''));
+    if (!atendidoDestete && diasDesdeDestete >= 9) {
+      tareas.push({
+        id: cerda.id,
+        tipo: 'Sin celo después del destete',
+        prioridad: 'critica',
+        descripcion: `Día ${diasDesdeDestete} del destete sin celo: revisar la cerda`,
+        dias: diasDesdeDestete,
+        fecha: regDestete.fecha,
+      });
+    }
+    alertaGenetica(regDestete, diasDesdeDestete, 'del destete');
   }
 
   // Repetición de celo: el ciclo se reinicia y el próximo celo llega hacia el día 21.
@@ -264,6 +300,18 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
         fecha: regRepeticion.fecha,
       });
     }
+    // Pasado el día 22 sin celo: crítica hasta que se registre algo
+    if (!atendida && diasRep >= 23) {
+      tareas.push({
+        id: cerda.id,
+        tipo: 'Sin celo tras la repetición',
+        prioridad: 'critica',
+        descripcion: `Día ${diasRep} tras la repetición sin celo: revisar la cerda`,
+        dias: diasRep,
+        fecha: regRepeticion.fecha,
+      });
+    }
+    alertaGenetica(regRepeticion, diasRep, 'de la repetición');
   }
 
   if (regCelo) {

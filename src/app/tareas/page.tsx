@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Chevron, Vacio } from "@/components/ui";
-import { confirmarGestacion, leerCerdas, useVersionDatos } from "@/lib/datos";
+import { confirmarGestacion, leerCerdas, marcarGeneticaSolicitada, useVersionDatos } from "@/lib/datos";
 import ConfirmarHierro from "@/components/ConfirmarHierro";
 import { confirmar } from "@/components/Dialogo";
 import { calcularTareasPendientes } from "@/utils/pendingTasks";
@@ -50,6 +50,15 @@ export default function TareasPage() {
 
   const cuenta = (p: string) => tareas?.filter((t) => t.prioridad === p).length ?? 0;
   const visibles = tareas?.filter((t) => filtro === "todas" || t.prioridad === filtro) ?? [];
+
+  const confirmarGenetica = async (id: string, registroId: string) => {
+    const ok = await confirmar({
+      titulo: "Material genético",
+      mensaje: `¿Ya se pidió el material genético para la cerda ${id}?`,
+      aceptar: "Confirmar",
+    });
+    if (ok) marcarGeneticaSolicitada(id, registroId);
+  };
 
   const confirmarG = async (id: string, etapa: 1 | 2) => {
     const ok = await confirmar({
@@ -116,7 +125,7 @@ export default function TareasPage() {
               <ul className="flex flex-col gap-2">
                 {g.items.map((t) => {
                   const e = ESTILO[t.prioridad] ?? ESTILO.media;
-                  const accion = t.hierroLote ? () => setHierro(t.hierroLote!) : t.confirmar ? () => confirmarG(t.id, t.confirmar!) : null;
+                  const accion = t.hierroLote ? () => setHierro(t.hierroLote!) : t.confirmar ? () => confirmarG(t.id, t.confirmar!) : t.geneticaRegistro ? () => confirmarGenetica(t.id, t.geneticaRegistro!) : null;
                   return (
                     <li key={`${t.id}-${t.tipo}`} className="relative overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/80">
                       <span className={`absolute inset-y-0 left-0 w-1 ${e.barra}`} aria-hidden="true" />

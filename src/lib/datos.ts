@@ -53,6 +53,8 @@ export interface RegistroCerda extends Registro {
   fecha: string;
   /** Inseminación: fechas de la 1.ª y 2.ª confirmación de gestación */
   confirmacion1?: string;
+  /** Fecha en que se pidió el material genético (en destete o repetición de celo) */
+  geneticaSolicitada?: string;
   confirmacion2?: string;
   vivos?: number;
   muertos?: number;
@@ -2453,6 +2455,17 @@ export function confirmarGestacion(cerdaId: string, etapa: 1 | 2): boolean {
   const campo = etapa === 1 ? "confirmacion1" : "confirmacion2";
   const nuevo = historial.map((r, k) => (k === i ? { ...r, [campo]: hoy() } : r));
   escribir(CLAVES.historial(cerdaId), nuevo);
+  return true;
+}
+
+/** Marca que ya se pidió el material genético (en el registro de destete o repetición) */
+export function marcarGeneticaSolicitada(cerdaId: string, registroId: string): boolean {
+  const historial = leerHistorial(cerdaId);
+  if (!historial.some((r) => r.id === registroId)) return false;
+  escribir(
+    CLAVES.historial(cerdaId),
+    historial.map((r) => (r.id === registroId ? { ...r, geneticaSolicitada: hoy() } : r)),
+  );
   return true;
 }
 
