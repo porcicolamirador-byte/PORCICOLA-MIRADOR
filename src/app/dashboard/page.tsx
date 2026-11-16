@@ -365,7 +365,22 @@ export default function Dashboard() {
               pendientes > 0 ? `${COLOR_NIVEL.cuadro} text-white` : "bg-white/15 text-white"
             }`}
           >
-            {pendientes > 0 ? pendientes : "✓"}
+            {pendientes > 0 ? (
+              pendientes
+            ) : (
+              <>
+                {/* Todo al día: el logo late y lleva un chulito verde */}
+                <span className="logo-late flex h-[30px] w-[30px] items-center justify-center rounded-[9px] bg-white p-0.5">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/images/logo.png" alt="" className="h-full w-full object-contain" />
+                </span>
+                <span className="absolute -bottom-0.5 -right-0.5 flex h-[15px] w-[15px] items-center justify-center rounded-full border-2 border-sky-900 bg-green-500">
+                  <svg viewBox="0 0 24 24" className="h-2 w-2" fill="none" stroke="#fff" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12.5l4.5 4.5L19 7.5" />
+                  </svg>
+                </span>
+              </>
+            )}
           </span>
 
           <div className="relative min-w-0 flex-1">
