@@ -444,9 +444,10 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
       const nombre = nombreLote(lote);
       void confirmar({
         titulo: `¿Liquidar el lote ${lote.codigo ?? ""}?`.replace("  ", " "),
-        mensaje: `Registraste la venta de ${nombre}. Si vendiste todos los cerdos, puedes liquidar el lote ahora: pasará a lotes cerrados y se quitarán sus alertas. Si fue una venta parcial, el lote sigue activo.`,
-        aceptar: "Sí, liquidar lote",
-        cancelar: "No, sigue activo",
+        mensaje: `Registraste la venta de ${nombre}. Si se liquidaron todos los cerdos, puedes cerrar el lote ahora. Si fue una venta parcial, el lote seguirá activo.`,
+        aceptar: "Liquidar lote",
+        cancelar: "Venta parcial",
+        principalPrimero: true,
       }).then((ok) => {
         if (ok) guardarLotes(leerLotes().map((l) => (l.id === lote.id ? { ...l, activo: false, fechaSalida: hoy() } : l)));
       });

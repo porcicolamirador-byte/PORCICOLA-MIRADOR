@@ -21,6 +21,8 @@ export interface OpcionesDialogo {
   cancelar?: string | null;
   /** Pinta el botón principal en rojo (acciones que borran) */
   destructivo?: boolean;
+  /** Pone el botón principal a la izquierda */
+  principalPrimero?: boolean;
   /**
    * Permiso que necesita el usuario para aceptar. Por defecto, una acción
    * destructiva pide "eliminar"; null para no pedir ninguno (p. ej. cerrar sesión).
@@ -117,7 +119,7 @@ export default function DialogoHost() {
   }, [actual, cerrar]);
 
   if (!actual) return null;
-  const { titulo, mensaje, aceptar = "Aceptar", cancelar = "Cancelar", destructivo } = actual.opciones;
+  const { titulo, mensaje, aceptar = "Aceptar", cancelar = "Cancelar", destructivo, principalPrimero } = actual.opciones;
 
   return (
     <div
@@ -162,7 +164,7 @@ export default function DialogoHost() {
               ref={botonPrincipal}
               type="button"
               onClick={() => cerrar(true)}
-              className={`rounded-2xl py-3 text-[15px] font-semibold text-white transition focus-visible:outline-none ${
+              className={`${principalPrimero ? "order-first " : ""}rounded-2xl py-3 text-[15px] font-semibold text-white transition focus-visible:outline-none ${
                 "bg-sky-900 active:bg-sky-950"
               }`}
             >
