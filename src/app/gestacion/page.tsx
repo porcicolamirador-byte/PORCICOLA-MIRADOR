@@ -1,7 +1,7 @@
 "use client";
 
 import { borrarConRegistro, guardarConRegistro } from "@/lib/log";
-import { useEffect, useMemo, useState, type TouchEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import { useRouter } from "next/navigation";
 import PageShell from "@/components/PageShell";
 import Modal from "@/components/Modal";
@@ -54,6 +54,11 @@ export default function Gestacion() {
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchCurrentX, setTouchCurrentX] = useState<number | null>(null);
   const [swipedIndex, setSwipedIndex] = useState<number | null>(null);
+  // Deslizar para editar/eliminar solo después de mantener presionado 1,5 s
+  const [armadoIndex, setArmadoIndex] = useState<number | null>(null);
+  const temporizadorDeslizar = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inicioToque = useRef<{ x: number; y: number } | null>(null);
+  const ignorarClic = useRef(false);
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [confirmDeleteIndex, setConfirmDeleteIndex] = useState<number | null>(null);
   const [deletePinInput, setDeletePinInput] = useState("");
@@ -364,18 +369,52 @@ export default function Gestacion() {
     }
   }
 
+  const cancelarTemporizador = () => {
+    if (temporizadorDeslizar.current) clearTimeout(temporizadorDeslizar.current);
+    temporizadorDeslizar.current = null;
+  };
+
   function handleTouchStart(e: TouchEvent, idx: number) {
-    setActiveTouchIndex(idx);
-    setTouchStartX(e.touches[0].clientX);
-    setTouchCurrentX(e.touches[0].clientX);
+    const x = e.touches[0].clientX;
+    inicioToque.current = { x, y: e.touches[0].clientY };
+    ignorarClic.current = false;
+    cancelarTemporizador();
+    // Ya abierta: se puede cerrar deslizando sin esperar
+    if (swipedIndex === idx) {
+      setActiveTouchIndex(idx);
+      setTouchStartX(x);
+      setTouchCurrentX(x);
+      return;
+    }
+    temporizadorDeslizar.current = setTimeout(() => {
+      temporizadorDeslizar.current = null;
+      setArmadoIndex(idx);
+      setActiveTouchIndex(idx);
+      setTouchStartX(inicioToque.current?.x ?? x);
+      setTouchCurrentX(inicioToque.current?.x ?? x);
+      ignorarClic.current = true;
+      try {
+        navigator.vibrate?.(30);
+      } catch {
+        // sin vibración
+      }
+    }, 1500);
   }
 
   function handleTouchMove(e: TouchEvent, idx: number) {
+    const t = e.touches[0];
+    // Si se mueve antes de 1,5 s, es desplazamiento normal: no se arma el deslizamiento
+    if (temporizadorDeslizar.current && inicioToque.current) {
+      if (Math.abs(t.clientX - inicioToque.current.x) > 10 || Math.abs(t.clientY - inicioToque.current.y) > 10) cancelarTemporizador();
+      return;
+    }
     if (activeTouchIndex !== idx || touchStartX === null) return;
-    setTouchCurrentX(e.touches[0].clientX);
+    setTouchCurrentX(t.clientX);
   }
 
   function handleTouchEnd(e: TouchEvent, idx: number) {
+    cancelarTemporizador();
+    setArmadoIndex(null);
     if (touchStartX === null || touchCurrentX === null) {
       setActiveTouchIndex(null);
       setTouchStartX(null);
@@ -758,7 +797,7 @@ export default function Gestacion() {
               return (
                 <article
                   key={index}
-                  className="tarjeta-boton relative overflow-hidden rounded-[20px] bg-white ring-1 ring-slate-200"
+                  className={`tarjeta-boton relative overflow-hidden rounded-[20px] bg-white ring-1 ${armadoIndex === index ? "ring-2 ring-sky-500" : "ring-slate-200"}`}
                 >
                   {/* Acciones que aparecen al deslizar */}
                   <div
@@ -793,6 +832,11 @@ export default function Gestacion() {
                   <div
                     className="relative z-10 cursor-pointer bg-white px-2.5 py-2"
                     onClick={() => {
+                      // Después de mantener presionado no se abre la cerda
+                      if (ignorarClic.current) {
+                        ignorarClic.current = false;
+                        return;
+                      }
                       if (isSwiped) {
                         setSwipedIndex(null);
                         return;
@@ -802,6 +846,8 @@ export default function Gestacion() {
                     onTouchStart={(e) => { handleTouchStart(e, index); e.stopPropagation(); }}
                     onTouchMove={(e) => { handleTouchMove(e, index); e.stopPropagation(); }}
                     onTouchEnd={(e) => { handleTouchEnd(e, index); e.stopPropagation(); }}
+                    onTouchCancel={(e) => { handleTouchEnd(e, index); }}
+                    onContextMenu={(e) => e.preventDefault()}
                     style={{
                       transform: `translateX(${translateX}px)`,
                       transition: isActiveMove ? "none" : "transform 200ms ease-out",

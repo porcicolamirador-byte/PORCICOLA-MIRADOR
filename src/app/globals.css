@@ -38,6 +38,10 @@ html {
 body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   -webkit-tap-highlight-color: transparent;
+  /* Sin selección de texto ni menú al mantener presionado: se siente como botón, no como página */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 /*
