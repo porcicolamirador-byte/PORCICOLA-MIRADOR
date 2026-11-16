@@ -268,8 +268,8 @@ export default function Dashboard() {
 
   // Relojes de Engorde: lotes activos según cuánto les falta para los 5 meses (desde su fecha de ingreso).
   // Azul: faltan 30 días o menos · Amarillo: faltan 15 o menos (hasta 5 meses y 15 días) · Rojo: pasó de 5 meses y 15 días
-  // Prueba: los 3 relojes encendidos hasta las 6:00 p. m. del 16 nov 2026 (hora Colombia); luego, las condiciones reales
-  const PRUEBA_RELOJES_HASTA = Date.parse("2026-11-16T23:00:00Z");
+  // Prueba: los 3 relojes encendidos hasta las 5:55 p. m. del 16 nov 2026 (hora Colombia); luego, las condiciones reales
+  const PRUEBA_RELOJES_HASTA = Date.parse("2026-11-16T22:55:00Z");
   const [finPrueba, setFinPrueba] = useState(() => Date.now() >= PRUEBA_RELOJES_HASTA);
   useEffect(() => {
     if (finPrueba) return;
