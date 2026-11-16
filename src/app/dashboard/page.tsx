@@ -529,10 +529,10 @@ export default function Dashboard() {
                   <span
                     role="img"
                     aria-label={alarmaBodega === "roja" ? "Alimento de cerdas en negativo" : "Alimento de cerdas para 2 días o menos"}
-                    className={`absolute left-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-full text-white shadow-md ${alarmaBodega === "roja" ? "bg-red-600" : "bg-orange-500"}`}
+                    className={`absolute left-2 top-2 flex h-4 w-4 items-center justify-center rounded-full text-white shadow ${alarmaBodega === "roja" ? "bg-red-600" : "bg-orange-500"}`}
                   >
-                    {alarmaBodega === "roja" && <span aria-hidden="true" className="absolute inset-0 rounded-full bg-red-500/60 motion-safe:animate-ping" />}
-                    <svg viewBox="0 0 24 24" className="relative h-4 w-4 campana-alarma" fill="currentColor" aria-hidden="true">
+                    {alarmaBodega === "roja" && <span aria-hidden="true" className="onda-critica pointer-events-none absolute inset-0 rounded-full bg-red-500" />}
+                    <svg viewBox="0 0 24 24" className="relative h-2.5 w-2.5 campana-alarma" fill="currentColor" aria-hidden="true">
                       <path d="M12 2a6 6 0 0 0-6 6v3.6l-1.7 3.4A1 1 0 0 0 5.2 16.5h13.6a1 1 0 0 0 .9-1.5L18 11.6V8a6 6 0 0 0-6-6Zm-2.8 16a2.9 2.9 0 0 0 5.6 0H9.2Z" />
                     </svg>
                   </span>
