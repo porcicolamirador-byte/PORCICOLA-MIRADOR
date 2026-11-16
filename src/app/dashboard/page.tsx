@@ -10,6 +10,8 @@ import { puedeCrearGranjas, puedeVerGranja } from "@/lib/nube";
 import { cambiarGranja, crearGranja, granjaActual, leerGranjas, nombreGranjaActual, sincronizar } from "@/lib/sincronizar";
 import { registrarLog } from "@/lib/log";
 import SummaryCard from "@/components/SummaryCard";
+import { calcularConsumoCerdas } from "@/lib/consumoCerdas";
+import { useVersionDatos } from "@/lib/datos";
 import { useModulosOcultos } from "@/lib/modulos";
 import PageShell from "@/components/PageShell";
 import BottomNav from "@/components/BottomNav";
@@ -249,6 +251,20 @@ export default function Dashboard() {
   }, []);
 
   const pendingTasks = useMemo(() => calcularTareasPendientes(cerdas), [cerdas]);
+  // Campana de Bodega: naranja si el alimento de cerdas alcanza para 2 días o menos, roja si va en negativo
+  const versionDatos = useVersionDatos();
+  const alarmaBodega = useMemo<"roja" | "naranja" | null>(() => {
+    if (versionDatos < 0) return null;
+    try {
+      const c = calcularConsumoCerdas();
+      const alimentos = [c.gestacion, c.lactancia].filter((a) => a.kgDia > 0 && a.existenciaKg !== null);
+      if (alimentos.some((a) => a.faltanteKg > 0 || (a.existenciaKg ?? 0) <= 0.01)) return "roja";
+      if (alimentos.some((a) => a.dias !== null && a.dias <= 2)) return "naranja";
+    } catch {
+      // sin datos de bodega
+    }
+    return null;
+  }, [versionDatos]);
   const pendientes = pendingTasks.length;
   // Color del número de alertas según la prioridad más alta: crítica rojo, alta naranja, media azul, baja gris
   const nivel = (["critica", "alta", "media", "baja"] as const).find((p) => pendingTasks.some((t) => t.prioridad === p)) ?? "baja";
@@ -433,8 +449,20 @@ export default function Dashboard() {
                 key={modulo.nombre}
                 type="button"
                 onClick={() => router.push(modulo.ruta)}
-                className={`flex flex-col items-center gap-3 rounded-3xl border px-3.5 py-3.5 text-center shadow-sm transition active:scale-[0.97] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 ${modulo.card}`}
+                className={`relative flex flex-col items-center gap-3 rounded-3xl border px-3.5 py-3.5 text-center shadow-sm transition active:scale-[0.97] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 ${modulo.card}`}
               >
+                {modulo.nombre === "Bodega" && alarmaBodega && (
+                  <span
+                    role="img"
+                    aria-label={alarmaBodega === "roja" ? "Alimento de cerdas en negativo" : "Alimento de cerdas para 2 días o menos"}
+                    className={`absolute left-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-full text-white shadow-md ${alarmaBodega === "roja" ? "bg-red-600" : "bg-orange-500"}`}
+                  >
+                    {alarmaBodega === "roja" && <span aria-hidden="true" className="absolute inset-0 rounded-full bg-red-500/60 motion-safe:animate-ping" />}
+                    <svg viewBox="0 0 24 24" className="relative h-4 w-4 campana-alarma" fill="currentColor" aria-hidden="true">
+                      <path d="M12 2a6 6 0 0 0-6 6v3.6l-1.7 3.4A1 1 0 0 0 5.2 16.5h13.6a1 1 0 0 0 .9-1.5L18 11.6V8a6 6 0 0 0-6-6Zm-2.8 16a2.9 2.9 0 0 0 5.6 0H9.2Z" />
+                    </svg>
+                  </span>
+                )}
                 <div className={`flex h-11 w-11 items-center justify-center rounded-2xl text-2xl ${modulo.tile}`}>
                   <IconoModulo nombre={modulo.nombre} className="h-6 w-6" />
                 </div>

@@ -351,3 +351,14 @@ html.oscuro .text-emerald-700 { color: #6ee7b7; }
 }
 html.oscuro .tarjeta-boton { box-shadow: 0 3px 0 #000, 0 6px 14px rgb(0 0 0 / 0.5); }
 html.oscuro .tarjeta-boton:active { box-shadow: 0 1px 0 #000, 0 2px 6px rgb(0 0 0 / 0.5); }
+
+/* Campana de alarma de Bodega: se mece suavemente */
+@keyframes campana-mecer {
+  0%, 70%, 100% { transform: rotate(0); }
+  75% { transform: rotate(14deg); }
+  85% { transform: rotate(-12deg); }
+  92% { transform: rotate(6deg); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .campana-alarma { transform-origin: 50% 10%; animation: campana-mecer 2.4s ease-in-out infinite; }
+}
