@@ -390,6 +390,9 @@ export default function BodegaPage() {
                             <p className="text-[10px] leading-tight text-slate-500">
                               Mín. {fmt(p.minimo)} {p.unidad}
                               {p.unidad === "bultos" && existencia > 0 ? ` · ${fmt(existencia * factorKg(p))} kg` : ""}
+                              {p.unidad === "bultos" && existencia < 0 ? (
+                                <span className="font-semibold text-red-600"> · {fmt(existencia * factorKg(p))} kg en negativo</span>
+                              ) : null}
                             </p>
                             </>
                             )}
@@ -1706,6 +1709,7 @@ function TarjetaConsumoCerdas() {
   const revisar = [datos.gestacion, datos.lactancia].some(agotado);
   const naranja = revisar || [datos.gestacion, datos.lactancia].some(porAgotarse);
   const kgDia = datos.gestacion.kgDia + datos.lactancia.kgDia;
+  const faltante = datos.gestacion.faltanteKg + datos.lactancia.faltanteKg;
 
   return (
     <>
@@ -1730,7 +1734,9 @@ function TarjetaConsumoCerdas() {
           <span className={`block text-sm font-bold tabular-nums ${naranja ? "text-orange-600" : "text-slate-900"}`}>
             {revisar ? "Revisar" : minimo ? `${minimo.dias} días` : "–"}
           </span>
-          <span className="block text-[10px] text-slate-400">{revisar ? "alimento en 0" : "alcanza"}</span>
+          <span className={`block text-[10px] ${faltante > 0 ? "font-semibold text-red-600" : "text-slate-400"}`}>
+            {faltante > 0 ? `−${kgTexto(faltante)} en negativo` : revisar ? "alimento en 0" : "alcanza"}
+          </span>
         </span>
         <Chevron />
       </button>
@@ -1786,7 +1792,11 @@ function BloqueConsumo({ titulo, a }: { titulo: string; a: ConsumoAlimentoCerdas
           <p className={`text-[13px] font-bold tabular-nums ${alerta ? "text-orange-600" : "text-sky-900"}`}>
             {agotado(a) ? "Revisar" : a.dias !== null ? `${a.dias} días` : "–"}
           </p>
-          <p className="text-[10px] text-slate-500">{a.existenciaKg !== null ? `hay ${bultosTexto(a.existenciaKg, a.kgBulto)}` : "sin producto"}</p>
+          {a.faltanteKg > 0 ? (
+            <p className="text-[10px] font-semibold text-red-600">−{kgTexto(a.faltanteKg)} en negativo</p>
+          ) : (
+            <p className="text-[10px] text-slate-500">{a.existenciaKg !== null ? `hay ${bultosTexto(a.existenciaKg, a.kgBulto)}` : "sin producto"}</p>
+          )}
         </div>
       </div>
       <ul className="divide-y divide-slate-100 border-t border-slate-100">

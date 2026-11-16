@@ -32,6 +32,8 @@ export interface ConsumoAlimentoCerdas {
   kgDia: number;
   /** Existencia en bodega, en kilos (null si no hay producto con ese código) */
   existenciaKg: number | null;
+  /** Kilos que van en negativo (consumo descontado sin existencia), 0 si no hay */
+  faltanteKg: number;
   /** Días que alcanza la existencia (null si no hay consumo o producto) */
   dias: number | null;
   /** Kilos por bulto del producto (para mostrar en bultos) */
@@ -286,6 +288,7 @@ export function calcularConsumoCerdas(): { gestacion: ConsumoAlimentoCerdas; lac
     return {
       nombre: principal?.nombre ?? "Sin producto en bodega",
       existenciaKg: item ? Math.max(0, item.disponible) * factorKg(item.producto) : null,
+      faltanteKg: item && item.disponible < 0 ? Math.round(-item.disponible * factorKg(item.producto) * 10) / 10 : 0,
       kgBulto: principal?.unidad === "bultos" ? factorKg(principal) : KG_POR_BULTO,
     };
   };
@@ -299,6 +302,7 @@ export function calcularConsumoCerdas(): { gestacion: ConsumoAlimentoCerdas; lac
       nombre: d.nombre,
       kgDia,
       existenciaKg: d.existenciaKg,
+      faltanteKg: d.faltanteKg,
       dias: d.existenciaKg !== null && kgDia > 0 ? Math.floor(d.existenciaKg / kgDia) : null,
       kgBulto: d.kgBulto,
       grupos: lista,
