@@ -370,7 +370,7 @@ export default function Dashboard() {
             ) : (
               <>
                 {/* Todo al día: el logo late y lleva un chulito verde */}
-                <span className="logo-late flex h-[30px] w-[30px] items-center justify-center rounded-[9px] bg-white p-0.5">
+                <span className="logo-late flex h-[30px] w-[30px] items-center justify-center rounded-[9px] p-0.5" style={{ background: "#fff" }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/images/logo.png" alt="" className="h-full w-full object-contain" />
                 </span>
