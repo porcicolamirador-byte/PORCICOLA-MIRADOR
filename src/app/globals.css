@@ -362,3 +362,16 @@ html.oscuro .tarjeta-boton:active { box-shadow: 0 1px 0 #000, 0 2px 6px rgb(0 0 
 @media (prefers-reduced-motion: no-preference) {
   .campana-alarma { transform-origin: 50% 10%; animation: campana-mecer 2.4s ease-in-out infinite; }
 }
+
+/* Onda roja fuerte del botón de alertas cuando hay críticas */
+@keyframes onda-critica {
+  0% { transform: scale(1); opacity: 0.9; }
+  80%, 100% { transform: scale(2.3); opacity: 0; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .onda-critica { animation: onda-critica 1.3s cubic-bezier(0, 0, 0.2, 1) infinite; }
+  .onda-critica-2 { animation-delay: 0.65s; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .onda-critica { opacity: 0.35; transform: scale(1.25); }
+}

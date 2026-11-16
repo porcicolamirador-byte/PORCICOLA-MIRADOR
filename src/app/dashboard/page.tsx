@@ -490,10 +490,11 @@ export default function Dashboard() {
         >
           {/* Anillo que late: rojo e intenso si hay algo urgente; verde y suave si no */}
           {hayCriticas ? (
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 rounded-full bg-rose-500/50 motion-safe:animate-ping"
-            />
+            <>
+              {/* Crítica: dos ondas rojas intensas que se dispersan más lejos */}
+              <span aria-hidden="true" className="onda-critica pointer-events-none absolute inset-0 rounded-full bg-red-600" />
+              <span aria-hidden="true" className="onda-critica onda-critica-2 pointer-events-none absolute inset-0 rounded-full bg-red-500" />
+            </>
           ) : (
             <span aria-hidden="true" className={`latido-suave pointer-events-none absolute inset-0 rounded-full ${COLOR_NIVEL.anillo}`} />
           )}
