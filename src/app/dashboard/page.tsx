@@ -268,8 +268,8 @@ export default function Dashboard() {
 
   // Relojes de Engorde: lotes activos según cuánto les falta para los 5 meses (desde su fecha de ingreso).
   // Azul: faltan 30 días o menos · Amarillo: faltan 15 o menos (hasta 5 meses y 15 días) · Rojo: pasó de 5 meses y 15 días
-  // Prueba: los 3 relojes encendidos hasta las 5:55 p. m. del 16 nov 2026 (hora Colombia); luego, las condiciones reales
-  const PRUEBA_RELOJES_HASTA = Date.parse("2026-11-16T22:55:00Z");
+  // Prueba: los 3 relojes encendidos hasta las 6:00 p. m. del 16 nov 2026 (hora Colombia); luego, las condiciones reales
+  const PRUEBA_RELOJES_HASTA = Date.parse("2026-11-16T23:00:00Z");
   const [finPrueba, setFinPrueba] = useState(() => Date.now() >= PRUEBA_RELOJES_HASTA);
   useEffect(() => {
     if (finPrueba) return;
@@ -498,7 +498,7 @@ export default function Dashboard() {
                 className={`relative flex flex-col items-center gap-3 rounded-3xl border px-3.5 py-3.5 text-center shadow-sm transition active:scale-[0.97] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 ${modulo.card}`}
               >
                 {modulo.nombre === "Engorde" && (relojesEngorde.azul > 0 || relojesEngorde.amarillo > 0 || relojesEngorde.rojo > 0) && (
-                  <span className="absolute left-2 top-2 flex items-center gap-1" role="img"
+                  <span className="absolute left-2 top-2 flex flex-col items-center gap-0.5" role="img"
                     aria-label={[
                       relojesEngorde.rojo ? `${relojesEngorde.rojo} lote(s) pasaron de 5 meses y 15 días` : "",
                       relojesEngorde.amarillo ? `${relojesEngorde.amarillo} lote(s) a 15 días de los 5 meses` : "",
@@ -511,9 +511,9 @@ export default function Dashboard() {
                     ] as const)
                       .filter(([k]) => relojesEngorde[k] > 0)
                       .map(([k, color]) => (
-                        <span key={k} aria-hidden="true" className={`relative flex h-5 w-5 items-center justify-center rounded-full text-white shadow ${color}`}>
+                        <span key={k} aria-hidden="true" className={`relative flex h-4 w-4 items-center justify-center rounded-full text-white shadow ${color}`}>
                           {k === "rojo" && <span className="onda-critica pointer-events-none absolute inset-0 rounded-full bg-red-500" />}
-                          <svg viewBox="0 0 24 24" className="campana-alarma relative h-3 w-3" fill="currentColor">
+                          <svg viewBox="0 0 24 24" className="campana-alarma relative h-2.5 w-2.5" fill="currentColor">
                             <path d="M6 2h12v2h-1v3.2a3 3 0 0 1-.9 2.1L13.4 12l2.7 2.7a3 3 0 0 1 .9 2.1V20h1v2H6v-2h1v-3.2a3 3 0 0 1 .9-2.1l2.7-2.7-2.7-2.7A3 3 0 0 1 7 7.2V4H6V2Zm3 2v3.2c0 .3.1.5.3.7L12 10.6l2.7-2.7a1 1 0 0 0 .3-.7V4H9Zm3 9.4-2.7 2.7a1 1 0 0 0-.3.7V20h6v-3.2a1 1 0 0 0-.3-.7L12 13.4Z" />
                           </svg>
                         </span>
