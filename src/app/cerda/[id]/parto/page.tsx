@@ -89,7 +89,7 @@ export default function RegistrarParto() {
   const [pesoPromedio, setPesoPromedio] = useState("1.25");
   const [pesoCerda, setPesoCerda] = useState("");
   const [estadoSalud, setEstadoSalud] = useState("Buena");
-  const [vacunacion, setVacunacion] = useState("secuencial");
+  const [vacunacion, setVacunacion] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [observacionesLechones, setObservacionesLechones] = useState("");
   const [error, setError] = useState("");
@@ -138,6 +138,7 @@ export default function RegistrarParto() {
     const nPesoCerda = aNumero(pesoCerda);
     if (nPesoCerda === null || !(nPesoCerda > 0)) return setError("Escribe el peso de la cerda");
     if (!estadoSalud) return setError("Elige el estado de salud de la cerda");
+    if (!vacunacion) return setError("Elige el método de vacunación de la camada (Bioseguridad)");
     const nMuertos = Math.max(0, nMuertosTxt);
     const nMomias = Math.max(0, nMomiasTxt);
 
@@ -306,13 +307,15 @@ export default function RegistrarParto() {
           </Seccion>
 
           <Seccion titulo="Bioseguridad">
-            <Campo etiqueta="Método de vacunación de la camada">
-              <SelectorApp valor={vacunacion} onCambiar={setVacunacion} titulo="Método de vacunación" opciones={METODOS_VACUNACION} className="w-full" claseBoton={CLASE_SELECTOR} />
+            <Campo etiqueta="Método de vacunación de la camada *">
+              <SelectorApp valor={vacunacion} onCambiar={setVacunacion} titulo="Método de vacunación" opciones={METODOS_VACUNACION} placeholder="Elegir método" className="w-full" claseBoton={CLASE_SELECTOR} />
             </Campo>
             <p className="mt-2 text-xs leading-snug text-slate-500">
               {vacunacion === "secuencial"
                 ? "Alertas críticas: RespiSure-ONE desde el día 3 y Fostera Gold PCV desde el día 21, hasta confirmar cada aplicación."
-                : "Vacunación combinada."}
+                : vacunacion === "combinada"
+                  ? "Vacunación combinada."
+                  : "Obligatorio: define las alertas de vacunas de la camada."}
             </p>
           </Seccion>
 

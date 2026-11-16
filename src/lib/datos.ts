@@ -2458,7 +2458,9 @@ export function confirmarGestacion(cerdaId: string, etapa: 1 | 2): boolean {
   return true;
 }
 
-/** Confirma la aplicación de una vacuna de la camada (en el registro del parto) */
+const NOMBRES_VACUNA: Record<string, string> = { respisure: "RespiSure-ONE", fostera: "Fostera Gold PCV" };
+
+/** Confirma la aplicación de una vacuna de la camada (en el registro del parto y en el lote) */
 export function confirmarVacunaParto(cerdaId: string, codigoParto: string, vacuna: string): boolean {
   const historial = leerHistorial(cerdaId);
   const i = historial.findIndex((r) => r.tipo === "Parto" && String((r as { codigoParto?: unknown }).codigoParto ?? "") === codigoParto);
@@ -2467,6 +2469,13 @@ export function confirmarVacunaParto(cerdaId: string, codigoParto: string, vacun
     CLAVES.historial(cerdaId),
     historial.map((r, k) => (k === i ? { ...r, vacunas: { ...((r as { vacunas?: Record<string, string> }).vacunas ?? {}), [vacuna]: hoy() } } : r)),
   );
+  // También queda en los registros del lote de la camada
+  const lote = loteDelParto(codigoParto);
+  if (lote) {
+    const nombre = NOMBRES_VACUNA[vacuna] ?? vacuna;
+    const aplicacion: AplicacionLote = { id: nuevoId(), fecha: hoy(), hora: horaActual(), tipo: `Vacuna ${nombre}`, nota: "Vacunación secuencial · confirmada desde Tareas" };
+    guardarLotes(leerLotes().map((l) => (l.id === lote.id ? { ...l, aplicaciones: [...(l.aplicaciones ?? []), aplicacion] } : l)));
+  }
   return true;
 }
 
