@@ -11,7 +11,7 @@ import { cambiarGranja, crearGranja, granjaActual, leerGranjas, nombreGranjaActu
 import { registrarLog } from "@/lib/log";
 import SummaryCard from "@/components/SummaryCard";
 import { calcularConsumoCerdas } from "@/lib/consumoCerdas";
-import { useVersionDatos } from "@/lib/datos";
+import { leerLotes, useVersionDatos } from "@/lib/datos";
 import { useModulosOcultos } from "@/lib/modulos";
 import PageShell from "@/components/PageShell";
 import BottomNav from "@/components/BottomNav";
@@ -265,6 +265,28 @@ export default function Dashboard() {
     }
     return null;
   }, [versionDatos]);
+
+  // Relojes de Engorde: lotes activos según cuánto les falta para los 5 meses (desde su fecha de ingreso).
+  // Azul: faltan 30 días o menos · Amarillo: faltan 15 o menos (hasta 5 meses y 15 días) · Rojo: pasó de 5 meses y 15 días
+  const relojesEngorde = useMemo(() => {
+    const vacio = { azul: 0, amarillo: 0, rojo: 0 };
+    if (versionDatos < 0) return vacio;
+    const d = new Date();
+    const hoyIso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const sumar = (iso: string, meses: number, dias: number) => {
+      const [a, m, di] = iso.split("-").map(Number);
+      const f = new Date(Date.UTC(a, m - 1 + meses, di + dias));
+      return f.toISOString().slice(0, 10);
+    };
+    const r = { ...vacio };
+    for (const l of leerLotes()) {
+      if (!l.activo || !/^\d{4}-\d{2}-\d{2}$/.test(l.fechaIngreso || "")) continue;
+      if (hoyIso > sumar(l.fechaIngreso, 5, 15)) r.rojo++;
+      else if (hoyIso >= sumar(l.fechaIngreso, 5, -15)) r.amarillo++;
+      else if (hoyIso >= sumar(l.fechaIngreso, 5, -30)) r.azul++;
+    }
+    return r;
+  }, [versionDatos]);
   const pendientes = pendingTasks.length;
   // Color del número de alertas según la prioridad más alta: crítica rojo, alta naranja, media azul, baja gris
   const nivel = (["critica", "alta", "media", "baja"] as const).find((p) => pendingTasks.some((t) => t.prioridad === p)) ?? "baja";
@@ -466,6 +488,29 @@ export default function Dashboard() {
                 onClick={() => router.push(modulo.ruta)}
                 className={`relative flex flex-col items-center gap-3 rounded-3xl border px-3.5 py-3.5 text-center shadow-sm transition active:scale-[0.97] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 ${modulo.card}`}
               >
+                {modulo.nombre === "Engorde" && (relojesEngorde.azul > 0 || relojesEngorde.amarillo > 0 || relojesEngorde.rojo > 0) && (
+                  <span className="absolute left-2 top-2 flex items-center gap-1" role="img"
+                    aria-label={[
+                      relojesEngorde.rojo ? `${relojesEngorde.rojo} lote(s) pasaron de 5 meses y 15 días` : "",
+                      relojesEngorde.amarillo ? `${relojesEngorde.amarillo} lote(s) a 15 días de los 5 meses` : "",
+                      relojesEngorde.azul ? `${relojesEngorde.azul} lote(s) a 30 días de los 5 meses` : "",
+                    ].filter(Boolean).join(", ")}>
+                    {([
+                      ["rojo", "bg-red-600"],
+                      ["amarillo", "bg-yellow-500"],
+                      ["azul", "bg-sky-600"],
+                    ] as const)
+                      .filter(([k]) => relojesEngorde[k] > 0)
+                      .map(([k, color]) => (
+                        <span key={k} aria-hidden="true" className={`relative flex h-5 w-5 items-center justify-center rounded-full text-white shadow ${color}`}>
+                          {k === "rojo" && <span className="onda-critica pointer-events-none absolute inset-0 rounded-full bg-red-500" />}
+                          <svg viewBox="0 0 24 24" className="campana-alarma relative h-3 w-3" fill="currentColor">
+                            <path d="M6 2h12v2h-1v3.2a3 3 0 0 1-.9 2.1L13.4 12l2.7 2.7a3 3 0 0 1 .9 2.1V20h1v2H6v-2h1v-3.2a3 3 0 0 1 .9-2.1l2.7-2.7-2.7-2.7A3 3 0 0 1 7 7.2V4H6V2Zm3 2v3.2c0 .3.1.5.3.7L12 10.6l2.7-2.7a1 1 0 0 0 .3-.7V4H9Zm3 9.4-2.7 2.7a1 1 0 0 0-.3.7V20h6v-3.2a1 1 0 0 0-.3-.7L12 13.4Z" />
+                          </svg>
+                        </span>
+                      ))}
+                  </span>
+                )}
                 {modulo.nombre === "Bodega" && alarmaBodega && (
                   <span
                     role="img"
