@@ -12,6 +12,7 @@ import SelectorApp from "@/components/SelectorApp";
 import {
   formatoFecha,
   formatoPesos,
+  guardarLotes,
   guardarMovimientos,
   hoy,
   leerMovimientos,
@@ -438,6 +439,18 @@ function NuevoMovimiento({ abierta, onCerrar }: { abierta: boolean; onCerrar: ()
     setPago("");
     setError("");
     onCerrar();
+    // Venta de cerdos con lote: se ofrece liquidar el lote en el mismo paso (se quitan sus alertas)
+    if (lote && lote.activo && categoria.startsWith("Venta")) {
+      const nombre = nombreLote(lote);
+      void confirmar({
+        titulo: `¿Liquidar el lote ${lote.codigo ?? ""}?`.replace("  ", " "),
+        mensaje: `Registraste la venta de ${nombre}. Si vendiste todos los cerdos, puedes liquidar el lote ahora: pasará a lotes cerrados y se quitarán sus alertas. Si fue una venta parcial, el lote sigue activo.`,
+        aceptar: "Sí, liquidar lote",
+        cancelar: "No, sigue activo",
+      }).then((ok) => {
+        if (ok) guardarLotes(leerLotes().map((l) => (l.id === lote.id ? { ...l, activo: false, fechaSalida: hoy() } : l)));
+      });
+    }
   };
 
   return (
