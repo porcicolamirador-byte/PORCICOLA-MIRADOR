@@ -268,8 +268,17 @@ export default function Dashboard() {
 
   // Relojes de Engorde: lotes activos según cuánto les falta para los 5 meses (desde su fecha de ingreso).
   // Azul: faltan 30 días o menos · Amarillo: faltan 15 o menos (hasta 5 meses y 15 días) · Rojo: pasó de 5 meses y 15 días
+  // Prueba: los 3 relojes encendidos hasta las 6:00 p. m. del 16 nov 2026 (hora Colombia); luego, las condiciones reales
+  const PRUEBA_RELOJES_HASTA = Date.parse("2026-11-16T23:00:00Z");
+  const [finPrueba, setFinPrueba] = useState(() => Date.now() >= PRUEBA_RELOJES_HASTA);
+  useEffect(() => {
+    if (finPrueba) return;
+    const t = setTimeout(() => setFinPrueba(true), Math.max(0, PRUEBA_RELOJES_HASTA - Date.now()));
+    return () => clearTimeout(t);
+  }, [finPrueba, PRUEBA_RELOJES_HASTA]);
   const relojesEngorde = useMemo(() => {
     const vacio = { azul: 0, amarillo: 0, rojo: 0 };
+    if (!finPrueba) return { azul: 1, amarillo: 1, rojo: 1 };
     if (versionDatos < 0) return vacio;
     const d = new Date();
     const hoyIso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -286,7 +295,7 @@ export default function Dashboard() {
       else if (hoyIso >= sumar(l.fechaIngreso, 5, -30)) r.azul++;
     }
     return r;
-  }, [versionDatos]);
+  }, [versionDatos, finPrueba]);
   const pendientes = pendingTasks.length;
   // Color del número de alertas según la prioridad más alta: crítica rojo, alta naranja, media azul, baja gris
   const nivel = (["critica", "alta", "media", "baja"] as const).find((p) => pendingTasks.some((t) => t.prioridad === p)) ?? "baja";
