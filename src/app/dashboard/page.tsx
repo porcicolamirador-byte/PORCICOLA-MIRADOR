@@ -497,7 +497,9 @@ export default function Dashboard() {
           ) : (
             <span aria-hidden="true" className={`latido-suave pointer-events-none absolute inset-0 rounded-full ${COLOR_NIVEL.anillo}`} />
           )}
-          <span className="relative text-xl">🕣</span>
+          <svg viewBox="0 0 24 24" className="campana-alarma relative h-6 w-6" fill="currentColor" aria-hidden="true">
+            <path d="M12 2a6 6 0 0 0-6 6v3.6l-1.7 3.4A1 1 0 0 0 5.2 16.5h13.6a1 1 0 0 0 .9-1.5L18 11.6V8a6 6 0 0 0-6-6Zm-2.8 16a2.9 2.9 0 0 0 5.6 0H9.2Z" />
+          </svg>
           <span className="pointer-events-none absolute -right-1 top-0.5 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-slate-900 shadow-sm">
             {pendientes}
           </span>
