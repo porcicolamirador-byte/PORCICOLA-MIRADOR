@@ -391,7 +391,7 @@ export default function BodegaPage() {
                               Mín. {fmt(p.minimo)} {p.unidad}
                               {p.unidad === "bultos" && existencia > 0 ? ` · ${fmt(existencia * factorKg(p))} kg` : ""}
                               {p.unidad === "bultos" && existencia < 0 ? (
-                                <span className="font-semibold text-red-600"> · {fmt(existencia * factorKg(p))} kg en negativo</span>
+                                <span className="font-semibold text-red-600"> · {fmt(existencia * factorKg(p))} kg</span>
                               ) : null}
                             </p>
                             </>
@@ -1735,7 +1735,7 @@ function TarjetaConsumoCerdas() {
             {revisar ? "Revisar" : minimo ? `${minimo.dias} días` : "–"}
           </span>
           <span className={`block text-[10px] ${faltante > 0 ? "font-semibold text-red-600" : "text-slate-400"}`}>
-            {faltante > 0 ? `−${kgTexto(faltante)} en negativo` : revisar ? "alimento en 0" : "alcanza"}
+            {faltante > 0 ? `−${kgTexto(faltante)}` : revisar ? "alimento en 0" : "alcanza"}
           </span>
         </span>
         <Chevron />
@@ -1793,7 +1793,7 @@ function BloqueConsumo({ titulo, a }: { titulo: string; a: ConsumoAlimentoCerdas
             {agotado(a) ? "Revisar" : a.dias !== null ? `${a.dias} días` : "–"}
           </p>
           {a.faltanteKg > 0 ? (
-            <p className="text-[10px] font-semibold text-red-600">−{kgTexto(a.faltanteKg)} en negativo</p>
+            <p className="text-[10px] font-semibold text-red-600">−{kgTexto(a.faltanteKg)}</p>
           ) : (
             <p className="text-[10px] text-slate-500">{a.existenciaKg !== null ? `hay ${bultosTexto(a.existenciaKg, a.kgBulto)}` : "sin producto"}</p>
           )}
