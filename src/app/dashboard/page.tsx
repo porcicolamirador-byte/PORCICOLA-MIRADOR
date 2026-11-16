@@ -250,6 +250,14 @@ export default function Dashboard() {
 
   const pendingTasks = useMemo(() => calcularTareasPendientes(cerdas), [cerdas]);
   const pendientes = pendingTasks.length;
+  // Color del número de alertas según la prioridad más alta: crítica rojo, alta naranja, media azul, baja gris
+  const nivel = (["critica", "alta", "media", "baja"] as const).find((p) => pendingTasks.some((t) => t.prioridad === p)) ?? "baja";
+  const COLOR_NIVEL = {
+    critica: { cuadro: "bg-rose-500", boton: "bg-rose-600 hover:bg-rose-700 focus-visible:ring-rose-600", anillo: "bg-rose-500/50" },
+    alta: { cuadro: "bg-orange-500", boton: "bg-orange-500 hover:bg-orange-600 focus-visible:ring-orange-500", anillo: "bg-orange-400/40" },
+    media: { cuadro: "bg-sky-500", boton: "bg-sky-600 hover:bg-sky-700 focus-visible:ring-sky-600", anillo: "bg-sky-400/30" },
+    baja: { cuadro: "bg-slate-400", boton: "bg-slate-500 hover:bg-slate-600 focus-visible:ring-slate-500", anillo: "bg-slate-400/30" },
+  }[nivel];
   const cerdasCriticas = useMemo(() => obtenerCerdasCriticas(cerdas), [cerdas]);
 
   useEffect(() => {
@@ -338,7 +346,7 @@ export default function Dashboard() {
           <span
             aria-hidden="true"
             className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold tabular-nums ${
-              hayCriticas ? "bg-rose-500 text-white" : "bg-white/15 text-white"
+              pendientes > 0 ? `${COLOR_NIVEL.cuadro} text-white` : "bg-white/15 text-white"
             }`}
           >
             {pendientes > 0 ? pendientes : "✓"}
@@ -448,9 +456,7 @@ export default function Dashboard() {
           onClick={() => router.push('/tareas')}
           style={{ bottom: "calc(env(safe-area-inset-bottom) + 6.5rem)" }}
           className={`fixed right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-2xl transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
-            hayCriticas
-              ? 'bg-rose-600 hover:bg-rose-700 focus-visible:ring-rose-600'
-              : 'bg-sky-600 hover:bg-sky-700 focus-visible:ring-sky-600'
+            COLOR_NIVEL.boton
           }`}
           aria-label={`Ver alertas pendientes: ${pendientes}${hayCriticas ? ", hay urgentes" : ""}`}
         >
@@ -461,7 +467,7 @@ export default function Dashboard() {
               className="pointer-events-none absolute inset-0 rounded-full bg-rose-500/50 motion-safe:animate-ping"
             />
           ) : (
-            <span aria-hidden="true" className="latido-suave pointer-events-none absolute inset-0 rounded-full bg-sky-400/30" />
+            <span aria-hidden="true" className={`latido-suave pointer-events-none absolute inset-0 rounded-full ${COLOR_NIVEL.anillo}`} />
           )}
           <span className="relative text-xl">🕣</span>
           <span className="pointer-events-none absolute -right-1 top-0.5 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-slate-900 shadow-sm">
