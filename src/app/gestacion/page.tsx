@@ -699,7 +699,7 @@ export default function Gestacion() {
                   key={cerda.id}
                   type="button"
                   onClick={() => router.push(`/cerda/${encodeURIComponent(cerda.id)}`)}
-                  className="relative flex min-w-0 flex-col items-start gap-2.5 overflow-hidden rounded-3xl border border-slate-200 bg-white px-3.5 py-3.5 text-left shadow-sm transition active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600"
+                  className="tarjeta-boton relative flex min-w-0 flex-col items-start gap-2.5 overflow-hidden rounded-3xl border border-slate-200 bg-white px-3.5 py-3.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600"
                 >
                   <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${obtenerBarraColor(estadoLabel)}`} />
                   <div className="relative flex h-11 min-w-[3.25rem] max-w-full items-center justify-center rounded-xl bg-amber-300 px-2.5 pt-1.5 shadow-inner">
@@ -758,7 +758,7 @@ export default function Gestacion() {
               return (
                 <article
                   key={index}
-                  className="relative overflow-hidden rounded-[20px] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] ring-1 ring-slate-200/70"
+                  className="tarjeta-boton relative overflow-hidden rounded-[20px] bg-white ring-1 ring-slate-200"
                 >
                   {/* Acciones que aparecen al deslizar */}
                   <div

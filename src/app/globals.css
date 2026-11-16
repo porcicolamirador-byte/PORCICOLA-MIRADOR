@@ -334,3 +334,16 @@ html.oscuro .bg-sky-50\/70 { background-color: color-mix(in srgb,#0ea5e9 14%,#1c
 .arete-id,
 html.oscuro .arete-id { color: #111111; }
 html.oscuro .text-emerald-700 { color: #6ee7b7; }
+
+/* Tarjetas de las cerdas con aspecto de botón: relieve abajo y se hunden al tocar */
+.tarjeta-boton {
+  box-shadow: 0 3px 0 #cbd5e1, 0 6px 14px rgb(15 23 42 / 0.08);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.tarjeta-boton:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #cbd5e1, 0 2px 6px rgb(15 23 42 / 0.08);
+}
+html.oscuro .tarjeta-boton { box-shadow: 0 3px 0 #000, 0 6px 14px rgb(0 0 0 / 0.5); }
+html.oscuro .tarjeta-boton:active { box-shadow: 0 1px 0 #000, 0 2px 6px rgb(0 0 0 / 0.5); }
