@@ -966,6 +966,12 @@ export default function CerdaDetalle() {
                   {fila("Peso de la cerda", p.pesoCerda != null ? `${p.pesoCerda} kg` : "")}
                   {fila("Estado de salud", p.estadoSalud || "")}
                   {fila("Lote de engorde", info.lote)}
+                  {fila("Vacunación", p.vacunacion === "secuencial" ? "Secuencial" : p.vacunacion === "combinada" ? "Combinada" : "")}
+                  {p.vacunacion === "secuencial" &&
+                    fila(
+                      "Vacunas aplicadas",
+                      [p.vacunas?.respisure ? `RespiSure-ONE ${formatearFechaCorta(p.vacunas.respisure)}` : "", p.vacunas?.fostera ? `Fostera Gold PCV ${formatearFechaCorta(p.vacunas.fostera)}` : ""].filter(Boolean).join(" · ") || "Pendientes",
+                    )}
                 </div>
               </section>
               {(p.observaciones || p.observacionesLechones) && (

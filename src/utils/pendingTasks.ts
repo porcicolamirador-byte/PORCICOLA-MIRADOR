@@ -24,7 +24,15 @@ export interface PendingTask {
   hierroLote?: string;
   /** Botón para confirmar que se pidió el material genético (id del registro de destete o repetición) */
   geneticaRegistro?: string;
+  /** Vacuna de la camada por confirmar (parto y vacuna) */
+  vacunaParto?: { codigoParto: string; vacuna: string };
 }
+
+/** Vacunación secuencial de la camada: vacuna y día del parto desde el que se avisa (crítica hasta confirmar) */
+export const VACUNAS_SECUENCIAL = [
+  { clave: 'respisure', nombre: 'RespiSure-ONE', desde: 3, texto: 'días 3 a 5' },
+  { clave: 'fostera', nombre: 'Fostera Gold PCV', desde: 21, texto: 'día 21' },
+];
 
 /** Días después del destete o de la repetición en que se pide el material genético (5 días) */
 export const VENTANA_GENETICA = { desde: 2, hasta: 6 };
@@ -234,6 +242,30 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
         fecha: regParto.fecha,
         hierroLote: lote.id,
       });
+    }
+  }
+
+  // Bioseguridad: vacunas de la camada según el método elegido en el parto (crítica hasta confirmar)
+  if (regParto) {
+    const p = regParto as Registro & { vacunacion?: string; vacunas?: Record<string, string>; codigoParto?: string };
+    const diasParto = calcularDiasEntre(regParto.fecha || hoy, hoy);
+    const codigo = String(p.codigoParto ?? '');
+    const lote = codigo ? loteDelParto(codigo) : undefined;
+    const camadaActiva = !lote || lote.activo !== false;
+    if (p.vacunacion === 'secuencial' && codigo && camadaActiva) {
+      for (const v of VACUNAS_SECUENCIAL) {
+        if (diasParto >= v.desde && !p.vacunas?.[v.clave]) {
+          tareas.push({
+            id: cerda.id,
+            tipo: `Vacuna ${v.nombre}`,
+            prioridad: 'critica',
+            descripcion: `Día ${diasParto} del parto: aplicar ${v.nombre} a la camada (${v.texto})`,
+            dias: diasParto,
+            fecha: regParto.fecha,
+            vacunaParto: { codigoParto: codigo, vacuna: v.clave },
+          });
+        }
+      }
     }
   }
 

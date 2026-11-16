@@ -572,9 +572,16 @@ export default function Dashboard() {
           ) : (
             <span aria-hidden="true" className={`latido-suave pointer-events-none absolute inset-0 rounded-full ${COLOR_NIVEL.anillo}`} />
           )}
-          <svg viewBox="0 0 24 24" className="campana-alarma relative h-6 w-6" fill="currentColor" aria-hidden="true">
-            <path d="M12 2a6 6 0 0 0-6 6v3.6l-1.7 3.4A1 1 0 0 0 5.2 16.5h13.6a1 1 0 0 0 .9-1.5L18 11.6V8a6 6 0 0 0-6-6Zm-2.8 16a2.9 2.9 0 0 0 5.6 0H9.2Z" />
-          </svg>
+          {pendingTasks.some((t) => t.vacunaParto) ? (
+            // Vacuna pendiente: la vacunación es prioridad, la campana cambia por una jeringa
+            <svg viewBox="0 0 24 24" className="campana-alarma relative h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="m18 2 4 4M17 7l3-3M19 9 8.7 19.3a1 1 0 0 1-1.4 0l-2.6-2.6a1 1 0 0 1 0-1.4L15 5M9 11l4 4M5 19l-3 3M14 4l6 6" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" className="campana-alarma relative h-6 w-6" fill="currentColor" aria-hidden="true">
+              <path d="M12 2a6 6 0 0 0-6 6v3.6l-1.7 3.4A1 1 0 0 0 5.2 16.5h13.6a1 1 0 0 0 .9-1.5L18 11.6V8a6 6 0 0 0-6-6Zm-2.8 16a2.9 2.9 0 0 0 5.6 0H9.2Z" />
+            </svg>
+          )}
           <span className="pointer-events-none absolute -right-1 top-0.5 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-slate-900 shadow-sm">
             {pendientes}
           </span>

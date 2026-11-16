@@ -12,6 +12,10 @@ import { crearLoteDesdeParto } from "@/lib/datos";
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 const TIPOS_PARTO = ["Normal", "Asistido", "Distócico", "Cesárea"];
 const ESTADOS_SALUD = ["Buena", "Regular", "Mala"];
+const METODOS_VACUNACION = [
+  { valor: "secuencial", texto: "Vacunación secuencial" },
+  { valor: "combinada", texto: "Vacunación combinada" },
+];
 
 interface Registro {
   tipo?: string;
@@ -85,6 +89,7 @@ export default function RegistrarParto() {
   const [pesoPromedio, setPesoPromedio] = useState("1.25");
   const [pesoCerda, setPesoCerda] = useState("");
   const [estadoSalud, setEstadoSalud] = useState("Buena");
+  const [vacunacion, setVacunacion] = useState("secuencial");
   const [observaciones, setObservaciones] = useState("");
   const [observacionesLechones, setObservacionesLechones] = useState("");
   const [error, setError] = useState("");
@@ -157,6 +162,8 @@ export default function RegistrarParto() {
       genetica: (ultimaInseminacion as { genetica?: string } | undefined)?.genetica || undefined,
       pesoCerda: aNumero(pesoCerda) ?? undefined,
       estadoSalud,
+      // Bioseguridad: método de vacunación de la camada (genera las alertas de vacunas)
+      vacunacion,
       observaciones: observaciones.trim() || undefined,
       observacionesLechones: observacionesLechones.trim() || undefined,
       descripcion: "",
@@ -296,6 +303,17 @@ export default function RegistrarParto() {
                   className="h-20 w-full resize-none rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-base outline-none focus:ring-2 focus:ring-sky-200" />
               </Campo>
             </div>
+          </Seccion>
+
+          <Seccion titulo="Bioseguridad">
+            <Campo etiqueta="Método de vacunación de la camada">
+              <SelectorApp valor={vacunacion} onCambiar={setVacunacion} titulo="Método de vacunación" opciones={METODOS_VACUNACION} className="w-full" claseBoton={CLASE_SELECTOR} />
+            </Campo>
+            <p className="mt-2 text-xs leading-snug text-slate-500">
+              {vacunacion === "secuencial"
+                ? "Alertas críticas: RespiSure-ONE desde el día 3 y Fostera Gold PCV desde el día 21, hasta confirmar cada aplicación."
+                : "Vacunación combinada."}
+            </p>
           </Seccion>
 
           {error && (

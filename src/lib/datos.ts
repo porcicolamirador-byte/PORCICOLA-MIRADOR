@@ -2458,6 +2458,18 @@ export function confirmarGestacion(cerdaId: string, etapa: 1 | 2): boolean {
   return true;
 }
 
+/** Confirma la aplicación de una vacuna de la camada (en el registro del parto) */
+export function confirmarVacunaParto(cerdaId: string, codigoParto: string, vacuna: string): boolean {
+  const historial = leerHistorial(cerdaId);
+  const i = historial.findIndex((r) => r.tipo === "Parto" && String((r as { codigoParto?: unknown }).codigoParto ?? "") === codigoParto);
+  if (i < 0) return false;
+  escribir(
+    CLAVES.historial(cerdaId),
+    historial.map((r, k) => (k === i ? { ...r, vacunas: { ...((r as { vacunas?: Record<string, string> }).vacunas ?? {}), [vacuna]: hoy() } } : r)),
+  );
+  return true;
+}
+
 /** Marca que ya se pidió el material genético (en el registro de destete o repetición) */
 export function marcarGeneticaSolicitada(cerdaId: string, registroId: string): boolean {
   const historial = leerHistorial(cerdaId);
