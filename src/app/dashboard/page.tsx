@@ -296,6 +296,17 @@ export default function Dashboard() {
     }
     return r;
   }, [versionDatos, finPrueba]);
+  // Un solo reloj: si hay varios estados, cambia de color cada segundo (rojo → amarillo → azul)
+  const estadosReloj = (["rojo", "amarillo", "azul"] as const).filter((k) => relojesEngorde[k] > 0);
+  const [pasoReloj, setPasoReloj] = useState(0);
+  const variosEstados = estadosReloj.length > 1;
+  useEffect(() => {
+    if (!variosEstados) return;
+    const t = setInterval(() => setPasoReloj((p) => p + 1), 1000);
+    return () => clearInterval(t);
+  }, [variosEstados]);
+  const estadoReloj = estadosReloj.length ? estadosReloj[pasoReloj % estadosReloj.length] : null;
+  const COLOR_RELOJ = { rojo: "bg-red-600", amarillo: "bg-yellow-500", azul: "bg-sky-600" } as const;
   const pendientes = pendingTasks.length;
   // Color del número de alertas según la prioridad más alta: crítica rojo, alta naranja, media azul, baja gris
   const nivel = (["critica", "alta", "media", "baja"] as const).find((p) => pendingTasks.some((t) => t.prioridad === p)) ?? "baja";
@@ -498,26 +509,20 @@ export default function Dashboard() {
                 className={`relative flex flex-col items-center gap-3 rounded-3xl border px-3.5 py-3.5 text-center shadow-sm transition active:scale-[0.97] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 ${modulo.card}`}
               >
                 {modulo.nombre === "Engorde" && (relojesEngorde.azul > 0 || relojesEngorde.amarillo > 0 || relojesEngorde.rojo > 0) && (
-                  <span className="absolute left-2 top-2 flex flex-col items-center gap-0.5" role="img"
+                  <span className="absolute left-2 top-2 flex" role="img"
                     aria-label={[
                       relojesEngorde.rojo ? `${relojesEngorde.rojo} lote(s) pasaron de 5 meses y 15 días` : "",
                       relojesEngorde.amarillo ? `${relojesEngorde.amarillo} lote(s) a 15 días de los 5 meses` : "",
                       relojesEngorde.azul ? `${relojesEngorde.azul} lote(s) a 30 días de los 5 meses` : "",
                     ].filter(Boolean).join(", ")}>
-                    {([
-                      ["rojo", "bg-red-600"],
-                      ["amarillo", "bg-yellow-500"],
-                      ["azul", "bg-sky-600"],
-                    ] as const)
-                      .filter(([k]) => relojesEngorde[k] > 0)
-                      .map(([k, color]) => (
-                        <span key={k} aria-hidden="true" className={`relative flex h-4 w-4 items-center justify-center rounded-full text-white shadow ${color}`}>
-                          {k === "rojo" && <span className="onda-critica pointer-events-none absolute inset-0 rounded-full bg-red-500" />}
-                          <svg viewBox="0 0 24 24" className="campana-alarma relative h-2.5 w-2.5" fill="currentColor">
-                            <path d="M6 2h12v2h-1v3.2a3 3 0 0 1-.9 2.1L13.4 12l2.7 2.7a3 3 0 0 1 .9 2.1V20h1v2H6v-2h1v-3.2a3 3 0 0 1 .9-2.1l2.7-2.7-2.7-2.7A3 3 0 0 1 7 7.2V4H6V2Zm3 2v3.2c0 .3.1.5.3.7L12 10.6l2.7-2.7a1 1 0 0 0 .3-.7V4H9Zm3 9.4-2.7 2.7a1 1 0 0 0-.3.7V20h6v-3.2a1 1 0 0 0-.3-.7L12 13.4Z" />
-                          </svg>
-                        </span>
-                      ))}
+                    {estadoReloj && (
+                      <span aria-hidden="true" className={`relative flex h-4 w-4 items-center justify-center rounded-full text-white shadow transition-colors duration-300 ${COLOR_RELOJ[estadoReloj]}`}>
+                        {estadoReloj === "rojo" && <span className="onda-critica pointer-events-none absolute inset-0 rounded-full bg-red-500" />}
+                        <svg viewBox="0 0 24 24" className="campana-alarma relative h-2.5 w-2.5" fill="currentColor">
+                          <path d="M6 2h12v2h-1v3.2a3 3 0 0 1-.9 2.1L13.4 12l2.7 2.7a3 3 0 0 1 .9 2.1V20h1v2H6v-2h1v-3.2a3 3 0 0 1 .9-2.1l2.7-2.7-2.7-2.7A3 3 0 0 1 7 7.2V4H6V2Zm3 2v3.2c0 .3.1.5.3.7L12 10.6l2.7-2.7a1 1 0 0 0 .3-.7V4H9Zm3 9.4-2.7 2.7a1 1 0 0 0-.3.7V20h6v-3.2a1 1 0 0 0-.3-.7L12 13.4Z" />
+                        </svg>
+                      </span>
+                    )}
                   </span>
                 )}
                 {modulo.nombre === "Bodega" && alarmaBodega && (
