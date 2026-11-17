@@ -280,7 +280,12 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
   const alertaGenetica = (reg: Registro, dias: number, de: string, ventana = VENTANA_GENETICA) => {
     const r = reg as Registro & { id?: string; geneticaSolicitada?: string };
     const inseminada = historial.some((x) => x.tipo === 'Inseminación' && (x.fecha || '') >= (reg.fecha || ''));
-    if (!r.geneticaSolicitada && !inseminada && dias >= ventana.desde && dias <= ventana.hasta) {
+    // Si ya se registró la compra de la genética para la cerda (pendiente de usar o ya vencida), ya se pidió
+    const desde = reg.fecha || '';
+    const pendiente = (cerda as { geneticaPendiente?: { fecha?: string } }).geneticaPendiente;
+    const perdidas = (cerda as { geneticasPerdidas?: { fecha?: string }[] }).geneticasPerdidas;
+    const comprada = (pendiente?.fecha ?? '') >= desde && !!pendiente?.fecha || (Array.isArray(perdidas) && perdidas.some((g) => (g.fecha ?? '') >= desde));
+    if (!r.geneticaSolicitada && !inseminada && !comprada && dias >= ventana.desde && dias <= ventana.hasta) {
       tareas.push({
         id: cerda.id,
         tipo: 'Solicitar material genético',
