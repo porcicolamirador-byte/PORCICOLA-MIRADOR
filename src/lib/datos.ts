@@ -550,6 +550,15 @@ export const PRODUCTOS_PREESTABLECIDOS: ProductoBodega[] = [
   { id: "pre-MC-01", codigo: "MC-01", nombre: "Maxi Cerdos 337 Fin.", categoria: "Alimento", unidad: "bultos", kgPorUnidad: 40, minimo: 0, activo: true, preestablecido: true },
   { id: "pre-CG-01", codigo: "CG-01", nombre: "Maxi Cerdas Gestación", categoria: "Alimento", unidad: "bultos", kgPorUnidad: 40, minimo: 0, activo: true, preestablecido: true },
   { id: "pre-CL-01", codigo: "CL-01", nombre: "Maxi Cerdas Lactancia", categoria: "Alimento", unidad: "bultos", kgPorUnidad: 40, minimo: 0, activo: true, preestablecido: true },
+  // Medicamentos y vacunas (nombre · marca)
+  { id: "pre-HI-01", codigo: "HI-01", nombre: "Hierro · Kyrovet", categoria: "Medicamentos", unidad: "ml", minimo: 0, activo: true, preestablecido: true },
+  { id: "pre-RS-01", codigo: "RS-01", nombre: "RespiSure-ONE · Zoetis", categoria: "Vacunas", unidad: "dosis", minimo: 0, activo: true, preestablecido: true },
+  { id: "pre-FG-01", codigo: "FG-01", nombre: "Fostera Gold PCV · Zoetis", categoria: "Vacunas", unidad: "dosis", minimo: 0, activo: true, preestablecido: true },
+  { id: "pre-FM-01", codigo: "FM-01", nombre: "Fostera Gold PCV MH® · Zoetis", categoria: "Vacunas", unidad: "dosis", minimo: 0, activo: true, preestablecido: true },
+  { id: "pre-CV-01", codigo: "CV-01", nombre: "Circumvent MH · MSD", categoria: "Vacunas", unidad: "dosis", minimo: 0, activo: true, preestablecido: true },
+  { id: "pre-FS-01", codigo: "FS-01", nombre: "FarrowSure GOLD B® · Zoetis", categoria: "Vacunas", unidad: "dosis", minimo: 0, activo: true, preestablecido: true },
+  { id: "pre-PO-01", codigo: "PO-01", nombre: "Porcilis® · MSD", categoria: "Vacunas", unidad: "dosis", minimo: 0, activo: true, preestablecido: true },
+  { id: "pre-IS-01", codigo: "IS-01", nombre: "Innosure inmunocastración · Zoetis", categoria: "Vacunas", unidad: "dosis", minimo: 0, activo: true, preestablecido: true },
 ];
 export interface LineaFactura {
   productoId: string;

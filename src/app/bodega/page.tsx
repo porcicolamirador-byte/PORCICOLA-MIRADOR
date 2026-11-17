@@ -129,6 +129,19 @@ export default function BodegaPage() {
     else setNuevaFactura(true);
   };
   const [productoSel, setProductoSel] = useState<string | null>(null);
+  // Página de Bioseguridad (Bodega › Inventario › Bioseguridad), con su propia entrada en el historial
+  const [verBioseguridad, setVerBioseguridad] = useState(false);
+  useEffect(() => {
+    const leerVista = () => setVerBioseguridad(new URLSearchParams(window.location.search).get("ver") === "bioseguridad");
+    leerVista();
+    window.addEventListener("popstate", leerVista);
+    return () => window.removeEventListener("popstate", leerVista);
+  }, []);
+  const abrirBioseguridad = () => {
+    window.history.pushState(null, "", "?ver=bioseguridad");
+    setVerBioseguridad(true);
+    window.scrollTo(0, 0);
+  };
   const [facturaSel, setFacturaSel] = useState<string | null>(null);
   const [editandoFactura, setEditandoFactura] = useState<Factura | null>(null);
   const [facturaGastoSel, setFacturaGastoSel] = useState<string | null>(null);
@@ -173,6 +186,14 @@ export default function BodegaPage() {
     consumoCerdas ? [consumoCerdas.gestacion, consumoCerdas.lactancia].map((a) => [a.codigo, a.existenciaKg !== null && a.existenciaKg <= 0.01 ? 0 : a.dias] as const) : [],
   );
   const factura = datos?.facturas.find((f) => f.id === facturaSel) ?? null;
+
+  if (verBioseguridad) {
+    return (
+      <ModuloPage titulo="Bioseguridad" subtitulo="Bodega · gastos de producción y más" icono="🦠" tono="teal" volverA="/bodega">
+        <TarjetaGastosProduccion />
+      </ModuloPage>
+    );
+  }
 
   return (
     <ModuloPage
@@ -412,7 +433,7 @@ export default function BodegaPage() {
                     Bioseguridad
                   </h2>
                   <div className="grid grid-cols-2 gap-2">
-                    <TarjetaBioseguridad />
+                    <TarjetaBioseguridad onAbrir={abrirBioseguridad} />
                   </div>
                 </section>
               )}
@@ -1825,9 +1846,8 @@ function BloqueConsumo({ titulo, a }: { titulo: string; a: ConsumoAlimentoCerdas
 }
 
 /** Tarjeta de Bioseguridad (Inventario): abre su página con los gastos de producción */
-function TarjetaBioseguridad() {
+function TarjetaBioseguridad({ onAbrir }: { onAbrir: () => void }) {
   const version = useVersionDatos();
-  const [abierta, setAbierta] = useState(false);
   const mesActual = hoy().slice(0, 7);
   const delMes = (version < 0 ? [] : leerGastosProduccion()).filter((g) => g.fecha.slice(0, 7) === mesActual);
 
@@ -1835,7 +1855,7 @@ function TarjetaBioseguridad() {
     <>
       <button
         type="button"
-        onClick={() => setAbierta(true)}
+        onClick={onAbrir}
         className="flex flex-col gap-1.5 rounded-2xl bg-white p-2.5 text-left ring-1 ring-slate-200/80 transition active:scale-[0.98]"
       >
         <div className="flex items-start justify-between gap-2">
@@ -1847,10 +1867,51 @@ function TarjetaBioseguridad() {
         <div className="h-1 w-full rounded-full bg-slate-100" />
         <p className="text-[10px] leading-tight text-slate-500">Gastos de producción</p>
       </button>
+    </>
+  );
+}
+
+function TarjetaGastosProduccion() {
+  const version = useVersionDatos();
+  const [abierta, setAbierta] = useState(false);
+  const mesActual = hoy().slice(0, 7);
+  const gastos = version < 0 ? [] : leerGastosProduccion();
+  const delMes = gastos.filter((g) => g.fecha.slice(0, 7) === mesActual);
+  const totalMes = delMes.reduce((s, g) => s + g.monto, 0);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setAbierta(true)}
+        className="flex w-full items-center gap-3 rounded-2xl bg-white p-3 text-left ring-1 ring-slate-200/80 transition active:scale-[0.99]"
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700" aria-hidden="true">
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" />
+            <path d="M9 8h6M9 12h6M9 16h3" />
+          </svg>
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5">
+            <span className="truncate text-[15px] font-semibold text-slate-900">Gastos de producción</span>
+            <span className="shrink-0 rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 ring-1 ring-sky-200">Fijo</span>
+          </span>
+          <span className="block truncate text-xs text-slate-500">
+            Insumos, medicamentos y más · {delMes.length} este mes
+          </span>
+        </span>
+        <span className="shrink-0 text-right">
+          <span className="block text-sm font-bold tabular-nums text-slate-900">{formatoPesos(totalMes)}</span>
+          <span className="block text-[10px] text-slate-400">este mes</span>
+        </span>
+        <Chevron />
+      </button>
       {abierta && <HojaGastosProduccion onCerrar={() => setAbierta(false)} />}
     </>
   );
 }
+
 
 function HojaGastosProduccion({ onCerrar, iniciarNuevo = false }: { onCerrar: () => void; iniciarNuevo?: boolean }) {
   const version = useVersionDatos();
