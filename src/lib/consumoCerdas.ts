@@ -69,6 +69,9 @@ function reglaDe(historial: { tipo: string; fecha: string }[], diaCambio: number
  */
 const CLAVE_DIA = "consumo-cerdas-dia";
 const HORA_CIERRE = 17;
+/** Horas del descuento de hoy: mitad de la ración a las 7 a. m. y la otra mitad a las 4 p. m. */
+const HORA_DESCUENTO_AM = 7;
+const HORA_DESCUENTO_PM = 16;
 interface RegistroDia {
   fecha: string;
   cerdas: Record<string, { am: Regla; pm: Regla }>;
@@ -120,6 +123,9 @@ function registroDeHoy(diaCambio: number, guardar: boolean): RegistroDia {
 /** Kilos de hoy por regla, sumando media ración por cada comida */
 function kilosDeHoy(dia: RegistroDia, reglas: { gestacion: number; preparto: number; lactancia: number }) {
   const kg: Record<Regla, number> = { g: 0, pre: 0, lac: 0, x: 0 };
+  // Mitad de la mañana (se descuenta a las 7 a. m.) y mitad de la tarde (4 p. m.)
+  const am: Record<Regla, number> = { g: 0, pre: 0, lac: 0, x: 0 };
+  const pm: Record<Regla, number> = { g: 0, pre: 0, lac: 0, x: 0 };
   const cerdas: Record<Regla, number> = { g: 0, pre: 0, lac: 0, x: 0 };
   const racion: Record<Regla, number> = { g: reglas.gestacion, pre: reglas.preparto, lac: reglas.lactancia, x: 0 };
   // El conteo de cerdas es solo de las que existen ahora; los kilos sí incluyen
@@ -129,6 +135,8 @@ function kilosDeHoy(dia: RegistroDia, reglas: { gestacion: number; preparto: num
   for (const [id, e] of Object.entries(dia.cerdas)) {
     kg[e.am] += racion[e.am] / 2;
     kg[e.pm] += racion[e.pm] / 2;
+    am[e.am] += racion[e.am] / 2;
+    pm[e.pm] += racion[e.pm] / 2;
     if (!existentes.has(id)) {
       if (e.am !== "x" || e.pm !== "x") eliminadas++;
       continue;
@@ -136,7 +144,7 @@ function kilosDeHoy(dia: RegistroDia, reglas: { gestacion: number; preparto: num
     // Cuenta en la regla de su estado actual (o la de la mañana si ya no come)
     cerdas[e.pm !== "x" ? e.pm : e.am]++;
   }
-  return { kg, cerdas, eliminadas };
+  return { kg, am, pm, cerdas, eliminadas };
 }
 
 /** Cerdas en cada regla hoy (día completo, para los días anteriores que faltan) */
@@ -193,7 +201,16 @@ export function aplicarDescuentoCerdas() {
     const cambios = new Map<string, SalidaBodega>();
     const kgTexto = (n: number) => `${Math.round(n * 10) / 10} kg`;
 
-    const descontar = (codigo: string, prefijo: string, kgDiaDe: (fecha: string) => { kg: number; nota: string }, kgHoy: number, nota: string) => {
+    // Hoy se descuenta en dos partes: la mitad a las 7 a. m. y la otra a las 4 p. m. (en una sola salida)
+    const horaAhora = new Date().getHours();
+    const vaManana = horaAhora >= HORA_DESCUENTO_AM;
+    const vaTarde = horaAhora >= HORA_DESCUENTO_PM;
+    const partesHoy = (amKg: number, pmKg: number) => ({
+      kg: (vaManana ? amKg : 0) + (vaTarde ? pmKg : 0),
+      texto: `7 a. m. ${kgTexto(amKg)}${vaManana ? " ✓" : ""} · 4 p. m. ${kgTexto(pmKg)}${vaTarde ? " ✓" : ""}`,
+      hora: vaTarde ? "16:00" : "07:00",
+    });
+    const descontar = (codigo: string, prefijo: string, kgDiaDe: (fecha: string) => { kg: number; nota: string }, kgHoy: number, nota: string, horaHoy = "06:00", kgPlanHoy = kgHoy) => {
       const productos = todos.filter((p) => codigoDe(p) === codigo && p.activo !== false);
       const producto = productos.find((p) => p.unidad === "bultos") ?? productos[0];
       if (!producto) return;
@@ -201,6 +218,8 @@ export function aplicarDescuentoCerdas() {
       // Sin ninguna compra todavía no se descuenta: al ingresar la primera factura se ponen al día los días que faltan
       if (!item || item.sinCompras) return;
       const deHoyKg = Math.round((kgHoy / factorKg(producto)) * 1000) / 1000;
+      // Lo del día completo: si mañana quedó solo la mitad de la mañana, se completa con este plan
+      const planHoy = Math.round((kgPlanHoy / factorKg(producto)) * 1000) / 1000;
       for (let f = desde; f <= hoyIso; f = sumarDias(f, 1)) {
         const id = prefijo + f;
         const esHoy = f === hoyIso;
@@ -224,7 +243,14 @@ export function aplicarDescuentoCerdas() {
         if (!esHoy && previa) {
           // Día pasado que quedó corto porque no había existencia: se completa lo que tocaba
           const plan = planDe(previa, factorKg(producto));
-          if (plan !== null && (Number(previa.cantidad) || 0) < plan - 0.0005) cambios.set(id, { ...previa, cantidad: plan, plan });
+          if (plan !== null && (Number(previa.cantidad) || 0) < plan - 0.0005)
+            cambios.set(id, {
+              ...previa,
+              cantidad: plan,
+              plan,
+              // Si solo alcanzó a descontarse la mañana, queda completo con las dos partes
+              ...(previa.nota?.includes("4 p. m.") ? { hora: "16:00", nota: previa.nota.replace(/(7 a\. m\. [\d.,]+ kg)(?! ✓)/, "$1 ✓").replace(/(4 p\. m\. [\d.,]+ kg)(?! ✓)/, "$1 ✓") } : {}),
+            });
           continue;
         }
         // Se descuenta completo aunque la existencia quede en negativo: al ingresar la factura (aunque sea de fecha anterior) se compensa
@@ -233,18 +259,20 @@ export function aplicarDescuentoCerdas() {
           if (previa.reactivada) {
             const { reactivada: _r, ...resto } = previa;
             void _r;
-            cambios.set(id, { ...resto, productoId: producto.id, cantidad, plan: cantidad, nota });
+            cambios.set(id, { ...resto, productoId: producto.id, cantidad, plan: planHoy, nota, hora: horaHoy });
             return;
           }
-          if (Math.abs((Number(previa.cantidad) || 0) - cantidad) < 0.0005 && previa.nota === nota && previa.productoId === producto.id) return;
-          cambios.set(id, { ...previa, productoId: producto.id, cantidad, plan: cantidad, nota });
+          if (Math.abs((Number(previa.cantidad) || 0) - cantidad) < 0.0005 && previa.nota === nota && previa.productoId === producto.id && previa.hora === horaHoy && previa.plan === planHoy) return;
+          cambios.set(id, { ...previa, productoId: producto.id, cantidad, plan: planHoy, nota, hora: horaHoy });
           return;
         }
         if (cantidad <= 0) continue;
-        cambios.set(id, { id, productoId: producto.id, fecha: f, hora: "06:00", cantidad, plan: cantidad, nota: esHoy ? nota : notaDia });
+        cambios.set(id, { id, productoId: producto.id, fecha: f, hora: esHoy ? horaHoy : "06:00", cantidad, plan: esHoy ? planHoy : cantidad, nota: esHoy ? nota : notaDia });
       }
     };
 
+    const gHoy = partesHoy(hoyDia.am.g, hoyDia.pm.g);
+    const lHoy = partesHoy(hoyDia.am.pre + hoyDia.am.lac, hoyDia.pm.pre + hoyDia.pm.lac);
     descontar(
       reglas.codigoGestacion,
       PREFIJOS_AUTO.gestacion,
@@ -252,8 +280,10 @@ export function aplicarDescuentoCerdas() {
         const c = contarCerdas(reglas.diaCambio, f);
         return { kg: c.gestacion * reglas.gestacion, nota: `Consumo automático cerdas · ${c.gestacion} cerdas` };
       },
+      gHoy.kg,
+      `Consumo automático cerdas · ${hoyDia.cerdas.g} cerdas · ${gHoy.texto} · ${kgTexto(gHoy.kg)} hoy`,
+      gHoy.hora,
       hoyDia.kg.g,
-      `Consumo automático cerdas · ${hoyDia.cerdas.g} cerdas · ${kgTexto(hoyDia.kg.g)} hoy`,
     );
     descontar(
       reglas.codigoLactancia,
@@ -262,8 +292,10 @@ export function aplicarDescuentoCerdas() {
         const c = contarCerdas(reglas.diaCambio, f);
         return { kg: c.preparto * reglas.preparto + c.lactando * reglas.lactancia, nota: `Consumo automático lactancia · ${c.preparto} pre-parto + ${c.lactando} lactando` };
       },
+      lHoy.kg,
+      `Consumo automático lactancia · ${hoyDia.cerdas.pre} pre-parto + ${hoyDia.cerdas.lac} lactando · ${lHoy.texto} · ${kgTexto(lHoy.kg)} hoy`,
+      lHoy.hora,
       hoyDia.kg.pre + hoyDia.kg.lac,
-      `Consumo automático lactancia · ${hoyDia.cerdas.pre} pre-parto + ${hoyDia.cerdas.lac} lactando · ${kgTexto(hoyDia.kg.pre + hoyDia.kg.lac)} hoy`,
     );
     if (cambios.size === 0) return;
     // La de hoy se actualiza (aunque quede en 0) en vez de borrarse: borrar exige permiso
