@@ -176,6 +176,7 @@ export function Selector({
   opciones,
   titulo = "Elige una opción",
   placeholder,
+  buscar,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -183,6 +184,8 @@ export function Selector({
   /** Título de la ventana de opciones */
   titulo?: string;
   placeholder?: string;
+  /** Buscador dentro de la lista */
+  buscar?: boolean;
 }) {
   return (
     <SelectorApp
@@ -193,6 +196,7 @@ export function Selector({
       placeholder={placeholder}
       className="w-full"
       claseBoton={CLASE_SELECTOR}
+      buscar={buscar}
     />
   );
 }

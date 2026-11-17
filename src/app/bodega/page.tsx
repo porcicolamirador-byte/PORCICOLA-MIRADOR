@@ -792,15 +792,6 @@ function NuevaFactura({
               </button>
             ))}
           </div>
-          {grupo === "bioseguridad" && (
-            <input
-              type="search"
-              value={buscarProd}
-              onChange={(e) => setBuscarProd(e.target.value)}
-              placeholder="Buscar medicamento, vacuna o insumo"
-              className="mt-2 w-full rounded-2xl bg-slate-100 px-4 py-2.5 text-base text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-600"
-            />
-          )}
         </div>
 
         <div>
@@ -823,6 +814,8 @@ function NuevaFactura({
                 <Selector
                   value={l.productoId}
                   onChange={(v) => cambiarLinea(l.clave, { productoId: v })}
+                  titulo={grupo === "alimento" ? "Alimento" : "Medicamentos, vacunas y más"}
+                  buscar={grupo === "bioseguridad"}
                   opciones={[
                     { valor: "", texto: ordenados.length || !qProd ? "Elige un producto…" : "Ningún producto coincide con la búsqueda" },
                     ...opcionesLinea(l.productoId),
@@ -2206,6 +2199,7 @@ function HojaGastosProduccion({ onCerrar, iniciarNuevo = false, productoInicial 
                   onChange={elegirProducto}
                   titulo="Medicamento o vacuna"
                   placeholder="Elige el producto"
+                  buscar
                   opciones={productosBioseguridad().map((p) => ({ valor: p.id, texto: `${p.categoria === "Vacunas" ? "💉" : "💊"} ${p.nombre}` }))}
                 />
               </Campo>

@@ -26,6 +26,7 @@ export default function SelectorApp({
   placeholder,
   deshabilitado = false,
   claseBoton,
+  buscar = false,
 }: {
   valor: string;
   opciones: OpcionSelector[];
@@ -40,8 +41,13 @@ export default function SelectorApp({
   deshabilitado?: boolean;
   /** Reemplaza el estilo del botón (para que se vea como los demás campos) */
   claseBoton?: string;
+  /** Muestra un buscador arriba de la lista (para listas largas) */
+  buscar?: boolean;
 }) {
   const [abierta, setAbierta] = useState(false);
+  const [filtro, setFiltro] = useState("");
+  const q = filtro.trim().toLowerCase();
+  const visibles = buscar && q ? opciones.filter((o) => o.valor && `${o.texto} ${o.detalle ?? ""}`.toLowerCase().includes(q)) : opciones;
   const [montado, setMontado] = useState(false);
   useEffect(() => setMontado(true), []);
   const actual = opciones.find((o) => o.valor === valor) ?? (placeholder === undefined ? opciones[0] : undefined);
@@ -64,15 +70,39 @@ export default function SelectorApp({
         </svg>
       </button>
       {abierta && montado && createPortal(
-        <Modal abierta etiqueta={etiqueta} titulo={titulo} onCerrar={() => setAbierta(false)}>
-          <Rueda
-            opciones={opciones}
-            valor={valor}
-            onElegir={(v) => {
-              onCambiar(v);
-              setAbierta(false);
-            }}
-          />
+        <Modal
+          abierta
+          etiqueta={etiqueta}
+          titulo={titulo}
+          onCerrar={() => {
+            setAbierta(false);
+            setFiltro("");
+          }}
+        >
+          {buscar && (
+            <input
+              type="search"
+              value={filtro}
+              onChange={(e) => setFiltro(e.target.value)}
+              placeholder="Buscar…"
+              aria-label="Buscar"
+              className="mb-3 w-full rounded-2xl bg-slate-100 px-4 py-2.5 text-base text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-600"
+            />
+          )}
+          {visibles.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-500">Nada coincide con la búsqueda.</p>
+          ) : (
+            <Rueda
+              key={q}
+              opciones={visibles}
+              valor={valor}
+              onElegir={(v) => {
+                onCambiar(v);
+                setAbierta(false);
+                setFiltro("");
+              }}
+            />
+          )}
         </Modal>,
         document.body
       )}
