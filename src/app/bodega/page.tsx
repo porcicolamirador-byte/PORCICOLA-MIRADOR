@@ -1824,40 +1824,30 @@ function BloqueConsumo({ titulo, a }: { titulo: string; a: ConsumoAlimentoCerdas
   );
 }
 
-/** Tarjeta de Bioseguridad (Inventario): gastos de producción del mes y botón para registrar */
+/** Tarjeta de Bioseguridad (Inventario): abre su página con los gastos de producción */
 function TarjetaBioseguridad() {
   const version = useVersionDatos();
-  const [hoja, setHoja] = useState<null | "lista" | "nuevo">(null);
+  const [abierta, setAbierta] = useState(false);
   const mesActual = hoy().slice(0, 7);
-  const gastos = version < 0 ? [] : leerGastosProduccion();
-  const delMes = gastos.filter((g) => g.fecha.slice(0, 7) === mesActual);
-  const totalMes = delMes.reduce((s, g) => s + g.monto, 0);
-  const registrar = () => {
-    if (!puede("bodega")) return void avisarSinPermisoBodega();
-    setHoja("nuevo");
-  };
+  const delMes = (version < 0 ? [] : leerGastosProduccion()).filter((g) => g.fecha.slice(0, 7) === mesActual);
 
   return (
     <>
-      <div className="flex flex-col gap-1.5 rounded-2xl bg-white p-2.5 text-left ring-1 ring-slate-200/80">
-        <button type="button" onClick={() => setHoja("lista")} className="flex flex-col gap-1.5 text-left transition active:scale-[0.98]">
-          <div className="flex items-start justify-between gap-2">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-[18px] w-[18px]"><circle cx="12" cy="12" r="4.2" /><path d="M12 4v3.8M12 16.2V20M4 12h3.8M16.2 12H20M6.3 6.3l2.7 2.7M15 15l2.7 2.7M6.3 17.7 9 15M15 9l2.7-2.7M4 4l16 16" /></svg></span>
-            <Insignia clase="bg-sky-50 text-sky-700 ring-sky-200">{delMes.length} este mes</Insignia>
-          </div>
-          <p className="line-clamp-2 text-[13px] font-semibold leading-tight text-slate-900">Gastos de producción</p>
-          <p className="truncate text-xl font-bold leading-none tabular-nums text-slate-900">{formatoPesos(totalMes)}</p>
-          <p className="text-[10px] leading-tight text-slate-500">Insumos, medicamentos y más · este mes</p>
-        </button>
-        <button
-          type="button"
-          onClick={registrar}
-          className="mt-0.5 flex items-center justify-center gap-1 rounded-xl bg-sky-900 py-1.5 text-xs font-semibold text-white active:bg-sky-950"
-        >
-          <span aria-hidden="true" className="text-sm leading-none">+</span> Registrar
-        </button>
-      </div>
-      {hoja && <HojaGastosProduccion iniciarNuevo={hoja === "nuevo"} onCerrar={() => setHoja(null)} />}
+      <button
+        type="button"
+        onClick={() => setAbierta(true)}
+        className="flex flex-col gap-1.5 rounded-2xl bg-white p-2.5 text-left ring-1 ring-slate-200/80 transition active:scale-[0.98]"
+      >
+        <div className="flex items-start justify-between gap-2">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-[18px] w-[18px]"><circle cx="12" cy="12" r="4.2" /><path d="M12 4v3.8M12 16.2V20M4 12h3.8M16.2 12H20M6.3 6.3l2.7 2.7M15 15l2.7 2.7M6.3 17.7 9 15M15 9l2.7-2.7M4 4l16 16" /></svg></span>
+          {delMes.length > 0 && <Insignia clase="bg-sky-50 text-sky-700 ring-sky-200">{delMes.length} este mes</Insignia>}
+        </div>
+        <p className="line-clamp-2 text-[13px] font-semibold leading-tight text-slate-900">Bioseguridad</p>
+        <p className="text-xl font-bold leading-none text-slate-300">—</p>
+        <div className="h-1 w-full rounded-full bg-slate-100" />
+        <p className="text-[10px] leading-tight text-slate-500">Gastos de producción</p>
+      </button>
+      {abierta && <HojaGastosProduccion onCerrar={() => setAbierta(false)} />}
     </>
   );
 }
@@ -1913,7 +1903,7 @@ function HojaGastosProduccion({ onCerrar, iniciarNuevo = false }: { onCerrar: ()
   return (
     <Modal
       abierta
-      etiqueta="Bodega"
+      etiqueta="Bioseguridad"
       titulo={nuevo ? "Nuevo gasto" : "Gastos de producción"}
       subtitulo={nuevo ? "Gastos de producción" : `${gastos.length} registrados`}
       icono="🧾"
@@ -2004,7 +1994,7 @@ function HojaGastosProduccion({ onCerrar, iniciarNuevo = false }: { onCerrar: ()
             <span className="text-lg font-bold tabular-nums text-sky-900">{formatoPesos(total)}</span>
           </div>
           <Boton onClick={abrirNuevo} className="w-full py-3">
-            <IconoMas /> Registrar gasto
+            <IconoMas /> Registrar
           </Boton>
           {gastos.length === 0 ? (
             <p className="rounded-xl bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">Aún no hay gastos de producción.</p>
