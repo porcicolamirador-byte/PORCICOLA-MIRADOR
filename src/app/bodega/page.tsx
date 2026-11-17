@@ -599,7 +599,26 @@ function NuevaFactura({
     setError("");
   }, [abierta, editar]);
 
-  const ordenados = [...productos].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  // Tipo de factura: Alimento (solo alimentos) o Bioseguridad (todas las demás categorías, con búsqueda)
+  const [grupo, setGrupo] = useState<"alimento" | "bioseguridad">("alimento");
+  const [buscarProd, setBuscarProd] = useState("");
+  useEffect(() => {
+    if (!abierta || !editar) return;
+    const primero = productos.find((p) => p.id === editar.lineas[0]?.productoId);
+    setGrupo(primero && primero.categoria !== "Alimento" ? "bioseguridad" : "alimento");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abierta, editar]);
+  const qProd = buscarProd.trim().toLowerCase();
+  const ordenados = [...productos]
+    .filter((p) => (grupo === "alimento" ? p.categoria === "Alimento" : p.categoria !== "Alimento"))
+    .filter((p) => grupo === "alimento" || !qProd || p.nombre.toLowerCase().includes(qProd) || (p.codigo ?? "").toLowerCase().includes(qProd))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  /** Opciones de una línea: las del grupo (y el producto ya elegido, aunque no coincida con la búsqueda) */
+  const opcionesLinea = (actual: string) => {
+    const elegido = productos.find((p) => p.id === actual);
+    const lista = elegido && !ordenados.some((p) => p.id === elegido.id) ? [elegido, ...ordenados] : ordenados;
+    return lista.map((p) => ({ valor: p.id, texto: `${p.nombre} (${p.unidad})` }));
+  };
   const unidadDe = (id: string) => productos.find((p) => p.id === id)?.unidad ?? "";
   const total = lineas.reduce((s, l) => s + num(l.cantidad) * num(l.valor), 0);
   const proveedores = Array.from(new Set(facturas.map((f) => f.proveedor).filter(Boolean))) as string[];
@@ -610,6 +629,8 @@ function NuevaFactura({
     setFecha(hoy());
     setNota("");
     setLineas([lineaVacia()]);
+    setGrupo("alimento");
+    setBuscarProd("");
     setComoGasto(true);
     setPago("");
     setError("");
@@ -744,6 +765,45 @@ function NuevaFactura({
         </Campo>
 
         <div>
+          <p className="mb-2 text-[13px] font-medium text-slate-700">Tipo de factura *</p>
+          <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1" role="radiogroup" aria-label="Tipo de factura">
+            {(["alimento", "bioseguridad"] as const).map((g) => (
+              <button
+                key={g}
+                type="button"
+                role="radio"
+                aria-checked={grupo === g}
+                onClick={() => {
+                  if (g === grupo) return;
+                  setGrupo(g);
+                  setBuscarProd("");
+                  // Los productos que no son del tipo elegido se quitan de las líneas
+                  setLineas((ls) => {
+                    const quedan = ls.filter((l) => {
+                      const pr = productos.find((x) => x.id === l.productoId);
+                      return !pr || (g === "alimento" ? pr.categoria === "Alimento" : pr.categoria !== "Alimento");
+                    });
+                    return quedan.length ? quedan : [lineaVacia()];
+                  });
+                }}
+                className={`rounded-xl py-2 text-sm font-semibold transition ${grupo === g ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+              >
+                {g === "alimento" ? "Alimento" : "Bioseguridad"}
+              </button>
+            ))}
+          </div>
+          {grupo === "bioseguridad" && (
+            <input
+              type="search"
+              value={buscarProd}
+              onChange={(e) => setBuscarProd(e.target.value)}
+              placeholder="Buscar medicamento, vacuna o insumo"
+              className="mt-2 w-full rounded-2xl bg-slate-100 px-4 py-2.5 text-base text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-600"
+            />
+          )}
+        </div>
+
+        <div>
           <p className="mb-2 text-[13px] font-medium text-slate-700">Productos *</p>
           <div className="flex flex-col gap-2.5">
             {lineas.map((l, i) => (
@@ -764,8 +824,8 @@ function NuevaFactura({
                   value={l.productoId}
                   onChange={(v) => cambiarLinea(l.clave, { productoId: v })}
                   opciones={[
-                    { valor: "", texto: "Elige un producto…" },
-                    ...ordenados.map((p) => ({ valor: p.id, texto: `${p.nombre} (${p.unidad})` })),
+                    { valor: "", texto: ordenados.length || !qProd ? "Elige un producto…" : "Ningún producto coincide con la búsqueda" },
+                    ...opcionesLinea(l.productoId),
                   ]}
                 />
                 <div className="mt-2 grid grid-cols-2 gap-2">
