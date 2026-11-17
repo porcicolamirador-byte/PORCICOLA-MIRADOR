@@ -572,7 +572,10 @@ export default function Dashboard() {
           ) : (
             <span aria-hidden="true" className={`latido-suave pointer-events-none absolute inset-0 rounded-full ${COLOR_NIVEL.anillo}`} />
           )}
-          {pendingTasks.some((t) => t.vacunaParto) ? (
+          {!pendingTasks.some((t) => t.vacunaParto) && pendingTasks.some((t) => t.tipo === "Solicitar material genético") ? (
+            // Pedido de genética pendiente: el botón muestra 🧬
+            <span aria-hidden="true" className="campana-alarma relative text-2xl leading-none">🧬</span>
+          ) : pendingTasks.some((t) => t.vacunaParto) ? (
             // Vacuna pendiente: la vacunación es prioridad, la campana cambia por una jeringa
             <svg viewBox="0 0 24 24" className="campana-alarma relative h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="m18 2 4 4M17 7l3-3M19 9 8.7 19.3a1 1 0 0 1-1.4 0l-2.6-2.6a1 1 0 0 1 0-1.4L15 5M9 11l4 4M5 19l-3 3M14 4l6 6" />

@@ -11,6 +11,7 @@ import { puede } from "@/lib/nube";
 import { leerConfig } from "@/lib/config";
 import { largoPinLocal, mensajePin, verificarPinPropio } from "@/lib/bloqueo";
 import { eliminarLotesDePartos, renombrarCerda, useVersionDatos } from "@/lib/datos";
+import { calcularTareasPendientes } from "@/utils/pendingTasks";
 
 const ESTADOS = [
   "Todos",
@@ -127,6 +128,21 @@ export default function Gestacion() {
     setCerdas(datos);
   }, [versionDatos]);
   useEffect(() => setEstadoFiltro("Todos"), []);
+  // Cerdas con la alerta "Solicitar material genético" activa (🧬 palpitando en su tarjeta)
+  const conGeneticaPendiente = useMemo(() => {
+    if (versionDatos < 0) return new Set<string>();
+    try {
+      return new Set(calcularTareasPendientes(cerdas).filter((t) => t.tipo === "Solicitar material genético").map((t) => t.id));
+    } catch {
+      return new Set<string>();
+    }
+  }, [cerdas, versionDatos]);
+  const iconoGenetica = (id: string, clase = "") =>
+    conGeneticaPendiente.has(id) ? (
+      <span role="img" aria-label="Pedir genética" title="Pedir genética" className={`genetica-late pointer-events-none text-base leading-none ${clase}`}>
+        🧬
+      </span>
+    ) : null;
 
   // CERRAR MENÚ AL TOCAR FUERA
   useEffect(() => {
@@ -741,6 +757,7 @@ export default function Gestacion() {
                   className="tarjeta-boton relative flex min-w-0 flex-col items-start gap-2.5 overflow-hidden rounded-3xl border border-slate-200 bg-white px-3.5 py-3.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600"
                 >
                   <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${obtenerBarraColor(estadoLabel)}`} />
+                  {iconoGenetica(cerda.id, "absolute right-3 top-3")}
                   <div className="relative flex h-11 min-w-[3.25rem] max-w-full items-center justify-center rounded-xl bg-amber-300 px-2.5 pt-1.5 shadow-inner">
                     <span aria-hidden="true" className="absolute left-1/2 top-1 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-amber-50/90 ring-1 ring-amber-600/40" />
                     <span className="truncate text-base font-black tabular-nums text-amber-950 arete-id">{cerda.id}</span>
@@ -895,6 +912,7 @@ export default function Gestacion() {
                           </div>
                         )}
 
+                        {iconoGenetica(cerda.id, "shrink-0")}
                         <button
                           type="button"
                           aria-label={`Opciones de ${cerda.id}`}
