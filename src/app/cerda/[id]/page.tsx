@@ -16,6 +16,7 @@ import { CONFIRMACIONES_GESTACION } from "@/utils/pendingTasks";
 import {
   confirmarGestacion,
   actualizarGastoGenetica,
+  facturaGastoGenetica,
   quitarGastoGenetica,
   registrarGastoGenetica,
   type GeneticaPerdida,
@@ -265,6 +266,22 @@ export default function CerdaDetalle() {
      y se junta con la inseminación cuando se registre */
   const pendiente = (cerda?.geneticaPendiente ?? null) as { genetica: string; valor: number; fecha: string; movimientoId?: string; cuentaId?: string; pago?: "contado" | "credito" } | null;
   const pendienteEnConta = Boolean(pendiente?.movimientoId || pendiente?.cuentaId);
+  // Al registrar la inseminación con genética ya comprada: trae su número de factura para revisarlo o corregirlo
+  useEffect(() => {
+    if (mostrarForm && tipo === "Inseminación" && pendiente && pendienteEnConta) setFacturaGenetica(facturaGastoGenetica(pendiente));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mostrarForm, tipo, pendiente?.movimientoId, pendiente?.cuentaId]);
+  // Desde Tareas ("Solicitar material genético"): abre el registro de la compra de genética
+  useEffect(() => {
+    if (!cerda) return;
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("registro") !== "compra-genetica") return;
+    window.history.replaceState(null, "", window.location.pathname);
+    if (pendiente) return;
+    setTipo("Compra de genética");
+    setMostrarForm(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cerda?.id]);
   const totalRegistros = registros.length + (pendiente ? 1 : 0) + (Array.isArray(cerda?.geneticasPerdidas) ? cerda.geneticasPerdidas.length : 0);
   function guardarPendiente(valor: typeof pendiente) {
     const lista = JSON.parse(localStorage.getItem("cerdas") || "[]");
@@ -635,6 +652,10 @@ export default function CerdaDetalle() {
       mostrarAviso("Ingresa el valor de la genética");
       return;
     }
+    if (tipo === "Inseminación" && pendienteEnConta && !facturaGenetica.trim()) {
+      mostrarAviso("Ingresa el número de factura de la genética o elige General");
+      return;
+    }
     if (conGenetica && geneticaEnContabilidad && !(tipo === "Inseminación" && pendienteEnConta) && !facturaGenetica.trim()) {
       mostrarAviso("Ingresa el número de factura o elige General");
       return;
@@ -663,7 +684,7 @@ export default function CerdaDetalle() {
         if (pendiente.movimientoId) nuevo.movimientoId = pendiente.movimientoId;
         if (pendiente.cuentaId) nuevo.cuentaId = pendiente.cuentaId;
         nuevo.pago = pendiente.pago;
-        actualizarGastoGenetica(pendiente, { monto: genetica, descripcion: `Genética ${nombreGenetica} · inseminación cerda ${id}` });
+        actualizarGastoGenetica(pendiente, { monto: genetica, descripcion: `Genética ${nombreGenetica} · inseminación cerda ${id}`, factura: facturaGenetica });
       } else if (geneticaEnContabilidad) {
         const enlace = registrarGastoGenetica({ fecha, descripcion: `Genética ${nombreGenetica} · inseminación cerda ${id}`, monto: genetica, cerdaId: String(id), pago: pagoGenetica, factura: facturaGenetica });
         Object.assign(nuevo, enlace);
@@ -1664,6 +1685,13 @@ export default function CerdaDetalle() {
                         🧬 Genética comprada el {formatearFechaCorta(pendiente.fecha)}
                         {pendienteEnConta ? ` · ya está en Contabilidad (${pendiente.pago === "credito" ? "crédito" : "contado"})` : ""}
                       </p>
+                    )}
+                    {pendiente && pendienteEnConta && tipo === "Inseminación" && (
+                      // La factura llega con la genética: se puede corregir aquí para no perder la trazabilidad
+                      <div className="mt-2 w-full max-w-[320px]">
+                        <p className="mb-1 text-xs font-medium text-gray-600">Número de factura de la genética</p>
+                        <CampoFactura valor={facturaGenetica} onCambiar={setFacturaGenetica} />
+                      </div>
                     )}
                     {(tipo === "Compra de genética" || !pendienteEnConta) && (
                     <label className="mt-2 flex items-center gap-2 text-sm text-gray-700">

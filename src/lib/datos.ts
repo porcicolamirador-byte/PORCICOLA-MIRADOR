@@ -1110,7 +1110,13 @@ export function registrarGastoGenetica(d: { fecha: string; descripcion: string; 
   return { movimientoId };
 }
 
-export function actualizarGastoGenetica(g: GastoGenetica, cambios: { monto?: number; descripcion?: string; fecha?: string; categoria?: string; sinCerda?: boolean }) {
+export function actualizarGastoGenetica(g: GastoGenetica, cambios: { monto?: number; descripcion?: string; fecha?: string; categoria?: string; sinCerda?: boolean; factura?: string }) {
+  // Número de factura (llega con la genética): "General" toma el consecutivo
+  const factura = cambios.factura !== undefined ? numeroFactura(cambios.factura) || undefined : undefined;
+  if (factura) {
+    if (g.movimientoId) guardarMovimientos(leerMovimientos().map((m) => (m.id === g.movimientoId ? { ...m, factura } : m)));
+    if (g.cuentaId) guardarCuentasPorPagar(leerCuentasPorPagar().map((c) => (c.id === g.cuentaId ? { ...c, factura } : c)));
+  }
   if (g.movimientoId) {
     guardarMovimientos(
       leerMovimientos().map((m) => {
@@ -1130,6 +1136,13 @@ export function actualizarGastoGenetica(g: GastoGenetica, cambios: { monto?: num
       )
     );
   }
+}
+
+/** Número de factura del gasto de una genética (o "") */
+export function facturaGastoGenetica(g: GastoGenetica): string {
+  if (g.movimientoId) return leerMovimientos().find((m) => m.id === g.movimientoId)?.factura ?? "";
+  if (g.cuentaId) return leerCuentasPorPagar().find((c) => c.id === g.cuentaId)?.factura ?? "";
+  return "";
 }
 
 /** Quita el gasto de una genética de Contabilidad (y los abonos si era a crédito) */

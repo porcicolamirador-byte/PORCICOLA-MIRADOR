@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Chevron, Vacio } from "@/components/ui";
-import { confirmarGestacion, hierroAplicado, leerCerdas, loteDelParto, marcarGeneticaSolicitada, useVersionDatos } from "@/lib/datos";
+import { confirmarGestacion, hierroAplicado, leerCerdas, loteDelParto, useVersionDatos } from "@/lib/datos";
 import ConfirmarHierro from "@/components/ConfirmarHierro";
 import ConfirmarVacuna from "@/components/ConfirmarVacuna";
 import { confirmar } from "@/components/Dialogo";
@@ -68,15 +68,6 @@ export default function TareasPage() {
     }
     // Como el hierro: se elige el producto aplicado (o se ingresa con su valor)
     setVacunaAbierta({ cerdaId: id, codigoParto: v.codigoParto, vacuna: v.vacuna, nombre: nombre.replace(/^Vacuna /, "") });
-  };
-
-  const confirmarGenetica = async (id: string, registroId: string) => {
-    const ok = await confirmar({
-      titulo: "Material genético",
-      mensaje: `¿Ya se pidió el material genético para la cerda ${id}?`,
-      aceptar: "Confirmar",
-    });
-    if (ok) marcarGeneticaSolicitada(id, registroId);
   };
 
   const confirmarG = async (id: string, etapa: 1 | 2) => {
@@ -144,7 +135,7 @@ export default function TareasPage() {
               <ul className="flex flex-col gap-2">
                 {g.items.map((t) => {
                   const e = ESTILO[t.prioridad] ?? ESTILO.media;
-                  const accion = t.hierroLote ? () => setHierro(t.hierroLote!) : t.confirmar ? () => confirmarG(t.id, t.confirmar!) : t.geneticaRegistro ? () => confirmarGenetica(t.id, t.geneticaRegistro!) : t.vacunaParto ? () => confirmarVacuna(t.id, t.vacunaParto!, t.tipo) : null;
+                  const accion = t.hierroLote ? () => setHierro(t.hierroLote!) : t.confirmar ? () => confirmarG(t.id, t.confirmar!) : t.geneticaRegistro || t.tipo === "Solicitar material genético" ? () => router.push(`/cerda/${encodeURIComponent(t.id)}?registro=compra-genetica`) : t.vacunaParto ? () => confirmarVacuna(t.id, t.vacunaParto!, t.tipo) : null;
                   return (
                     <li key={`${t.id}-${t.tipo}`} className="relative overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/80">
                       <span className={`absolute inset-y-0 left-0 w-1 ${e.barra}`} aria-hidden="true" />
@@ -173,7 +164,7 @@ export default function TareasPage() {
                             onClick={accion}
                             className="shrink-0 rounded-full bg-sky-900 px-3.5 py-2 text-xs font-semibold text-white transition active:scale-95"
                           >
-                            Confirmar
+                            {t.tipo === "Solicitar material genético" ? "Registrar compra" : "Confirmar"}
                           </button>
                         ) : (
                           <Chevron />
