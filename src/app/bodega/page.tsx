@@ -85,6 +85,7 @@ import {
   CATEGORIAS_GASTO_PRODUCCION,
   FACTURA_GENERAL,
   crearProductoBodega,
+  darDeBajaExistencia,
   siguienteFacturaGeneral,
   textoCategoriaProduccion,
 } from "@/lib/datos";
@@ -2117,6 +2118,24 @@ function GavetaProducto({ productoId, onCerrar }: { productoId: string; onCerrar
         >
           <IconoMas /> Registrar
         </Boton>
+        {total > 0 && (
+          <button
+            type="button"
+            onClick={async () => {
+              if (!puede("bodega")) return void avisarSinPermisoBodega();
+              const ok = await confirmar({
+                titulo: "Dar de baja existencias",
+                mensaje: `Se quitarán los ${fmt(total)} ${p.unidad} que quedan de ${p.nombre}, para ajustar cuando la cantidad real no coincide. La contabilidad no cambia.`,
+                aceptar: "Dar de baja",
+                destructivo: true,
+              });
+              if (ok) darDeBajaExistencia(p.id);
+            }}
+            className="w-full rounded-2xl py-2.5 text-sm font-semibold text-red-600 ring-1 ring-red-200 active:bg-red-50"
+          >
+            Dar de baja existencias ({fmt(total)} {p.unidad})
+          </button>
+        )}
         {compras.length === 0 && enBodega <= 0 ? (
           <p className="rounded-xl bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">Aún no hay compras de este producto.</p>
         ) : (

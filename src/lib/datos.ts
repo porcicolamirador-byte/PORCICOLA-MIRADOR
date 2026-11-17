@@ -207,6 +207,8 @@ export interface Movimiento {
   marca?: string;
   /** Producto de bodega (medicamento o vacuna) al que entra esta compra */
   productoId?: string;
+  /** Cantidad dada de baja (ajuste de existencia; no cambia la contabilidad) */
+  baja?: number;
   /** Cantidad escrita libremente (gastos de producción), p. ej. "3 frascos" */
   cantidad?: string;
   /** Cerda a la que corresponde el gasto (p. ej. la genética de una inseminación) */
@@ -704,6 +706,8 @@ export interface CuentaPorPagar {
   marca?: string;
   /** Producto de bodega (medicamento o vacuna) al que entra esta compra */
   productoId?: string;
+  /** Cantidad dada de baja (ajuste de existencia; no cambia la contabilidad) */
+  baja?: number;
 }
 export const leerCuentasPorPagar = () =>
   leer<CuentaPorPagar[]>(CLAVES.cuentasPagar, []).map((c) => ({ ...c, abonos: Array.isArray(c.abonos) ? c.abonos : [] }));
@@ -1928,7 +1932,7 @@ export function medicamentosRegistrados() {
   const propios = leerGastosProduccion()
     .filter((m) => m.categoria === "Medicamentos y vacunas" && m.unidad && (m.cantidadNum ?? 0) > 0 && (m.valorUnitario ?? 0) > 0)
     .map((m) => {
-      const usado = usados.get(m.id) ?? 0;
+      const usado = (usados.get(m.id) ?? 0) + (Number(m.baja) || 0);
       return {
         id: m.id,
         nombre: (m.descripcion || "").replace(/\s*\([^)]*\)\s*$/, "") || m.descripcion,
@@ -1978,6 +1982,8 @@ export interface GastoProduccion {
   marca?: string;
   /** Producto de bodega (medicamento o vacuna) al que entra esta compra */
   productoId?: string;
+  /** Cantidad dada de baja (ajuste de existencia; no cambia la contabilidad) */
+  baja?: number;
   pago: "contado" | "credito";
   /** Solo a crédito: lo que falta por pagar */
   saldo?: number;
@@ -1990,12 +1996,35 @@ export const leerGastosProduccion = (): GastoProduccion[] => {
   return [
     ...leerMovimientos()
       .filter((m) => m.origen === "produccion")
-      .map((m) => ({ id: m.id, fecha: m.fecha, categoria: m.categoria, descripcion: m.descripcion, monto: m.monto, cantidad: m.cantidad, unidad: m.unidad, cantidadNum: m.cantidadNum, valorUnitario: m.valorUnitario, marca: m.marca, productoId: m.productoId, pago: "contado" as const, recuperado: recuperado.get(m.id) })),
+      .map((m) => ({ id: m.id, fecha: m.fecha, categoria: m.categoria, descripcion: m.descripcion, monto: m.monto, cantidad: m.cantidad, unidad: m.unidad, cantidadNum: m.cantidadNum, valorUnitario: m.valorUnitario, marca: m.marca, productoId: m.productoId, baja: m.baja, pago: "contado" as const, recuperado: recuperado.get(m.id) })),
     ...leerCuentasPorPagar()
       .filter((c) => c.origen === "produccion")
-      .map((c) => ({ id: c.id, fecha: c.fecha, categoria: c.categoria, descripcion: c.descripcion, monto: c.total, cantidad: c.cantidad, unidad: c.unidad, cantidadNum: c.cantidadNum, valorUnitario: c.valorUnitario, marca: c.marca, productoId: c.productoId, pago: "credito" as const, saldo: saldoCuenta(c) })),
+      .map((c) => ({ id: c.id, fecha: c.fecha, categoria: c.categoria, descripcion: c.descripcion, monto: c.total, cantidad: c.cantidad, unidad: c.unidad, cantidadNum: c.cantidadNum, valorUnitario: c.valorUnitario, marca: c.marca, productoId: c.productoId, baja: c.baja, pago: "credito" as const, saldo: saldoCuenta(c) })),
   ].sort((a, b) => b.fecha.localeCompare(a.fecha));
 };
+
+/**
+ * Da de baja lo que queda de un medicamento o vacuna (ajuste porque la cantidad real no coincide):
+ * lo restante de sus compras en Gastos de producción y lo que hay por facturas de Bodega.
+ * No cambia la contabilidad. Devuelve cuánto se quitó (en compras y en bodega).
+ */
+export function darDeBajaExistencia(productoId: string): { compras: number; bodega: number } {
+  const resto = new Map(medicamentosRegistrados().filter((m) => m.productoId === productoId && m.restante > 0).map((m) => [m.id, m.restante]));
+  let compras = 0;
+  if (resto.size) {
+    const sumarBaja = <T extends { id: string; baja?: number }>(x: T): T => {
+      const r = resto.get(x.id);
+      if (!r) return x;
+      compras += r;
+      return { ...x, baja: Math.round(((Number(x.baja) || 0) + r) * 1000) / 1000 };
+    };
+    guardarMovimientos(leerMovimientos().map(sumarBaja));
+    guardarCuentasPorPagar(leerCuentasPorPagar().map(sumarBaja));
+  }
+  const enBodega = Math.max(0, calcularInventario().find((i) => i.producto.id === productoId)?.disponible ?? 0);
+  if (enBodega > 0) guardarSalidas([...leerSalidas(), { id: nuevoId(), productoId, fecha: hoy(), hora: horaActual(), cantidad: Math.round(enBodega * 1000) / 1000, nota: "Baja de existencia (ajuste)" }]);
+  return { compras: Math.round(compras * 100) / 100, bodega: Math.round(enBodega * 100) / 100 };
+}
 
 /** Elimina un gasto de producción (de contado o a crédito con sus abonos) */
 export function eliminarGastoProduccion(id: string) {
