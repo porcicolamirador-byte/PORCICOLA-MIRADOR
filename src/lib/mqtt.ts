@@ -12,6 +12,7 @@
  *   granja/rele/estado      "on" | "off"
  *   granja/rgb/estado       "off" | "#RRGGBB"
  *   granja/conexion         "online" | "offline"
+ *   granja/wifi             intensidad de la señal WiFi en dBm, ej. "-62"
  * Temas que escucha el ESP32:
  *   granja/led_azul/set     "on" | "off"
  *   granja/rele/set         "on" | "off"
@@ -142,6 +143,8 @@ export type Granja = {
   actualizado: number | null;
   ledAzul: boolean | null;
   rele: boolean | null;
+  /** Intensidad de la señal WiFi del ESP32 en dBm (más cerca de 0 = mejor) */
+  wifi: number | null;
   /** "off" o un color "#RRGGBB"; null = todavía no se sabe */
   rgb: string | null;
 };
@@ -155,6 +158,7 @@ const INICIAL: Granja = {
   actualizado: null,
   ledAzul: null,
   rele: null,
+  wifi: null,
   rgb: null,
 };
 
@@ -190,6 +194,10 @@ export function useGranjaEnVivo(config: ConfigMqtt | null) {
             return { ...e, rele: msg === "on" };
           case "granja/rgb/estado":
             return { ...e, rgb: msg === "off" ? "off" : msg.toUpperCase() };
+          case "granja/wifi": {
+            const w = Number(msg);
+            return Number.isFinite(w) && w < 0 ? { ...e, wifi: w } : e;
+          }
           case "granja/conexion":
             return { ...e, esp32: msg === "online" };
           default:

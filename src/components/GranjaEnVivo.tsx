@@ -17,6 +17,34 @@ type Pendiente = { valor: boolean; id: number };
 /** Tiempo máximo para que el ESP32 confirme una orden */
 const ESPERA_CONFIRMACION = 6000;
 
+/** Calidad de la señal WiFi según los dBm que reporta el ESP32 */
+function calidadWifi(dbm: number) {
+  if (dbm >= -55) return { barras: 4, texto: "Excelente", color: "text-emerald-700" };
+  if (dbm >= -65) return { barras: 3, texto: "Buena", color: "text-emerald-700" };
+  if (dbm >= -75) return { barras: 2, texto: "Regular", color: "text-amber-700" };
+  return { barras: 1, texto: "Débil", color: "text-red-600" };
+}
+
+function SenalWifi({ dbm }: { dbm: number }) {
+  const c = calidadWifi(dbm);
+  return (
+    <div className="flex items-center gap-1.5" title={`Señal WiFi del ESP32: ${dbm} dBm`}>
+      <span aria-hidden="true" className="flex h-3.5 items-end gap-[2px]">
+        {[1, 2, 3, 4].map((n) => (
+          <span
+            key={n}
+            className={`w-[3px] rounded-sm ${n <= c.barras ? "bg-current" : "bg-slate-200"} ${c.color}`}
+            style={{ height: `${n * 25}%` }}
+          />
+        ))}
+      </span>
+      <span className={`text-xs font-semibold ${c.color}`}>
+        WiFi {c.texto} <span className="font-normal text-slate-500 tabular-nums">· {dbm} dBm</span>
+      </span>
+    </div>
+  );
+}
+
 /** "hace 8 s", "hace 3 min"… */
 export function haceCuanto(ms: number) {
   const s = Math.max(0, Math.round(ms / 1000));
@@ -163,7 +191,12 @@ export default function GranjaEnVivo({ config, granja }: { config: ConfigMqtt | 
                   </p>
                 )}
               </div>
-              {insignia}
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                {insignia}
+                {granja.wifi !== null && granja.conexion === "conectado" && granja.esp32 !== false && (
+                  <SenalWifi dbm={granja.wifi} />
+                )}
+              </div>
             </div>
 
             {granja.conexion === "error" && granja.error && (
