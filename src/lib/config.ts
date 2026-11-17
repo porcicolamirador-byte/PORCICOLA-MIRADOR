@@ -24,11 +24,12 @@ export const ETAPAS_ALIMENTACION: { clave: keyof AlimentacionEstandar; nombre: s
 /** Códigos de productos de bodega unidos a cada etapa (para el consumo establecido) */
 export type ProductosEtapa = Record<keyof AlimentacionEstandar, string[]>;
 
+/** Productos unidos a cada etapa por defecto (los mismos de la granja principal, para todas las granjas) */
 export const PRODUCTOS_ETAPA_POR_DEFECTO: ProductosEtapa = {
-  preiniciadorCerdos: [],
-  iniciacionCerdos: [],
-  levante: [],
-  engorde: [],
+  preiniciadorCerdos: ["PR-01"],
+  iniciacionCerdos: ["IN-01"],
+  levante: ["ML-01"],
+  engorde: ["MC-01"],
 };
 
 export const ALIMENTACION_POR_DEFECTO: AlimentacionEstandar = {
