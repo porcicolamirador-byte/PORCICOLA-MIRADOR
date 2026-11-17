@@ -285,12 +285,46 @@ export default function BodegaPage() {
             <div className="h-40 animate-pulse rounded-3xl bg-slate-100" />
           ) : (
             <div className="flex flex-col gap-3">
-              {CATEGORIAS_BIOSEGURIDAD.map((cat) =>
-                seccionCategoria(
-                  cat,
-                  [...datos.inventario].sort((a, b) => a.producto.nombre.localeCompare(b.producto.nombre, "es")),
-                ),
-              )}
+              {CATEGORIAS_BIOSEGURIDAD.map((cat) => {
+                const items = datos.inventario
+                  .filter((i) => i.producto.categoria === cat)
+                  .sort((a, b) => a.producto.nombre.localeCompare(b.producto.nombre, "es"));
+                if (!items.length) return null;
+                return (
+                  <section key={cat}>
+                    <h2 className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                      <IconoCategoria categoria={cat} className="h-3.5 w-3.5" />
+                      {cat} · {items.length}
+                    </h2>
+                    {/* Lista compacta: nombre, existencia y estado */}
+                    <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/80">
+                      {items.map(({ producto: p, existencia, bajoMinimo, sinCompras }) => {
+                        const estado = sinCompras
+                          ? { t: "Sin compras", c: "bg-slate-100 text-slate-500 ring-slate-200" }
+                          : existencia <= 0
+                            ? { t: "Agotado", c: "bg-red-600 text-white ring-red-600" }
+                            : bajoMinimo
+                              ? { t: "Reponer", c: "bg-red-50 text-red-700 ring-red-200" }
+                              : { t: "Disponible", c: "bg-sky-50 text-sky-700 ring-sky-200" };
+                        return (
+                          <li key={p.id}>
+                            <button type="button" onClick={() => setProductoSel(p.id)} className="flex w-full items-center gap-2.5 px-3 py-2 text-left active:bg-slate-50">
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-[13px] font-semibold text-slate-900">{p.nombre}</span>
+                                <span className="block text-[11px] text-slate-500">
+                                  {fmt(existencia)} {p.unidad}
+                                </span>
+                              </span>
+                              <Insignia clase={estado.c}>{estado.t}</Insignia>
+                              <Chevron />
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                );
+              })}
             </div>
           )}
         </>
