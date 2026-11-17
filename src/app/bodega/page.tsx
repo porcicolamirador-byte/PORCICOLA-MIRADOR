@@ -83,6 +83,8 @@ import {
   eliminarGastoProduccion,
   registrarGastoProduccion,
   CATEGORIAS_GASTO_PRODUCCION,
+  FACTURA_GENERAL,
+  siguienteFacturaGeneral,
   UNIDADES_VACUNA,
   textoCategoriaProduccion,
 } from "@/lib/datos";
@@ -104,7 +106,7 @@ const CATEGORIA_GASTO: Record<CategoriaBodega, string> = {
   Otros: "Otros gastos",
 };
 
-type Vista = "inventario" | "reponer" | "facturas";
+type Vista = "inventario" | "reponer" | "facturas" | "bioseguridad";
 
 /** Orden fijo de los alimentos en Bodega; los demás productos van después, por nombre */
 const ORDEN_BODEGA = ["PR-01", "IN-01", "ML-01", "MC-01", "CG-01", "CL-01"];
@@ -220,6 +222,7 @@ export default function BodegaPage() {
               { valor: "inventario", texto: "Inventario" },
               { valor: "reponer", texto: `Por reponer${bajos.length ? ` (${bajos.length})` : ""}` },
               { valor: "facturas", texto: `Facturas${datos?.facturas.length ? ` (${datos.facturas.length})` : ""}` },
+              { valor: "bioseguridad", texto: "Bioseguridad" },
             ]}
             valor={vista}
             onChange={setVista}
@@ -233,6 +236,9 @@ export default function BodegaPage() {
 
           {datos === null ? (
             <div className="h-40 animate-pulse rounded-3xl bg-slate-100" />
+          ) : vista === "bioseguridad" ? (
+            // Gaveta nueva: se le dará función más adelante
+            <Vacio titulo="Bioseguridad" texto="Próximamente." />
           ) : vista === "facturas" ? (
             facturasVisibles.length === 0 && otrasFacturas.length === 0 ? (
               <Vacio
@@ -534,8 +540,9 @@ function NuevaFactura({
 
   const guardar = async (e: FormEvent) => {
     e.preventDefault();
-    const n = numero.trim();
-    if (!n) return setError("Escribe el número de la factura.");
+    // "General" toma el consecutivo de la granja (FEG-001…)
+    const n = numero === FACTURA_GENERAL ? siguienteFacturaGeneral() : numero.trim();
+    if (!n) return setError("Escribe el número de la factura o elige General.");
     const validas = lineas.filter((l) => l.productoId && num(l.cantidad) > 0);
     if (validas.length === 0) return setError("Agrega al menos un producto con su cantidad.");
     if (lineas.some((l) => l.productoId && num(l.cantidad) <= 0)) return setError("Hay productos sin cantidad.");
@@ -630,9 +637,7 @@ function NuevaFactura({
     >
       <form onSubmit={guardar} className="flex flex-col gap-3.5">
         <div className="grid grid-cols-2 gap-3">
-          <Campo etiqueta="Número de factura *">
-            <Entrada value={numero} onChange={(v) => { setNumero(v); setError(""); }} placeholder="Ej. FE-1234" required />
-          </Campo>
+          <CampoFactura valor={numero} onCambiar={(v) => { setNumero(v); setError(""); }} />
           <Campo etiqueta="Fecha">
             <Entrada type="date" value={fecha} onChange={setFecha} required />
           </Campo>
