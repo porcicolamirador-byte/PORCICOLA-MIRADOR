@@ -139,7 +139,7 @@ export default function Gestacion() {
   }, [cerdas, versionDatos]);
   const iconoGenetica = (id: string, clase = "") =>
     conGeneticaPendiente.has(id) ? (
-      <span role="img" aria-label="Pedir genética" title="Pedir genética" className={`genetica-late pointer-events-none text-base leading-none ${clase}`}>
+      <span role="img" aria-label="Pedir genética" title="Pedir genética" className={`genetica-late pointer-events-none text-[11px] leading-none ${clase}`}>
         🧬
       </span>
     ) : null;

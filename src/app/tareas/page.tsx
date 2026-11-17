@@ -154,7 +154,7 @@ export default function TareasPage() {
                             <span className="arete-id whitespace-nowrap text-[13px] font-black tabular-nums tracking-tight text-amber-950">{t.id}</span>
                           </span>
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-[15px] font-semibold leading-tight text-slate-900">{t.tipo === "Solicitar material genético" && <span aria-hidden="true" className="genetica-late mr-1">🧬</span>}{t.tipo}</span>
+                            <span className="block truncate text-[15px] font-semibold leading-tight text-slate-900">{t.tipo}</span>
                             <span className="mt-0.5 block truncate text-xs text-slate-500">{t.descripcion}</span>
                           </span>
                         </button>
