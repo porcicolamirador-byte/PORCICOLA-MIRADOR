@@ -109,6 +109,8 @@ const CATEGORIA_GASTO: Record<CategoriaBodega, string> = {
 type Vista = "inventario" | "reponer" | "facturas";
 
 /** Orden fijo de los alimentos en Bodega; los demás productos van después, por nombre */
+/** Categorías que se ven dentro de la página de Bioseguridad (no en Inventario) */
+const CATEGORIAS_BIOSEGURIDAD: CategoriaBodega[] = ["Medicamentos", "Vacunas"];
 const ORDEN_BODEGA = ["PR-01", "IN-01", "ML-01", "MC-01", "CG-01", "CL-01"];
 const posicionBodega = (p: ProductoBodega) => {
   const i = ORDEN_BODEGA.indexOf(codigoDe(p));
@@ -187,26 +189,113 @@ export default function BodegaPage() {
   );
   const factura = datos?.facturas.find((f) => f.id === facturaSel) ?? null;
 
-  if (verBioseguridad) {
-    return (
-      <ModuloPage titulo="Bioseguridad" subtitulo="Bodega · gastos de producción y más" icono="🦠" tono="teal" volverA="/bodega">
-        <TarjetaGastosProduccion />
-      </ModuloPage>
-    );
-  }
+  // Sección de una categoría con las tarjetas de sus productos (Inventario y página de Bioseguridad)
+  const seccionCategoria = (cat: CategoriaBodega, lista: typeof inventarioVisible) => {
+                const items = lista.filter((i) => i.producto.categoria === cat);
+                if (!items.length) return null;
+                return (
+                  <section key={cat}>
+                    <h2 className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                      <IconoCategoria categoria={cat} className="h-3.5 w-3.5" />
+                      {cat} · {items.length}
+                    </h2>
+                    <div className="grid grid-cols-2 gap-2">
+                      {items.map(({ producto: p, existencia, disponible, subproducto, bajoMinimo, sinCompras }) => {
+                        const nuevo = !subproducto && sinCompras;
+                        const diasCerdas = !subproducto && !nuevo ? diasAlimento.get(codigoDe(p)) : undefined;
+                        // Alimento de cerdas: naranja cuando queda para unos 2 días o menos ("Revisar" en 0)
+                        const naranja = diasCerdas !== undefined && diasCerdas !== null && diasCerdas <= 2;
+                        const agotado = !subproducto && !nuevo && existencia <= 0 && !naranja;
+                        const referencia = Math.max(p.minimo * 3, p.minimo + 1, 1);
+                        const nivel = Math.max(0, Math.min(100, (existencia / referencia) * 100));
+                        const colorBarra = naranja ? "bg-orange-500" : agotado || bajoMinimo ? "bg-red-500" : existencia <= p.minimo * 1.5 ? "bg-amber-400" : "bg-sky-500";
+                        const estado = naranja
+                          ? { t: existencia <= 0 || diasCerdas === 0 ? "Revisar" : `${diasCerdas} día${diasCerdas === 1 ? "" : "s"}`, c: "bg-orange-500 text-white ring-orange-500" }
+                          : subproducto
+                          ? { t: "Subproducto", c: "bg-sky-50 text-sky-700 ring-sky-200" }
+                          : nuevo
+                          ? { t: "Sin compras", c: "bg-slate-100 text-slate-500 ring-slate-200" }
+                          : agotado
+                          ? { t: "Agotado", c: "bg-red-600 text-white ring-red-600" }
+                          : bajoMinimo
+                          ? { t: "Reponer", c: "bg-red-50 text-red-700 ring-red-200" }
+                          : existencia <= p.minimo * 1.5
+                          ? { t: "Bajo", c: "bg-amber-50 text-amber-800 ring-amber-200" }
+                          : { t: "Disponible", c: "bg-sky-50 text-sky-700 ring-sky-200" };
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => setProductoSel(p.id)}
+                            className={`flex flex-col gap-1.5 rounded-2xl bg-white p-2.5 text-left ring-1 transition active:scale-[0.98] ${
+                              naranja ? "ring-orange-300" : agotado || bajoMinimo ? "ring-red-200" : "ring-slate-200/80"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <RecuadroCategoria categoria={p.categoria} tamano="sm" />
+                              <Insignia clase={estado.c}>{estado.t}</Insignia>
+                            </div>
+                            <p className="line-clamp-2 text-[13px] font-semibold leading-tight text-slate-900">{p.nombre}</p>
+                            <p className={`text-xl font-bold leading-none tabular-nums ${subproducto ? "text-sky-700" : naranja ? "text-orange-600" : agotado || bajoMinimo ? "text-red-600" : "text-slate-900"}`}>
+                              {fmt(existencia)} <span className="text-xs font-semibold text-slate-500">{p.unidad}</span>
+                            </p>
+                            {subproducto ? (
+                              <p className="text-[10px] leading-tight text-slate-500">
+                                De {subproducto.principal} · quedan {fmt(Math.max(0, disponible))} {p.unidad}
+                              </p>
+                            ) : (
+                            <>
+                            <div className="h-1 w-full overflow-hidden rounded-full bg-slate-100" role="img" aria-label={`Nivel ${Math.round(nivel)} %`}>
+                              <div className={`h-full rounded-full ${colorBarra}`} style={{ width: `${Math.max(nivel, agotado ? 0 : 4)}%` }} />
+                            </div>
+                            <p className="text-[10px] leading-tight text-slate-500">
+                              Mín. {fmt(p.minimo)} {p.unidad}
+                              {p.unidad === "bultos" && existencia > 0 ? ` · ${fmt(existencia * factorKg(p))} kg` : ""}
+                              {p.unidad === "bultos" && existencia < 0 ? (
+                                <span className="font-semibold text-red-600"> · {fmt(existencia * factorKg(p))} kg</span>
+                              ) : null}
+                            </p>
+                            </>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                );
+  };
 
   return (
     <ModuloPage
-      titulo="Bodega"
-      subtitulo="Facturas, existencias y consumo de insumos"
-      icono="📦"
+      titulo={verBioseguridad ? "Bioseguridad" : "Bodega"}
+      subtitulo={verBioseguridad ? "Bodega · medicamentos, vacunas y gastos de producción" : "Facturas, existencias y consumo de insumos"}
+      icono={verBioseguridad ? "🦠" : "📦"}
       tono="teal"
+      volverA={verBioseguridad ? "/bodega" : undefined}
       accion={
         <Boton onClick={abrirFactura} className="px-3.5" disabled={sinCatalogo}>
           <IconoMas /> Factura
         </Boton>
       }
     >
+      {verBioseguridad ? (
+        <>
+          <TarjetaGastosProduccion />
+          {datos === null ? (
+            <div className="h-40 animate-pulse rounded-3xl bg-slate-100" />
+          ) : (
+            <div className="flex flex-col gap-3">
+              {CATEGORIAS_BIOSEGURIDAD.map((cat) =>
+                seccionCategoria(
+                  cat,
+                  [...datos.inventario].sort((a, b) => a.producto.nombre.localeCompare(b.producto.nombre, "es")),
+                ),
+              )}
+            </div>
+          )}
+        </>
+      ) : (
+      <>
       {/* Resumen compacto: dos filas, valores en pesos completos */}
       <div className="grid grid-cols-2 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/80 [&>*:nth-child(odd)]:border-r [&>*:nth-child(-n+2)]:border-b [&>*]:border-slate-200">
         {[
@@ -351,80 +440,7 @@ export default function BodegaPage() {
             </p>
           ) : (
             <div className="flex flex-col gap-3">
-              {CATEGORIAS_BODEGA.map(({ valor: cat }) => {
-                const items = inventarioVisible.filter((i) => i.producto.categoria === cat);
-                if (!items.length) return null;
-                return (
-                  <section key={cat}>
-                    <h2 className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                      <IconoCategoria categoria={cat} className="h-3.5 w-3.5" />
-                      {cat} · {items.length}
-                    </h2>
-                    <div className="grid grid-cols-2 gap-2">
-                      {items.map(({ producto: p, existencia, disponible, subproducto, bajoMinimo, sinCompras }) => {
-                        const nuevo = !subproducto && sinCompras;
-                        const diasCerdas = !subproducto && !nuevo ? diasAlimento.get(codigoDe(p)) : undefined;
-                        // Alimento de cerdas: naranja cuando queda para unos 2 días o menos ("Revisar" en 0)
-                        const naranja = diasCerdas !== undefined && diasCerdas !== null && diasCerdas <= 2;
-                        const agotado = !subproducto && !nuevo && existencia <= 0 && !naranja;
-                        const referencia = Math.max(p.minimo * 3, p.minimo + 1, 1);
-                        const nivel = Math.max(0, Math.min(100, (existencia / referencia) * 100));
-                        const colorBarra = naranja ? "bg-orange-500" : agotado || bajoMinimo ? "bg-red-500" : existencia <= p.minimo * 1.5 ? "bg-amber-400" : "bg-sky-500";
-                        const estado = naranja
-                          ? { t: existencia <= 0 || diasCerdas === 0 ? "Revisar" : `${diasCerdas} día${diasCerdas === 1 ? "" : "s"}`, c: "bg-orange-500 text-white ring-orange-500" }
-                          : subproducto
-                          ? { t: "Subproducto", c: "bg-sky-50 text-sky-700 ring-sky-200" }
-                          : nuevo
-                          ? { t: "Sin compras", c: "bg-slate-100 text-slate-500 ring-slate-200" }
-                          : agotado
-                          ? { t: "Agotado", c: "bg-red-600 text-white ring-red-600" }
-                          : bajoMinimo
-                          ? { t: "Reponer", c: "bg-red-50 text-red-700 ring-red-200" }
-                          : existencia <= p.minimo * 1.5
-                          ? { t: "Bajo", c: "bg-amber-50 text-amber-800 ring-amber-200" }
-                          : { t: "Disponible", c: "bg-sky-50 text-sky-700 ring-sky-200" };
-                        return (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => setProductoSel(p.id)}
-                            className={`flex flex-col gap-1.5 rounded-2xl bg-white p-2.5 text-left ring-1 transition active:scale-[0.98] ${
-                              naranja ? "ring-orange-300" : agotado || bajoMinimo ? "ring-red-200" : "ring-slate-200/80"
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <RecuadroCategoria categoria={p.categoria} tamano="sm" />
-                              <Insignia clase={estado.c}>{estado.t}</Insignia>
-                            </div>
-                            <p className="line-clamp-2 text-[13px] font-semibold leading-tight text-slate-900">{p.nombre}</p>
-                            <p className={`text-xl font-bold leading-none tabular-nums ${subproducto ? "text-sky-700" : naranja ? "text-orange-600" : agotado || bajoMinimo ? "text-red-600" : "text-slate-900"}`}>
-                              {fmt(existencia)} <span className="text-xs font-semibold text-slate-500">{p.unidad}</span>
-                            </p>
-                            {subproducto ? (
-                              <p className="text-[10px] leading-tight text-slate-500">
-                                De {subproducto.principal} · quedan {fmt(Math.max(0, disponible))} {p.unidad}
-                              </p>
-                            ) : (
-                            <>
-                            <div className="h-1 w-full overflow-hidden rounded-full bg-slate-100" role="img" aria-label={`Nivel ${Math.round(nivel)} %`}>
-                              <div className={`h-full rounded-full ${colorBarra}`} style={{ width: `${Math.max(nivel, agotado ? 0 : 4)}%` }} />
-                            </div>
-                            <p className="text-[10px] leading-tight text-slate-500">
-                              Mín. {fmt(p.minimo)} {p.unidad}
-                              {p.unidad === "bultos" && existencia > 0 ? ` · ${fmt(existencia * factorKg(p))} kg` : ""}
-                              {p.unidad === "bultos" && existencia < 0 ? (
-                                <span className="font-semibold text-red-600"> · {fmt(existencia * factorKg(p))} kg</span>
-                              ) : null}
-                            </p>
-                            </>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </section>
-                );
-              })}
+              {CATEGORIAS_BODEGA.filter((c) => !(vista === "inventario" && !q && CATEGORIAS_BIOSEGURIDAD.includes(c.valor))).map(({ valor: cat }) => seccionCategoria(cat, inventarioVisible))}
               {vista === "inventario" && !q && (
                 // Bioseguridad: tarjeta en blanco, se le dará función más adelante
                 <section>
@@ -441,7 +457,8 @@ export default function BodegaPage() {
           )}
         </>
       )}
-
+      </>
+      )}
 
       {datos && (
         <>
