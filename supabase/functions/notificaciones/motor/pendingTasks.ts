@@ -35,8 +35,9 @@ export const VACUNAS_SECUENCIAL = [
   { clave: 'fostera', nombre: 'Fostera Gold PCV', desde: 21, texto: 'día 21' },
 ];
 
-/** Días después del destete o de la repetición en que se pide el material genético (5 días) */
+/** Días en que se pide el material genético: tras el destete (2 a 6) y tras una repetición de celo (16 a 22) */
 export const VENTANA_GENETICA = { desde: 2, hasta: 6 };
+export const VENTANA_GENETICA_REPETICION = { desde: 16, hasta: 22 };
 
 /** Ventanas para confirmar la gestación (días después de la inseminación) */
 export const CONFIRMACIONES_GESTACION = [
@@ -277,10 +278,10 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
 
   // Pedir el material genético: del día 2 al 6 después del destete o de la repetición.
   // Se quita al confirmarla, al pasar los 5 días o si ya se inseminó.
-  const alertaGenetica = (reg: Registro, dias: number, de: string) => {
+  const alertaGenetica = (reg: Registro, dias: number, de: string, ventana = VENTANA_GENETICA) => {
     const r = reg as Registro & { id?: string; geneticaSolicitada?: string };
     const inseminada = historial.some((x) => x.tipo === 'Inseminación' && (x.fecha || '') >= (reg.fecha || ''));
-    if (!r.geneticaSolicitada && !inseminada && dias >= VENTANA_GENETICA.desde && dias <= VENTANA_GENETICA.hasta) {
+    if (!r.geneticaSolicitada && !inseminada && dias >= ventana.desde && dias <= ventana.hasta) {
       tareas.push({
         id: cerda.id,
         tipo: 'Solicitar material genético',
@@ -349,7 +350,7 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
         fecha: regRepeticion.fecha,
       });
     }
-    alertaGenetica(regRepeticion, diasRep, 'de la repetición');
+    alertaGenetica(regRepeticion, diasRep, 'de la repetición', VENTANA_GENETICA_REPETICION);
   }
 
   if (regCelo) {
