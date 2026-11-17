@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Chevron, Vacio } from "@/components/ui";
-import { confirmarGestacion, confirmarVacunaParto, leerCerdas, marcarGeneticaSolicitada, useVersionDatos } from "@/lib/datos";
+import { confirmarGestacion, confirmarVacunaParto, hierroAplicado, leerCerdas, loteDelParto, marcarGeneticaSolicitada, useVersionDatos } from "@/lib/datos";
 import ConfirmarHierro from "@/components/ConfirmarHierro";
 import { confirmar } from "@/components/Dialogo";
 import { calcularTareasPendientes } from "@/utils/pendingTasks";
@@ -52,6 +52,18 @@ export default function TareasPage() {
   const visibles = tareas?.filter((t) => filtro === "todas" || t.prioridad === filtro) ?? [];
 
   const confirmarVacuna = async (id: string, v: { codigoParto: string; vacuna: string }, nombre: string) => {
+    // RespiSure-ONE no se puede aplicar sin haber aplicado el hierro a la camada
+    const lote = loteDelParto(v.codigoParto);
+    if (v.vacuna === "respisure" && lote && !hierroAplicado(lote)) {
+      const irHierro = await confirmar({
+        titulo: "Falta el hierro",
+        mensaje: `Antes de RespiSure-ONE debes confirmar la aplicación de hierro a la camada ${v.codigoParto}.`,
+        aceptar: "Aplicar hierro",
+        cancelar: "Cerrar",
+      });
+      if (irHierro) setHierro(lote.id);
+      return;
+    }
     const ok = await confirmar({
       titulo: nombre,
       mensaje: `¿Ya se aplicó ${nombre.replace(/^Vacuna /, "")} a la camada ${v.codigoParto}? Quedará registrada con fecha de hoy.`,

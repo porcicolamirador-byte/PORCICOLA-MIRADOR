@@ -228,16 +228,17 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
     }
   }
 
-  // Hierro a los lechones entre el día 2 y 3 después del parto (se quita al confirmarlo en el lote)
+  // Hierro a los lechones desde el día 2 después del parto, hasta confirmarlo en el lote
   if (regParto) {
     const diasParto = calcularDiasEntre(regParto.fecha || hoy, hoy);
     const codigo = String((regParto as Registro & { codigoParto?: string }).codigoParto ?? '');
     const lote = codigo ? loteDelParto(codigo) : undefined;
-    if (diasParto >= 2 && diasParto <= 3 && lote && lote.activo && !hierroAplicado(lote)) {
+    if (diasParto >= 2 && lote && lote.activo && !hierroAplicado(lote)) {
       tareas.push({
         id: cerda.id,
         tipo: 'Aplicación de hierro',
-        prioridad: 'alta',
+        // Días 2 y 3: alta; después ya va atrasada y pasa a crítica
+        prioridad: diasParto <= 3 ? 'alta' : 'critica',
         descripcion: `Aplicar hierro a los lechones del ${lote.codigo ?? 'lote'} (día ${diasParto})`,
         dias: diasParto,
         fecha: regParto.fecha,
@@ -256,11 +257,15 @@ export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
     if (p.vacunacion === 'secuencial' && codigo && camadaActiva) {
       for (const v of VACUNAS_SECUENCIAL) {
         if (diasParto >= v.desde && !p.vacunas?.[v.clave]) {
+          // RespiSure-ONE solo se aplica después del hierro
+          const faltaHierro = v.clave === 'respisure' && lote && !hierroAplicado(lote);
           tareas.push({
             id: cerda.id,
             tipo: `Vacuna ${v.nombre}`,
             prioridad: 'critica',
-            descripcion: `Día ${diasParto} del parto: aplicar ${v.nombre} a la camada (${v.texto})`,
+            descripcion: faltaHierro
+              ? `Día ${diasParto} del parto: primero aplica el hierro, luego ${v.nombre}`
+              : `Día ${diasParto} del parto: aplicar ${v.nombre} a la camada (${v.texto})`,
             dias: diasParto,
             fecha: regParto.fecha,
             vacunaParto: { codigoParto: codigo, vacuna: v.clave },
