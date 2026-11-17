@@ -56,8 +56,15 @@ export default function ConfirmarVacuna({
   const [contable, setContable] = useState(true);
   // Producto que no existe todavía: se crea en Vacunas
   const [nuevoNombre, setNuevoNombre] = useState("");
-  const esNuevo = productoId === "NUEVO";
-  const producto = esNuevo ? { id: "NUEVO", nombre: nuevoNombre.trim(), unidad: "dosis", categoria: "Vacunas" as const } : productos.find((p) => p.id === productoId);
+  // Producto elegido en la lista y si se compró aparte (no sale de Bioseguridad)
+  const [productoLista, setProductoLista] = useState<string | null>(null);
+  const [aparte, setAparte] = useState(false);
+  const ingresando = med === "ingresar";
+  const conValor = ingresando || (aparte && !!productoLista);
+  const esNuevo = ingresando && productoId === "NUEVO";
+  const producto = esNuevo
+    ? { id: "NUEVO", nombre: nuevoNombre.trim(), unidad: "dosis", categoria: "Vacunas" as const }
+    : productos.find((p) => p.id === (ingresando ? productoId : productoLista));
   const cantidadNum = Number(cantidad.replace(",", ".")) || 0;
   const monto = Number(valor.replace(/\D/g, "")) || 0;
   const puedeIngresar = Boolean(producto && producto.nombre && cantidadNum > 0 && monto > 0 && animales > 0);
@@ -124,13 +131,23 @@ export default function ConfirmarVacuna({
             Confirma que hoy se aplicó {nombre} a los <b>{animales}</b> lechones de este lote. Quedará registrado en el lote con la fecha y la hora.
           </p>
           {/* Siempre la lista de medicamentos y vacunas; al final, ingresar uno que no esté */}
-          <CostoMedicamento key={lote.id} animales={animales} sugerir={clave} onCambiar={setMed} opcionIngresar />
-          {med !== "ingresar" ? (
+          <CostoMedicamento key={lote.id} animales={animales} sugerir={clave} onCambiar={setMed} opcionIngresar onProducto={setProductoLista} ocultarDosis={aparte} />
+          {productoLista && !ingresando && (
+            <label className="flex items-start gap-3 rounded-2xl bg-slate-50 px-3.5 py-3 ring-1 ring-slate-200">
+              <input type="checkbox" checked={aparte} onChange={(e) => setAparte(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-sky-600" />
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-slate-900">Se compró aparte</span>
+                <span className="block text-xs text-slate-500">No sale de Bioseguridad: ingresa la cantidad y el valor, y elige si va a Contabilidad.</span>
+              </span>
+            </label>
+          )}
+          {!conValor ? (
             <Boton disabled={!med} onClick={confirmarBodega} className="w-full py-3">
               Confirmar aplicación
             </Boton>
           ) : (
             <>
+              {ingresando && (
               <Campo etiqueta="Producto aplicado *">
                 <SelectorApp
                   valor={productoId}
@@ -143,6 +160,7 @@ export default function ConfirmarVacuna({
                   claseBoton={CLASE_SELECTOR}
                 />
               </Campo>
+              )}
               {esNuevo && (
                 <Campo etiqueta="Nombre de la vacuna o medicamento *">
                   <Entrada value={nuevoNombre} onChange={(v) => setNuevoNombre(v.slice(0, 60))} placeholder="Ej. Mycoflex · Boehringer" />

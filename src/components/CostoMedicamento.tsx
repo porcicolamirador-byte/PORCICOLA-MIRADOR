@@ -35,6 +35,8 @@ export default function CostoMedicamento({
   sugerir,
   onCambiar,
   opcionIngresar = false,
+  onProducto,
+  ocultarDosis = false,
 }: {
   animales: number;
   dias?: number;
@@ -44,6 +46,10 @@ export default function CostoMedicamento({
   onCambiar: (r: ResultadoMedicamento | "otro" | "ingresar" | null) => void;
   /** Agrega al final la opción para ingresar un producto que no está */
   opcionIngresar?: boolean;
+  /** Avisa qué producto de Bioseguridad quedó elegido (o null) */
+  onProducto?: (productoId: string | null) => void;
+  /** Solo elegir el producto (sin cantidad por animal ni costo) */
+  ocultarDosis?: boolean;
 }) {
   const meds = useMemo(() => medicamentosRegistrados(), []);
   // Medicamentos y vacunas de Bioseguridad (gavetas): una opción por producto con todo lo disponible.
@@ -94,6 +100,10 @@ export default function CostoMedicamento({
         : undefined
     : meds.find((m) => m.id === medId);
   const sinExistencia = Boolean(gaveta && !med);
+  useEffect(() => {
+    onProducto?.(gaveta?.productoId ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gaveta?.productoId]);
   const unidades = med ? (med.unidad === "ml" || med.unidad === "Litro" ? ["ml", "Litro"] : [med.unidad]) : [];
   const u = unidadDosis && unidades.includes(unidadDosis) ? unidadDosis : med?.unidad ?? "";
   const cant = Number(porAnimal.replace(",", ".")) || 0;
@@ -144,12 +154,12 @@ export default function CostoMedicamento({
           claseBoton={CLASE_SELECTOR}
         />
       </Campo>
-      {sinExistencia && (
+      {!ocultarDosis && sinExistencia && (
         <p className="rounded-xl bg-amber-50 px-3 py-2.5 text-xs font-medium text-amber-800 ring-1 ring-amber-100">
           {gaveta?.nombre} no tiene existencia. Regístralo en Bioseguridad o ingrésalo con su valor.
         </p>
       )}
-      {med && (
+      {med && !ocultarDosis && (
         <>
           <div className="grid grid-cols-2 gap-3">
             <Campo etiqueta="Cantidad por animal *">
