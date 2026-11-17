@@ -309,6 +309,8 @@ export default function Dashboard() {
   const COLOR_RELOJ = { rojo: "bg-red-600", amarillo: "bg-yellow-500", azul: "bg-sky-600" } as const;
   const pendientes = pendingTasks.length;
   // Color del número de alertas según la prioridad más alta: crítica rojo, alta naranja, media azul, baja gris
+  // Pedido de genética pendiente (sin vacunas): el botón va oscuro con 🧬
+  const modoGenetica = !pendingTasks.some((t) => t.vacunaParto) && pendingTasks.some((t) => t.tipo === "Solicitar material genético");
   const nivel = (["critica", "alta", "media", "baja"] as const).find((p) => pendingTasks.some((t) => t.prioridad === p)) ?? "baja";
   const COLOR_NIVEL = {
     critica: { cuadro: "bg-rose-500", boton: "bg-rose-600 hover:bg-rose-700 focus-visible:ring-rose-600", anillo: "bg-rose-500/50" },
@@ -558,7 +560,7 @@ export default function Dashboard() {
           onClick={() => router.push('/tareas')}
           style={{ bottom: "calc(env(safe-area-inset-bottom) + 6.5rem)" }}
           className={`fixed right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-2xl transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
-            COLOR_NIVEL.boton
+            modoGenetica ? "bg-slate-900 hover:bg-slate-800 focus-visible:ring-slate-900" : COLOR_NIVEL.boton
           }`}
           aria-label={`Ver alertas pendientes: ${pendientes}${hayCriticas ? ", hay urgentes" : ""}`}
         >
@@ -570,9 +572,9 @@ export default function Dashboard() {
               <span aria-hidden="true" className="onda-critica onda-critica-2 pointer-events-none absolute inset-0 rounded-full bg-red-500" />
             </>
           ) : (
-            <span aria-hidden="true" className={`latido-suave pointer-events-none absolute inset-0 rounded-full ${COLOR_NIVEL.anillo}`} />
+            <span aria-hidden="true" className={`latido-suave pointer-events-none absolute inset-0 rounded-full ${modoGenetica ? "bg-slate-500/40" : COLOR_NIVEL.anillo}`} />
           )}
-          {!pendingTasks.some((t) => t.vacunaParto) && pendingTasks.some((t) => t.tipo === "Solicitar material genético") ? (
+          {modoGenetica ? (
             // Pedido de genética pendiente: el botón muestra 🧬
             <span aria-hidden="true" className="campana-alarma relative text-2xl leading-none">🧬</span>
           ) : pendingTasks.some((t) => t.vacunaParto) ? (
