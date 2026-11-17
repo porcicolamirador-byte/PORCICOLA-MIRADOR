@@ -85,7 +85,6 @@ import {
   CATEGORIAS_GASTO_PRODUCCION,
   FACTURA_GENERAL,
   siguienteFacturaGeneral,
-  UNIDADES_VACUNA,
   textoCategoriaProduccion,
 } from "@/lib/datos";
 const avisarSinPermisoBodega = () =>
@@ -133,6 +132,7 @@ export default function BodegaPage() {
   const [productoSel, setProductoSel] = useState<string | null>(null);
   // Página de Bioseguridad (Bodega › Inventario › Bioseguridad), con su propia entrada en el historial
   const [verBioseguridad, setVerBioseguridad] = useState(false);
+  const [gavetaSel, setGavetaSel] = useState<string | null>(null);
   useEffect(() => {
     const leerVista = () => setVerBioseguridad(new URLSearchParams(window.location.search).get("ver") === "bioseguridad");
     leerVista();
@@ -273,9 +273,11 @@ export default function BodegaPage() {
       tono="teal"
       volverA={verBioseguridad ? "/bodega" : undefined}
       accion={
-        <Boton onClick={abrirFactura} className="px-3.5" disabled={sinCatalogo}>
-          <IconoMas /> Factura
-        </Boton>
+        verBioseguridad ? undefined : (
+          <Boton onClick={abrirFactura} className="px-3.5" disabled={sinCatalogo}>
+            <IconoMas /> Factura
+          </Boton>
+        )
       }
     >
       {verBioseguridad ? (
@@ -298,7 +300,11 @@ export default function BodegaPage() {
                     </h2>
                     {/* Lista compacta: nombre, existencia y estado */}
                     <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/80">
-                      {items.map(({ producto: p, existencia, bajoMinimo, sinCompras }) => {
+                      {items.map(({ producto: p, existencia: enBodega, bajoMinimo, sinCompras: sinFacturas }) => {
+                        // Gaveta del producto: lo que queda de sus compras en Gastos de producción + lo de facturas de bodega
+                        const compras = comprasDeProducto(p.id);
+                        const existencia = Math.round((compras.reduce((t, m) => t + m.restante, 0) + Math.max(0, enBodega)) * 100) / 100;
+                        const sinCompras = sinFacturas && compras.length === 0;
                         const estado = sinCompras
                           ? { t: "Sin compras", c: "bg-slate-100 text-slate-500 ring-slate-200" }
                           : existencia <= 0
@@ -308,7 +314,7 @@ export default function BodegaPage() {
                               : { t: "Disponible", c: "bg-sky-50 text-sky-700 ring-sky-200" };
                         return (
                           <li key={p.id}>
-                            <button type="button" onClick={() => setProductoSel(p.id)} className="flex w-full items-center gap-2.5 px-3 py-2 text-left active:bg-slate-50">
+                            <button type="button" onClick={() => setGavetaSel(p.id)} className="flex w-full items-center gap-2.5 px-3 py-2 text-left active:bg-slate-50">
                               <span className="min-w-0 flex-1">
                                 <span className="block truncate text-[13px] font-semibold text-slate-900">{p.nombre}</span>
                                 <span className="block text-[11px] text-slate-500">
@@ -541,6 +547,7 @@ export default function BodegaPage() {
         />
       )}
       {facturaGastoSel && <DetalleFacturaGasto id={facturaGastoSel} onCerrar={() => setFacturaGastoSel(null)} />}
+      {gavetaSel && datos && <GavetaProducto productoId={gavetaSel} onCerrar={() => setGavetaSel(null)} />}
     </ModuloPage>
   );
 }
@@ -1964,9 +1971,97 @@ function TarjetaGastosProduccion() {
 }
 
 
-function HojaGastosProduccion({ onCerrar, iniciarNuevo = false }: { onCerrar: () => void; iniciarNuevo?: boolean }) {
+/** Compras de un medicamento o vacuna hechas en Gastos de producción (con lo que queda de cada una) */
+const comprasDeProducto = (productoId: string) => medicamentosRegistrados().filter((m) => m.productoId === productoId);
+/** Unidad del formulario de gastos según la unidad del producto de bodega */
+const unidadGasto = (u: string) => (u === "ml" ? "ml" : u === "litros" ? "Litro" : "Dosis");
+/** Medicamentos y vacunas de bodega que se pueden elegir en Gastos de producción */
+const productosBioseguridad = () =>
+  leerProductos().filter((p) => p.activo !== false && CATEGORIAS_BIOSEGURIDAD.includes(p.categoria)).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+
+/** Gaveta de un medicamento o vacuna: lo que hay, sus compras y botón para registrar otra */
+function GavetaProducto({ productoId, onCerrar }: { productoId: string; onCerrar: () => void }) {
+  useVersionDatos();
+  const [registrar, setRegistrar] = useState(false);
+  const p = leerProductos().find((x) => x.id === productoId);
+  if (!p) return null;
+  const compras = comprasDeProducto(p.id);
+  const enBodega = Math.max(0, calcularInventario().find((i) => i.producto.id === p.id)?.disponible ?? 0);
+  const total = Math.round((compras.reduce((t, m) => t + m.restante, 0) + enBodega) * 100) / 100;
+  if (registrar) return <HojaGastosProduccion iniciarNuevo productoInicial={p.id} onCerrar={() => setRegistrar(false)} />;
+  return (
+    <Modal abierta etiqueta="Bioseguridad" titulo={p.nombre} subtitulo={p.categoria} icono={p.categoria === "Vacunas" ? "💉" : "💊"} onCerrar={onCerrar}>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between rounded-2xl bg-sky-50 px-4 py-3 ring-1 ring-sky-100">
+          <span className="text-sm text-sky-900">Disponible</span>
+          <span className="text-lg font-bold tabular-nums text-sky-900">
+            {fmt(total)} {p.unidad}
+          </span>
+        </div>
+        <Boton
+          onClick={() => {
+            if (!puede("bodega")) return void avisarSinPermisoBodega();
+            setRegistrar(true);
+          }}
+          className="w-full py-3"
+        >
+          <IconoMas /> Registrar
+        </Boton>
+        {compras.length === 0 && enBodega <= 0 ? (
+          <p className="rounded-xl bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">Aún no hay compras de este producto.</p>
+        ) : (
+          <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/80">
+            {compras.map((m) => (
+              <li key={m.id} className="flex items-center gap-2.5 px-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13px] font-semibold text-slate-900">
+                    {fmt(m.cantidad)} {m.unidad} · {formatoFecha(m.fecha)}
+                  </p>
+                  <p className="truncate text-[11px] text-slate-500">
+                    {formatoPesos(m.valorUnitario)} por {m.unidad} · usado {fmt(m.usado)}
+                  </p>
+                </div>
+                <span className="shrink-0 text-right text-sm font-bold tabular-nums text-slate-900">
+                  {fmt(m.restante)}
+                  <span className="block text-[10px] font-normal text-slate-400">quedan</span>
+                </span>
+              </li>
+            ))}
+            {enBodega > 0 && (
+              <li className="flex items-center justify-between px-3 py-2 text-[13px]">
+                <span className="text-slate-600">Por facturas de bodega</span>
+                <span className="font-bold tabular-nums text-slate-900">
+                  {fmt(enBodega)} {p.unidad}
+                </span>
+              </li>
+            )}
+          </ul>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+function HojaGastosProduccion({ onCerrar, iniciarNuevo = false, productoInicial }: { onCerrar: () => void; iniciarNuevo?: boolean; productoInicial?: string }) {
   const version = useVersionDatos();
   const [nuevo, setNuevo] = useState(iniciarNuevo);
+  // Vacunas/Medicamentos: se elige el producto de bodega (su gaveta); nombre, marca y unidad salen de él
+  const [productoId, setProductoId] = useState("");
+  const elegirProducto = (id: string) => {
+    setProductoId(id);
+    const p = leerProductos().find((x) => x.id === id);
+    if (!p) return;
+    const [nombre, marcaP] = p.nombre.split(" · ");
+    setDescripcion(nombre);
+    setMarca(marcaP ?? "");
+    setUnidad(unidadGasto(p.unidad));
+  };
+  useEffect(() => {
+    if (!productoInicial) return;
+    setCategoria("Medicamentos y vacunas");
+    elegirProducto(productoInicial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productoInicial]);
   const [descripcion, setDescripcion] = useState("");
   const [cantidad, setCantidad] = useState("");
   const [valor, setValor] = useState("");
@@ -1992,9 +2087,10 @@ function HojaGastosProduccion({ onCerrar, iniciarNuevo = false }: { onCerrar: ()
   const guardar = (e: FormEvent) => {
     e.preventDefault();
     if (!categoria) return;
-    if (esVacuna && (!unidad || !(cantidadNum > 0))) return;
+    if (esVacuna && (!productoId || !unidad || !(cantidadNum > 0))) return;
     if (!pago || !facturaG.trim()) return;
-    if (!registrarGastoProduccion({ descripcion, cantidad, unidad: esVacuna ? unidad : undefined, marca: esVacuna ? marca : undefined, valor: monto, categoria, fecha, pago, factura: facturaG })) return;
+    if (!registrarGastoProduccion({ descripcion, cantidad, unidad: esVacuna ? unidad : undefined, marca: esVacuna ? marca : undefined, valor: monto, categoria, fecha, pago, factura: facturaG, productoId: esVacuna ? productoId : undefined })) return;
+    setProductoId("");
     setPago("");
     setFacturaG("");
     setMarca("");
@@ -2031,6 +2127,9 @@ function HojaGastosProduccion({ onCerrar, iniciarNuevo = false }: { onCerrar: ()
                 if (v !== "Medicamentos y vacunas") {
                   setUnidad("");
                   setMarca("");
+                  setProductoId("");
+                } else {
+                  setDescripcion("");
                 }
               }}
               titulo="Categoría"
@@ -2039,18 +2138,28 @@ function HojaGastosProduccion({ onCerrar, iniciarNuevo = false }: { onCerrar: ()
             />
           </Campo>
           <CampoFactura valor={facturaG} onCambiar={setFacturaG} />
-          <Campo etiqueta="Producto o servicio *">
-            <Entrada value={descripcion} onChange={(v) => setDescripcion(v.slice(0, 80))} required />
-          </Campo>
-          {esVacuna && (
-            <div className="grid grid-cols-2 gap-3">
-              <Campo etiqueta="Unidad *">
-                <Selector value={unidad} onChange={setUnidad} titulo="Unidad" placeholder="Elige" opciones={UNIDADES_VACUNA.map((u) => ({ valor: u, texto: u }))} />
+          {esVacuna ? (
+            <>
+              <Campo etiqueta="Medicamento o vacuna *">
+                <Selector
+                  value={productoId}
+                  onChange={elegirProducto}
+                  titulo="Medicamento o vacuna"
+                  placeholder="Elige el producto"
+                  opciones={productosBioseguridad().map((p) => ({ valor: p.id, texto: `${p.categoria === "Vacunas" ? "💉" : "💊"} ${p.nombre}` }))}
+                />
               </Campo>
-              <Campo etiqueta="Marca">
-                <Entrada value={marca} onChange={(v) => setMarca(v.slice(0, 40))} />
-              </Campo>
-            </div>
+              {productoId && (
+                <p className="-mt-1.5 text-xs text-slate-500">
+                  Entra a su gaveta en Bioseguridad · unidad: {unidad}
+                  {marca ? ` · marca: ${marca}` : ""}
+                </p>
+              )}
+            </>
+          ) : (
+            <Campo etiqueta="Producto o servicio *">
+              <Entrada value={descripcion} onChange={(v) => setDescripcion(v.slice(0, 80))} required />
+            </Campo>
           )}
           <div className="grid grid-cols-2 gap-3">
             <Campo etiqueta={esVacuna ? `Cantidad${unidad ? ` (${unidad})` : ""} *` : "Cantidad"}>
@@ -2094,7 +2203,7 @@ function HojaGastosProduccion({ onCerrar, iniciarNuevo = false }: { onCerrar: ()
             <Boton variante="secundario" onClick={() => setNuevo(false)}>
               Cancelar
             </Boton>
-            <Boton type="submit" disabled={!pago || !facturaG.trim() || !categoria || !descripcion.trim() || monto <= 0 || (esVacuna && (!unidad || !(cantidadNum > 0)))}>
+            <Boton type="submit" disabled={!pago || !facturaG.trim() || !categoria || !descripcion.trim() || monto <= 0 || (esVacuna && (!productoId || !unidad || !(cantidadNum > 0)))}>
               Guardar
             </Boton>
           </div>
