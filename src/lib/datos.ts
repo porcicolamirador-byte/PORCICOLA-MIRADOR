@@ -2411,7 +2411,28 @@ export function agregarAplicacionLote(loteId: string, aplicacion: AplicacionLote
 export function quitarAplicacionesDeTratamiento(tratamientoId: string) {
   const lotes = leerLotes();
   if (!lotes.some((l) => (l.aplicaciones ?? []).some((a) => a.tratamientoId === tratamientoId))) return;
+  for (const l of lotes) for (const a of l.aplicaciones ?? []) if (a.tratamientoId === tratamientoId) desconfirmarVacuna(l, a);
   guardarLotes(lotes.map((l) => ({ ...l, aplicaciones: (l.aplicaciones ?? []).filter((a) => a.tratamientoId !== tratamientoId) })));
+}
+
+/** Si la aplicación borrada era una vacuna de la camada, el parto vuelve a quedar pendiente (y vuelve la alerta) */
+function desconfirmarVacuna(lote: Lote, a: AplicacionLote) {
+  if (!a.tipo?.startsWith("Vacuna ")) return;
+  const clave = Object.entries(NOMBRES_VACUNA).find(([, n]) => a.tipo === `Vacuna ${n}`)?.[0];
+  const codigo = lote.origen?.codigoParto;
+  const cerdaId = lote.origen?.cerdaId;
+  if (!clave || !codigo || !cerdaId) return;
+  const historial = leerHistorial(cerdaId);
+  let cambio = false;
+  const nuevo = historial.map((r) => {
+    const v = (r as { vacunas?: Record<string, string> }).vacunas;
+    if (r.tipo !== "Parto" || String((r as { codigoParto?: unknown }).codigoParto ?? "") !== codigo || !v?.[clave]) return r;
+    cambio = true;
+    const resto = { ...v };
+    delete resto[clave];
+    return { ...r, vacunas: resto };
+  });
+  if (cambio) escribir(CLAVES.historial(cerdaId), nuevo);
 }
 
 /** Cambia la fecha (y hora) de una aplicación del lote */
@@ -2425,8 +2446,10 @@ export function editarAplicacion(loteId: string, aplicacionId: string, cambios: 
 /** Borra una aplicación del lote (si era el hierro, vuelve la alerta) */
 export function eliminarAplicacion(loteId: string, aplicacionId: string) {
   // Si venía de un tratamiento con medicamento, ese registro también se quita (vuelve lo usado)
-  const ap = leerLotes().find((l) => l.id === loteId)?.aplicaciones?.find((a) => a.id === aplicacionId);
+  const loteAp = leerLotes().find((l) => l.id === loteId);
+  const ap = loteAp?.aplicaciones?.find((a) => a.id === aplicacionId);
   if (ap?.tratamientoId) guardarTratamientos(leerTratamientos().filter((t) => t.id !== ap.tratamientoId));
+  if (loteAp && ap) desconfirmarVacuna(loteAp, ap);
   guardarLotes(leerLotes().map((l) => (l.id === loteId ? { ...l, aplicaciones: (l.aplicaciones ?? []).filter((a) => a.id !== aplicacionId) } : l)));
 }
 
