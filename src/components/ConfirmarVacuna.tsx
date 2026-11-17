@@ -13,6 +13,7 @@ import SelectorApp from "@/components/SelectorApp";
 import CostoMedicamento, { type ResultadoMedicamento } from "@/components/CostoMedicamento";
 import {
   confirmarVacunaParto,
+  crearProductoBodega,
   FACTURA_GENERAL,
   formatoPesos,
   hoy,
@@ -42,8 +43,7 @@ export default function ConfirmarVacuna({
 }) {
   const lote = loteDelParto(codigoParto);
   const animales = lote?.vivos ?? 0;
-  const [modo, setModo] = useState<"bodega" | "ingresar">("bodega");
-  const [med, setMed] = useState<ResultadoMedicamento | "otro" | null>(null);
+  const [med, setMed] = useState<ResultadoMedicamento | "otro" | "ingresar" | null>(null);
   // Ingresar el producto aplicado
   const productos = leerProductos()
     .filter((p) => p.activo !== false && (p.categoria === "Vacunas" || p.categoria === "Medicamentos"))
@@ -53,14 +53,17 @@ export default function ConfirmarVacuna({
   const [cantidad, setCantidad] = useState("");
   const [valor, setValor] = useState("");
   const [contable, setContable] = useState(true);
-  const producto = productos.find((p) => p.id === productoId);
+  // Producto que no existe todavía: se crea en Vacunas
+  const [nuevoNombre, setNuevoNombre] = useState("");
+  const esNuevo = productoId === "NUEVO";
+  const producto = esNuevo ? { id: "NUEVO", nombre: nuevoNombre.trim(), unidad: "dosis", categoria: "Vacunas" as const } : productos.find((p) => p.id === productoId);
   const cantidadNum = Number(cantidad.replace(",", ".")) || 0;
   const monto = Number(valor.replace(/\D/g, "")) || 0;
-  const puedeIngresar = Boolean(producto && cantidadNum > 0 && monto > 0 && animales > 0);
+  const puedeIngresar = Boolean(producto && producto.nombre && cantidadNum > 0 && monto > 0 && animales > 0);
 
   const confirmarBodega = () => {
     if (!lote) return;
-    if (med && med !== "otro") {
+    if (med && med !== "otro" && med !== "ingresar") {
       const tratamientoId = registrarTratamientoLote(lote.id, med, `Vacuna ${nombre}`);
       confirmarVacunaParto(cerdaId, codigoParto, vacuna, { costo: med.costo, nota: `${med.nombre} · ${med.texto}`, tratamientoId });
     } else {
@@ -70,7 +73,8 @@ export default function ConfirmarVacuna({
   };
 
   const confirmarIngresado = () => {
-    if (!lote || !producto) return;
+    if (!lote || !producto || !producto.nombre) return;
+    const idProducto = esNuevo ? crearProductoBodega({ nombre: producto.nombre, categoria: "Vacunas", unidad: "dosis" }) : producto.id;
     const unidad = unidadGasto(producto.unidad);
     const [nom, marca] = producto.nombre.split(" · ");
     // Con Contabilidad: queda como compra de Gastos de producción (en su gaveta) y se usa toda en esta aplicación
@@ -86,7 +90,7 @@ export default function ConfirmarVacuna({
         fecha: hoy(),
         pago: "contado",
         factura: FACTURA_GENERAL,
-        productoId: producto.id,
+        productoId: idProducto,
       });
       if (!id) return;
       gastoId = id;
@@ -117,28 +121,12 @@ export default function ConfirmarVacuna({
           <p className="text-sm text-slate-600">
             Confirma que hoy se aplicó {nombre} a los <b>{animales}</b> lechones de este lote. Quedará registrado en el lote con la fecha y la hora.
           </p>
-          <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1" role="radiogroup" aria-label="Producto">
-            {(["bodega", "ingresar"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                role="radio"
-                aria-checked={modo === m}
-                onClick={() => setModo(m)}
-                className={`rounded-xl py-2 text-sm font-semibold transition ${modo === m ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
-              >
-                {m === "bodega" ? "De Bioseguridad" : "Ingresar producto"}
-              </button>
-            ))}
-          </div>
-
-          {modo === "bodega" ? (
-            <>
-              <CostoMedicamento key={lote.id} animales={animales} sugerir={clave} onCambiar={setMed} />
-              <Boton disabled={!med} onClick={confirmarBodega} className="w-full py-3">
-                Confirmar aplicación
-              </Boton>
-            </>
+          {/* Siempre la lista de medicamentos y vacunas; al final, ingresar uno que no esté */}
+          <CostoMedicamento key={lote.id} animales={animales} sugerir={clave} onCambiar={setMed} opcionIngresar />
+          {med !== "ingresar" ? (
+            <Boton disabled={!med} onClick={confirmarBodega} className="w-full py-3">
+              Confirmar aplicación
+            </Boton>
           ) : (
             <>
               <Campo etiqueta="Producto aplicado *">
@@ -148,11 +136,16 @@ export default function ConfirmarVacuna({
                   titulo="Producto aplicado"
                   placeholder="Elige el producto"
                   buscar
-                  opciones={productos.map((p) => ({ valor: p.id, texto: p.nombre }))}
+                  opciones={[...productos.map((p) => ({ valor: p.id, texto: p.nombre })), { valor: "NUEVO", texto: "➕ Producto nuevo" }]}
                   className="w-full"
                   claseBoton={CLASE_SELECTOR}
                 />
               </Campo>
+              {esNuevo && (
+                <Campo etiqueta="Nombre de la vacuna o medicamento *">
+                  <Entrada value={nuevoNombre} onChange={(v) => setNuevoNombre(v.slice(0, 60))} placeholder="Ej. Mycoflex · Boehringer" />
+                </Campo>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <Campo etiqueta={`Cantidad total${producto ? ` (${unidadGasto(producto.unidad)})` : ""} *`}>
                   <Entrada type="number" inputMode="decimal" value={cantidad} onChange={(v) => setCantidad(v.slice(0, 10))} />

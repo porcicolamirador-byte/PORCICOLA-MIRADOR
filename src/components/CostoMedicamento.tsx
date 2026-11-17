@@ -29,13 +29,16 @@ export default function CostoMedicamento({
   dias = 1,
   sugerir,
   onCambiar,
+  opcionIngresar = false,
 }: {
   animales: number;
   dias?: number;
   /** Palabra para elegir de una vez el medicamento (por ejemplo "hierro") */
   sugerir?: string;
-  /** null = sin medicamento elegido; "otro" = aplicado sin costo */
-  onCambiar: (r: ResultadoMedicamento | "otro" | null) => void;
+  /** null = sin medicamento elegido; "otro" = aplicado sin costo; "ingresar" = producto que no está en la lista */
+  onCambiar: (r: ResultadoMedicamento | "otro" | "ingresar" | null) => void;
+  /** Agrega al final la opción para ingresar un producto que no está */
+  opcionIngresar?: boolean;
 }) {
   const meds = useMemo(() => medicamentosRegistrados(), []);
   // Medicamentos y vacunas de Bioseguridad (gavetas): una opción por producto con todo lo disponible.
@@ -82,6 +85,7 @@ export default function CostoMedicamento({
 
   useEffect(() => {
     if (medId === "OTRO") return onCambiar("otro");
+    if (medId === "INGRESAR") return onCambiar("ingresar");
     if (!med || !(cant > 0) || !(usado > 0)) return onCambiar(null);
     onCambiar({
       gastoId: med.id,
@@ -115,6 +119,7 @@ export default function CostoMedicamento({
             })),
             ...sueltos.map((m) => ({ valor: m.id, texto: `${m.nombre} · ${formatoPesos(m.valorUnitario)}/${m.unidad}`, detalle: `quedan ${fmtN(m.restante)} ${m.unidad}` })),
             { valor: "OTRO", texto: "Otro (sin costo)" },
+            ...(opcionIngresar ? [{ valor: "INGRESAR", texto: "➕ Ingresar producto (no está en la lista)" }] : []),
           ]}
           className="w-full"
           claseBoton={CLASE_SELECTOR}

@@ -13,7 +13,7 @@ import { formatoFecha, formatoHora, hierroAplicado, leerLotes, nombreLote, regis
 
 export default function ConfirmarHierro({ loteId, onCerrar }: { loteId: string | null; onCerrar: () => void }) {
   const lote = loteId ? leerLotes().find((l) => l.id === loteId) : undefined;
-  const [med, setMed] = useState<ResultadoMedicamento | "otro" | null>(null);
+  const [med, setMed] = useState<ResultadoMedicamento | "otro" | "ingresar" | null>(null);
   if (!loteId) return null;
   const aplicado = lote ? hierroAplicado(lote) : undefined;
   const cerrar = () => onCerrar();
@@ -54,7 +54,7 @@ export default function ConfirmarHierro({ loteId, onCerrar }: { loteId: string |
             disabled={!med}
             onClick={() => {
               // Con medicamento de Gastos de producción: su costo se suma al lote
-              if (med && med !== "otro") {
+              if (med && med !== "otro" && med !== "ingresar") {
                 const tratamientoId = registrarTratamientoLote(lote.id, med, "Aplicación de hierro");
                 registrarHierro(lote.id, { costo: med.costo, nota: `${med.nombre} · ${med.texto}`, tratamientoId });
               } else {
