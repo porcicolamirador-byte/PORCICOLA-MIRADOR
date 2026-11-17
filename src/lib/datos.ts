@@ -656,6 +656,22 @@ export const codigoDe = (p: ProductoBodega) => (p.codigo ?? "").trim().toUpperCa
 /** Kilos por unidad del producto: kg = 1, bultos = kgPorUnidad (40), otras unidades = 1 */
 export const factorKg = (p: ProductoBodega) => (p.unidad === "bultos" ? Number(p.kgPorUnidad) || KG_POR_BULTO : 1);
 export const guardarProductos = (p: ProductoBodega[]) => escribir(CLAVES.productos, p);
+/** Crea un producto nuevo de bodega (opción "Otro" al ingresar facturas o compras) y devuelve su id */
+export function crearProductoBodega(d: { nombre: string; categoria: CategoriaBodega; unidad: string }): string {
+  const nombre = d.nombre.trim().slice(0, 60);
+  // Si ya existe uno con el mismo nombre y categoría, se usa ese
+  const existente = leerProductos().find((p) => p.nombre.trim().toLowerCase() === nombre.toLowerCase() && p.categoria === d.categoria);
+  if (existente) {
+    if (existente.activo === false) guardarProductos(leerProductos().map((p) => (p.id === existente.id ? { ...p, activo: true } : p)));
+    return existente.id;
+  }
+  const id = nuevoId();
+  guardarProductos([
+    ...leerProductos(),
+    { id, nombre, categoria: d.categoria, unidad: d.unidad, minimo: 0, activo: true, ...(d.unidad === "bultos" ? { kgPorUnidad: 40 } : {}) },
+  ]);
+  return id;
+}
 export function leerFacturas(): Factura[] {
   return leer<Factura[]>(CLAVES.facturas, []).map((f) => ({
     ...f,

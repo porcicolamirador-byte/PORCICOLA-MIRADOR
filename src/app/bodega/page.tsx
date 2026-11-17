@@ -20,7 +20,7 @@ import { cargarLogoJpeg, entregarPdf } from "@/lib/pdfFicha";
 import { granjaActual, leerGranjas, nombreGranjaActual } from "@/lib/sincronizar";
 import PagoFactura, { PagoCredito } from "@/components/PagoFactura";
 import { calcularConsumoCerdas, type ConsumoAlimentoCerdas } from "@/lib/consumoCerdas";
-import { CATEGORIAS_BODEGA, IconoCategoria, RecuadroCategoria } from "@/components/CatalogoProductos";
+import { CATEGORIAS_BODEGA, IconoCategoria, RecuadroCategoria, UNIDADES_BODEGA } from "@/components/CatalogoProductos";
 import {
   calcularInventario,
   codigoDe,
@@ -84,6 +84,7 @@ import {
   registrarGastoProduccion,
   CATEGORIAS_GASTO_PRODUCCION,
   FACTURA_GENERAL,
+  crearProductoBodega,
   siguienteFacturaGeneral,
   textoCategoriaProduccion,
 } from "@/lib/datos";
@@ -559,7 +560,16 @@ interface LineaForm {
   productoId: string;
   cantidad: string;
   valor: string;
+  /** Producto nuevo ("Otro"): nombre, categoría y unidad */
+  nuevoNombre?: string;
+  nuevaCategoria?: CategoriaBodega;
+  nuevaUnidad?: string;
 }
+/** Valor de la opción "Otro" en las listas de productos */
+const OTRO = "__OTRO__";
+const esNuevo = (id: string) => id.startsWith("nuevo:");
+/** Categorías que se pueden elegir para un producto nuevo de Bioseguridad */
+const CATEGORIAS_OTRO_BIO: CategoriaBodega[] = ["Medicamentos", "Vacunas", "Limpieza", "Otros"];
 
 const lineaVacia = (): LineaForm => ({ clave: nuevoId(), productoId: "", cantidad: "", valor: "" });
 
@@ -619,7 +629,7 @@ function NuevaFactura({
     const lista = elegido && !ordenados.some((p) => p.id === elegido.id) ? [elegido, ...ordenados] : ordenados;
     return lista.map((p) => ({ valor: p.id, texto: `${p.nombre} (${p.unidad})` }));
   };
-  const unidadDe = (id: string) => productos.find((p) => p.id === id)?.unidad ?? "";
+  const unidadDe = (id: string) => (esNuevo(id) ? lineas.find((l) => l.productoId === id)?.nuevaUnidad ?? "" : productos.find((p) => p.id === id)?.unidad ?? "");
   const total = lineas.reduce((s, l) => s + num(l.cantidad) * num(l.valor), 0);
   const proveedores = Array.from(new Set(facturas.map((f) => f.proveedor).filter(Boolean))) as string[];
 
@@ -657,8 +667,18 @@ function NuevaFactura({
     if (!pago) return setError("Selecciona el método de pago: contado o crédito.");
     const ids = validas.map((l) => l.productoId);
     if (new Set(ids).size !== ids.length) return setError("Un producto está repetido; súmalo en una sola línea.");
+    if (validas.some((l) => esNuevo(l.productoId) && !(l.nuevoNombre ?? "").trim())) return setError("Escribe el nombre del producto nuevo (Otro).");
+    // "Otro": se crea el producto en su categoría (Alimento o la elegida en Bioseguridad)
+    for (const l of validas) {
+      if (!esNuevo(l.productoId)) continue;
+      l.productoId = crearProductoBodega({
+        nombre: l.nuevoNombre ?? "",
+        categoria: grupo === "alimento" ? "Alimento" : l.nuevaCategoria ?? "Medicamentos",
+        unidad: grupo === "alimento" ? "bultos" : l.nuevaUnidad ?? "unidades",
+      });
+    }
     if (editar) {
-      const primeroEd = productos.find((p) => p.id === validas[0].productoId);
+      const primeroEd = leerProductos().find((p) => p.id === validas[0].productoId);
       const r = actualizarFactura(
         editar.id,
         {
@@ -704,7 +724,7 @@ function NuevaFactura({
     const valor = totalFactura(factura);
     // De contado: el gasto va completo hoy. A crédito: cada abono se registra como gasto.
     if (pago === "contado" && comoGasto && valor > 0) {
-      const primero = productos.find((p) => p.id === factura.lineas[0].productoId);
+      const primero = leerProductos().find((p) => p.id === factura.lineas[0].productoId);
       const movimientoId = nuevoId();
       guardarMovimientos([
         ...leerMovimientos(),
@@ -812,15 +832,52 @@ function NuevaFactura({
                   )}
                 </div>
                 <Selector
-                  value={l.productoId}
-                  onChange={(v) => cambiarLinea(l.clave, { productoId: v })}
+                  value={esNuevo(l.productoId) ? OTRO : l.productoId}
+                  onChange={(v) =>
+                    cambiarLinea(
+                      l.clave,
+                      v === OTRO
+                        ? { productoId: `nuevo:${l.clave}`, nuevaCategoria: grupo === "alimento" ? "Alimento" : "Medicamentos", nuevaUnidad: grupo === "alimento" ? "bultos" : "unidades" }
+                        : { productoId: v },
+                    )
+                  }
                   titulo={grupo === "alimento" ? "Alimento" : "Medicamentos, vacunas y más"}
                   buscar={grupo === "bioseguridad"}
                   opciones={[
                     { valor: "", texto: ordenados.length || !qProd ? "Elige un producto…" : "Ningún producto coincide con la búsqueda" },
                     ...opcionesLinea(l.productoId),
+                    { valor: OTRO, texto: "➕ Otro (producto nuevo)" },
                   ]}
                 />
+                {esNuevo(l.productoId) && (
+                  <div className="mt-2 flex flex-col gap-2">
+                    <Campo etiqueta="Nombre del producto nuevo *">
+                      <Entrada value={l.nuevoNombre ?? ""} onChange={(v) => cambiarLinea(l.clave, { nuevoNombre: v.slice(0, 60) })} placeholder={grupo === "alimento" ? "Ej. Maxi Cerdos Pre-ceba" : "Ej. Ivermectina · Marca"} />
+                    </Campo>
+                    {grupo === "alimento" ? (
+                      <p className="text-xs text-slate-500">Se crea en Alimento, en bultos de 40 kg.</p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2">
+                        <Campo etiqueta="Categoría">
+                          <Selector
+                            value={l.nuevaCategoria ?? "Medicamentos"}
+                            onChange={(v) => cambiarLinea(l.clave, { nuevaCategoria: v as CategoriaBodega })}
+                            titulo="Categoría"
+                            opciones={CATEGORIAS_OTRO_BIO.map((c) => ({ valor: c, texto: c }))}
+                          />
+                        </Campo>
+                        <Campo etiqueta="Unidad">
+                          <Selector
+                            value={l.nuevaUnidad ?? "unidades"}
+                            onChange={(v) => cambiarLinea(l.clave, { nuevaUnidad: v })}
+                            titulo="Unidad"
+                            opciones={UNIDADES_BODEGA.filter((u) => u !== "bultos").concat(["ml"]).map((u) => ({ valor: u, texto: u }))}
+                          />
+                        </Campo>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   <Campo etiqueta={`Cantidad${unidadDe(l.productoId) ? ` (${unidadDe(l.productoId)})` : ""}`}>
                     <Entrada
@@ -2100,8 +2157,17 @@ function HojaGastosProduccion({ onCerrar, iniciarNuevo = false, productoInicial 
   const [nuevo, setNuevo] = useState(iniciarNuevo);
   // Vacunas/Medicamentos: se elige el producto de bodega (su gaveta); nombre, marca y unidad salen de él
   const [productoId, setProductoId] = useState("");
+  // "Otro": producto nuevo de Bioseguridad
+  const [otroNombre, setOtroNombre] = useState("");
+  const [otroCategoria, setOtroCategoria] = useState<CategoriaBodega>("Medicamentos");
   const elegirProducto = (id: string) => {
     setProductoId(id);
+    if (id === OTRO) {
+      setDescripcion("");
+      setMarca("");
+      setUnidad("ml");
+      return;
+    }
     const p = leerProductos().find((x) => x.id === id);
     if (!p) return;
     const [nombre, marcaP] = p.nombre.split(" · ");
@@ -2142,8 +2208,16 @@ function HojaGastosProduccion({ onCerrar, iniciarNuevo = false, productoInicial 
     if (!categoria) return;
     if (esVacuna && (!productoId || !unidad || !(cantidadNum > 0))) return;
     if (!pago || !facturaG.trim()) return;
-    if (!registrarGastoProduccion({ descripcion, cantidad, unidad: esVacuna ? unidad : undefined, marca: esVacuna ? marca : undefined, valor: monto, categoria, fecha, pago, factura: facturaG, productoId: esVacuna ? productoId : undefined })) return;
+    let idProducto = productoId;
+    let desc = descripcion;
+    if (esVacuna && productoId === OTRO) {
+      if (!otroNombre.trim()) return;
+      idProducto = crearProductoBodega({ nombre: otroNombre, categoria: otroCategoria, unidad: unidad === "Dosis" ? "dosis" : unidad === "Litro" ? "litros" : "ml" });
+      desc = otroNombre.trim();
+    }
+    if (!registrarGastoProduccion({ descripcion: desc, cantidad, unidad: esVacuna ? unidad : undefined, marca: esVacuna ? marca : undefined, valor: monto, categoria, fecha, pago, factura: facturaG, productoId: esVacuna ? idProducto : undefined })) return;
     setProductoId("");
+    setOtroNombre("");
     setPago("");
     setFacturaG("");
     setMarca("");
@@ -2200,10 +2274,28 @@ function HojaGastosProduccion({ onCerrar, iniciarNuevo = false, productoInicial 
                   titulo="Medicamento o vacuna"
                   placeholder="Elige el producto"
                   buscar
-                  opciones={productosBioseguridad().map((p) => ({ valor: p.id, texto: `${p.categoria === "Vacunas" ? "💉" : "💊"} ${p.nombre}` }))}
+                  opciones={[
+                    ...productosBioseguridad().map((p) => ({ valor: p.id, texto: `${p.categoria === "Vacunas" ? "💉" : "💊"} ${p.nombre}` })),
+                    { valor: OTRO, texto: "➕ Otro (producto nuevo)" },
+                  ]}
                 />
               </Campo>
-              {productoId && (
+              {productoId === OTRO && (
+                <div className="flex flex-col gap-2">
+                  <Campo etiqueta="Nombre del producto nuevo *">
+                    <Entrada value={otroNombre} onChange={(v) => setOtroNombre(v.slice(0, 60))} placeholder="Ej. Ivermectina · Marca" />
+                  </Campo>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Campo etiqueta="Categoría">
+                      <Selector value={otroCategoria} onChange={(v) => setOtroCategoria(v as CategoriaBodega)} titulo="Categoría" opciones={CATEGORIAS_BIOSEGURIDAD.map((c) => ({ valor: c, texto: c }))} />
+                    </Campo>
+                    <Campo etiqueta="Unidad">
+                      <Selector value={unidad} onChange={setUnidad} titulo="Unidad" opciones={["ml", "Dosis", "Litro"].map((u) => ({ valor: u, texto: u }))} />
+                    </Campo>
+                  </div>
+                </div>
+              )}
+              {productoId && productoId !== OTRO && (
                 <p className="-mt-1.5 text-xs text-slate-500">
                   Entra a su gaveta en Bioseguridad · unidad: {unidad}
                   {marca ? ` · marca: ${marca}` : ""}
@@ -2257,7 +2349,7 @@ function HojaGastosProduccion({ onCerrar, iniciarNuevo = false, productoInicial 
             <Boton variante="secundario" onClick={() => setNuevo(false)}>
               Cancelar
             </Boton>
-            <Boton type="submit" disabled={!pago || !facturaG.trim() || !categoria || !descripcion.trim() || monto <= 0 || (esVacuna && (!productoId || !unidad || !(cantidadNum > 0)))}>
+            <Boton type="submit" disabled={!pago || !facturaG.trim() || !categoria || !(productoId === OTRO ? otroNombre.trim() : descripcion.trim()) || monto <= 0 || (esVacuna && (!productoId || !unidad || !(cantidadNum > 0)))}>
               Guardar
             </Boton>
           </div>
