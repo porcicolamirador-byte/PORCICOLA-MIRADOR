@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useState } from "react";
 import SelectorApp from "@/components/SelectorApp";
 import { Campo, CLASE_SELECTOR, Entrada } from "@/components/ui";
-import { convertirUnidad, formatoPesos, medicamentosRegistrados } from "@/lib/datos";
+import { convertirUnidad, formatoPesos, leerProductos, medicamentosRegistrados } from "@/lib/datos";
 
 export interface ResultadoMedicamento {
   gastoId: string;
@@ -38,10 +38,41 @@ export default function CostoMedicamento({
   onCambiar: (r: ResultadoMedicamento | "otro" | null) => void;
 }) {
   const meds = useMemo(() => medicamentosRegistrados(), []);
-  const [medId, setMedId] = useState(() => (sugerir ? meds.find((m) => m.nombre.toLowerCase().includes(sugerir.toLowerCase()))?.id ?? "" : ""));
+  // Medicamentos y vacunas de Bioseguridad (gavetas): una opción por producto con todo lo disponible.
+  // Se descuenta de la compra más antigua que aún tenga.
+  const gavetas = useMemo(() => {
+    const productos = leerProductos();
+    const grupos = new Map<string, typeof meds>();
+    for (const m of meds) if (m.productoId) grupos.set(m.productoId, [...(grupos.get(m.productoId) ?? []), m]);
+    return [...grupos.entries()]
+      .map(([productoId, lista]) => {
+        const orden = [...lista].sort((a, b) => a.fecha.localeCompare(b.fecha));
+        const disponible = lista.reduce((t, m) => t + m.restante, 0);
+        const compra = orden.find((m) => m.restante > 0) ?? orden[orden.length - 1];
+        const nombre = productos.find((p) => p.id === productoId)?.nombre ?? compra.nombre;
+        return { valor: `prod:${productoId}`, nombre, disponible, compra, orden };
+      })
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  }, [meds]);
+  const sueltos = meds.filter((m) => !m.productoId);
+  const [medId, setMedId] = useState(() => {
+    if (!sugerir) return "";
+    const s = sugerir.toLowerCase();
+    return gavetas.find((g) => g.nombre.toLowerCase().includes(s) && g.disponible > 0)?.valor ?? sueltos.find((m) => m.nombre.toLowerCase().includes(s))?.id ?? "";
+  });
   const [porAnimal, setPorAnimal] = useState("");
   const [unidadDosis, setUnidadDosis] = useState("");
-  const med = meds.find((m) => m.id === medId);
+  const gaveta = gavetas.find((g) => g.valor === medId);
+  // De la gaveta se toma la compra más antigua que alcance para esta aplicación (o la más antigua con algo)
+  const compraGaveta = (() => {
+    if (!gaveta) return undefined;
+    const c = Number(porAnimal.replace(",", ".")) || 0;
+    const uBase = gaveta.compra.unidad;
+    const uSel = unidadDosis || uBase;
+    const necesario = c > 0 ? convertirUnidad(c * animales * Math.max(1, dias), uSel, uBase) : 0;
+    return gaveta.orden.find((m) => m.restante >= necesario && m.restante > 0) ?? gaveta.compra;
+  })();
+  const med = gaveta && compraGaveta ? { ...compraGaveta, nombre: gaveta.nombre } : meds.find((m) => m.id === medId);
   const unidades = med ? (med.unidad === "Dosis" ? ["Dosis"] : ["ml", "Litro"]) : [];
   const u = unidadDosis && unidades.includes(unidadDosis) ? unidadDosis : med?.unidad ?? "";
   const cant = Number(porAnimal.replace(",", ".")) || 0;
@@ -63,7 +94,7 @@ export default function CostoMedicamento({
       texto: `${fmtN(cant)} ${u} × ${animales} ${animales === 1 ? "animal" : "animales"}${nDias > 1 ? ` × ${nDias} días` : ""} · ${formatoPesos(costo)}`,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [medId, cant, u, animales, nDias]);
+  }, [medId, med?.id, cant, u, animales, nDias]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -75,9 +106,14 @@ export default function CostoMedicamento({
             setUnidadDosis("");
           }}
           titulo="Medicamento aplicado"
-          placeholder={meds.length ? "Elige el medicamento" : "Sin medicamentos en Gastos de producción"}
+          placeholder={meds.length ? "Elige el medicamento o vacuna" : "Sin medicamentos ni vacunas registrados"}
           opciones={[
-            ...meds.map((m) => ({ valor: m.id, texto: `${m.nombre} · ${formatoPesos(m.valorUnitario)}/${m.unidad}`, detalle: `quedan ${fmtN(m.restante)} ${m.unidad}` })),
+            ...gavetas.map((g) => ({
+              valor: g.valor,
+              texto: `${g.nombre} · ${formatoPesos(g.compra.valorUnitario)}/${g.compra.unidad}`,
+              detalle: g.disponible > 0 ? `disponible ${fmtN(g.disponible)} ${g.compra.unidad}` : "sin disponible",
+            })),
+            ...sueltos.map((m) => ({ valor: m.id, texto: `${m.nombre} · ${formatoPesos(m.valorUnitario)}/${m.unidad}`, detalle: `quedan ${fmtN(m.restante)} ${m.unidad}` })),
             { valor: "OTRO", texto: "Otro (sin costo)" },
           ]}
           className="w-full"
@@ -122,9 +158,9 @@ export default function CostoMedicamento({
                 <span className="text-sm text-sky-900">Costo que se suma al lote</span>
                 <span className="text-lg font-bold tabular-nums text-sky-900">{formatoPesos(costo)}</span>
               </div>
-              {usado > med.restante + 1e-9 && (
+              {usado > (gaveta ? gaveta.disponible : med.restante) + 1e-9 && (
                 <p className="text-xs font-medium text-amber-700">
-                  Solo quedan {fmtN(med.restante)} {med.unidad} de esta compra.
+                  Solo hay {fmtN(gaveta ? gaveta.disponible : med.restante)} {med.unidad} disponibles{gaveta ? "" : " de esta compra"}.
                 </p>
               )}
             </div>
