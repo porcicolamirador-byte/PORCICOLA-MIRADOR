@@ -2010,7 +2010,8 @@ export function eliminarGastoProduccion(id: string) {
 }
 
 /** Registra un gasto de producción: queda como gasto en la contabilidad general */
-export function registrarGastoProduccion(datos: { descripcion: string; cantidad?: string; unidad?: string; marca?: string; valor: number; categoria: string; fecha: string; pago: "contado" | "credito"; factura?: string; productoId?: string }) {
+/** Devuelve el id del gasto (o false si faltan datos) */
+export function registrarGastoProduccion(datos: { descripcion: string; cantidad?: string; unidad?: string; marca?: string; valor: number; categoria: string; fecha: string; pago: "contado" | "credito"; factura?: string; productoId?: string }): string | false {
   const descripcion = datos.descripcion.trim().slice(0, 80);
   if (!descripcion || !(datos.valor > 0)) return false;
   const cantidadNum = Number(String(datos.cantidad ?? "").replace(",", ".")) || 0;
@@ -2028,16 +2029,18 @@ export function registrarGastoProduccion(datos: { descripcion: string; cantidad?
   };
   // A crédito: queda en "Por pagar a crédito" y entra al balance cuando se abona o paga
   if (datos.pago === "credito") {
+    const idCuenta = nuevoId();
     guardarCuentasPorPagar([
       ...leerCuentasPorPagar(),
-      { id: nuevoId(), fecha: datos.fecha, descripcion: `${descripcion}${marca ? ` · ${marca}` : ""}${cantidad ? ` (${cantidad})` : ""}`, categoria: datos.categoria, total: Math.round(datos.valor), abonos: [], origen: "produccion", ...extra },
+      { id: idCuenta, fecha: datos.fecha, descripcion: `${descripcion}${marca ? ` · ${marca}` : ""}${cantidad ? ` (${cantidad})` : ""}`, categoria: datos.categoria, total: Math.round(datos.valor), abonos: [], origen: "produccion", ...extra },
     ]);
-    return true;
+    return idCuenta;
   }
+  const idMovimiento = nuevoId();
   guardarMovimientos([
     ...leerMovimientos(),
     {
-      id: nuevoId(),
+      id: idMovimiento,
       fecha: datos.fecha,
       tipo: "gasto",
       categoria: datos.categoria,
@@ -2047,7 +2050,7 @@ export function registrarGastoProduccion(datos: { descripcion: string; cantidad?
       ...extra,
     },
   ]);
-  return true;
+  return idMovimiento;
 }
 
 /** Categorías de Contabilidad para los gastos de un lote */
@@ -2495,7 +2498,7 @@ export function confirmarGestacion(cerdaId: string, etapa: 1 | 2): boolean {
 const NOMBRES_VACUNA: Record<string, string> = { respisure: "RespiSure-ONE", fostera: "Fostera Gold PCV" };
 
 /** Confirma la aplicación de una vacuna de la camada (en el registro del parto y en el lote) */
-export function confirmarVacunaParto(cerdaId: string, codigoParto: string, vacuna: string): boolean {
+export function confirmarVacunaParto(cerdaId: string, codigoParto: string, vacuna: string, extra?: { costo?: number; nota?: string; tratamientoId?: string }): boolean {
   const historial = leerHistorial(cerdaId);
   const i = historial.findIndex((r) => r.tipo === "Parto" && String((r as { codigoParto?: unknown }).codigoParto ?? "") === codigoParto);
   if (i < 0) return false;
@@ -2507,7 +2510,7 @@ export function confirmarVacunaParto(cerdaId: string, codigoParto: string, vacun
   const lote = loteDelParto(codigoParto);
   if (lote) {
     const nombre = NOMBRES_VACUNA[vacuna] ?? vacuna;
-    const aplicacion: AplicacionLote = { id: nuevoId(), fecha: hoy(), hora: horaActual(), tipo: `Vacuna ${nombre}`, nota: "Vacunación secuencial · confirmada desde Tareas" };
+    const aplicacion: AplicacionLote = { id: nuevoId(), fecha: hoy(), hora: horaActual(), tipo: `Vacuna ${nombre}`, nota: "Vacunación secuencial · confirmada desde Tareas", ...(extra ?? {}) };
     guardarLotes(leerLotes().map((l) => (l.id === lote.id ? { ...l, aplicaciones: [...(l.aplicaciones ?? []), aplicacion] } : l)));
   }
   return true;

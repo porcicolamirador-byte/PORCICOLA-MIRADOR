@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ModuloPage from "@/components/ModuloPage";
 import { Chevron, Vacio } from "@/components/ui";
-import { confirmarGestacion, confirmarVacunaParto, hierroAplicado, leerCerdas, loteDelParto, marcarGeneticaSolicitada, useVersionDatos } from "@/lib/datos";
+import { confirmarGestacion, hierroAplicado, leerCerdas, loteDelParto, marcarGeneticaSolicitada, useVersionDatos } from "@/lib/datos";
 import ConfirmarHierro from "@/components/ConfirmarHierro";
+import ConfirmarVacuna from "@/components/ConfirmarVacuna";
 import { confirmar } from "@/components/Dialogo";
 import { calcularTareasPendientes } from "@/utils/pendingTasks";
 import { cambiarGranja, granjaActual, leerGranjas, sincronizar } from "@/lib/sincronizar";
@@ -27,6 +28,7 @@ export default function TareasPage() {
   const version = useVersionDatos();
   const [filtro, setFiltro] = useState<Prioridad>("todas");
   const [hierro, setHierro] = useState<string | null>(null);
+  const [vacunaAbierta, setVacunaAbierta] = useState<{ cerdaId: string; codigoParto: string; vacuna: string; nombre: string } | null>(null);
 
   // Desde una notificación: abre la granja de la alerta
   useEffect(() => {
@@ -64,12 +66,8 @@ export default function TareasPage() {
       if (irHierro) setHierro(lote.id);
       return;
     }
-    const ok = await confirmar({
-      titulo: nombre,
-      mensaje: `¿Ya se aplicó ${nombre.replace(/^Vacuna /, "")} a la camada ${v.codigoParto}? Quedará registrada con fecha de hoy.`,
-      aceptar: "Confirmar",
-    });
-    if (ok) confirmarVacunaParto(id, v.codigoParto, v.vacuna);
+    // Como el hierro: se elige el producto aplicado (o se ingresa con su valor)
+    setVacunaAbierta({ cerdaId: id, codigoParto: v.codigoParto, vacuna: v.vacuna, nombre: nombre.replace(/^Vacuna /, "") });
   };
 
   const confirmarGenetica = async (id: string, registroId: string) => {
@@ -190,6 +188,7 @@ export default function TareasPage() {
         </div>
       )}
       <ConfirmarHierro loteId={hierro} onCerrar={() => setHierro(null)} />
+      {vacunaAbierta && <ConfirmarVacuna {...vacunaAbierta} onCerrar={() => setVacunaAbierta(null)} />}
     </ModuloPage>
   );
 }
