@@ -9,7 +9,7 @@ import { useState } from "react";
 import Modal from "@/components/Modal";
 import { Boton } from "@/components/ui";
 import CostoMedicamento, { type ResultadoMedicamento } from "@/components/CostoMedicamento";
-import { formatoFecha, formatoHora, hierroAplicado, leerLotes, nombreLote, registrarHierro, registrarTratamientoLote } from "@/lib/datos";
+import { formatoFecha, formatoHora, hierroAplicado, leerLotes, nombreLote, registrarHierro, registrarSalidaMedicamento, registrarTratamientoLote } from "@/lib/datos";
 
 export default function ConfirmarHierro({ loteId, onCerrar }: { loteId: string | null; onCerrar: () => void }) {
   const lote = loteId ? leerLotes().find((l) => l.id === loteId) : undefined;
@@ -55,6 +55,7 @@ export default function ConfirmarHierro({ loteId, onCerrar }: { loteId: string |
             onClick={() => {
               // Con medicamento de Gastos de producción: su costo se suma al lote
               if (med && med !== "otro" && med !== "ingresar") {
+                if (med.salida) registrarSalidaMedicamento(med.salida.productoId, med.salida.cantidad, `Aplicación de hierro · ${nombreLote(lote)}`);
                 const tratamientoId = registrarTratamientoLote(lote.id, med, "Aplicación de hierro");
                 registrarHierro(lote.id, { costo: med.costo, nota: `${med.nombre} · ${med.texto}`, tratamientoId });
               } else {

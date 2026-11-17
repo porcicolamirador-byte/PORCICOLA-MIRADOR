@@ -21,6 +21,7 @@ import {
   loteDelParto,
   nombreLote,
   registrarGastoProduccion,
+  registrarSalidaMedicamento,
   registrarTratamientoLote,
 } from "@/lib/datos";
 
@@ -64,6 +65,7 @@ export default function ConfirmarVacuna({
   const confirmarBodega = () => {
     if (!lote) return;
     if (med && med !== "otro" && med !== "ingresar") {
+      if (med.salida) registrarSalidaMedicamento(med.salida.productoId, med.salida.cantidad, `Vacuna ${nombre} · ${nombreLote(lote)}`);
       const tratamientoId = registrarTratamientoLote(lote.id, med, `Vacuna ${nombre}`);
       confirmarVacunaParto(cerdaId, codigoParto, vacuna, { costo: med.costo, nota: `${med.nombre} · ${med.texto}`, tratamientoId });
     } else {

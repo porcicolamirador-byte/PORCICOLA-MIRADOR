@@ -2397,6 +2397,12 @@ export function registrarTratamientoLote(loteId: string, r: { gastoId: string; n
   return id;
 }
 
+/** Salida de bodega de un medicamento o vacuna aplicado (cuando sale de lo que entró por facturas) */
+export function registrarSalidaMedicamento(productoId: string, cantidad: number, nota: string) {
+  if (!(cantidad > 0)) return;
+  guardarSalidas([...leerSalidas(), { id: nuevoId(), productoId, fecha: hoy(), hora: horaActual(), cantidad, nota: nota.slice(0, 120) }]);
+}
+
 /** Agrega al lote un medicamento aplicado (desde Tratamientos), con su costo */
 export function agregarAplicacionLote(loteId: string, aplicacion: AplicacionLote) {
   guardarLotes(leerLotes().map((l) => (l.id === loteId ? { ...l, aplicaciones: [...(l.aplicaciones ?? []), aplicacion] } : l)));
