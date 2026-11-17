@@ -12,7 +12,7 @@ export default function CampoFactura({ valor, onCambiar, claseCampo }: { valor: 
   const general = valor === FACTURA_GENERAL;
   return (
     <Campo etiqueta="Número de factura *">
-      <div className="flex items-stretch gap-2">
+      <div className="flex items-stretch gap-1.5">
         <div className="min-w-0 flex-1">
           {general ? (
             <div className={claseCampo ?? "flex h-full items-center rounded-xl bg-slate-50 px-3.5 py-2.5 text-base text-slate-500 ring-1 ring-slate-200"}>
@@ -26,9 +26,10 @@ export default function CampoFactura({ valor, onCambiar, claseCampo }: { valor: 
           type="button"
           onClick={() => onCambiar(general ? "" : FACTURA_GENERAL)}
           aria-pressed={general}
-          className={`shrink-0 rounded-xl px-3.5 text-sm font-semibold ring-1 transition ${general ? "bg-sky-900 text-white ring-sky-900" : "bg-white text-slate-600 ring-slate-200 active:bg-slate-50"}`}
+          aria-label="Factura general (consecutivo de la granja)"
+          className={`shrink-0 rounded-lg px-2 text-[11px] font-semibold ring-1 transition ${general ? "bg-sky-900 text-white ring-sky-900" : "bg-white text-slate-600 ring-slate-200 active:bg-slate-50"}`}
         >
-          General
+          Gen
         </button>
       </div>
     </Campo>

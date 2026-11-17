@@ -106,7 +106,7 @@ const CATEGORIA_GASTO: Record<CategoriaBodega, string> = {
   Otros: "Otros gastos",
 };
 
-type Vista = "inventario" | "reponer" | "facturas" | "bioseguridad";
+type Vista = "inventario" | "reponer" | "facturas";
 
 /** Orden fijo de los alimentos en Bodega; los demás productos van después, por nombre */
 const ORDEN_BODEGA = ["PR-01", "IN-01", "ML-01", "MC-01", "CG-01", "CL-01"];
@@ -222,7 +222,6 @@ export default function BodegaPage() {
               { valor: "inventario", texto: "Inventario" },
               { valor: "reponer", texto: `Por reponer${bajos.length ? ` (${bajos.length})` : ""}` },
               { valor: "facturas", texto: `Facturas${datos?.facturas.length ? ` (${datos.facturas.length})` : ""}` },
-              { valor: "bioseguridad", texto: "Bioseguridad" },
             ]}
             valor={vista}
             onChange={setVista}
@@ -236,9 +235,6 @@ export default function BodegaPage() {
 
           {datos === null ? (
             <div className="h-40 animate-pulse rounded-3xl bg-slate-100" />
-          ) : vista === "bioseguridad" ? (
-            // Gaveta nueva: se le dará función más adelante
-            <Vacio titulo="Bioseguridad" texto="Próximamente." />
           ) : vista === "facturas" ? (
             facturasVisibles.length === 0 && otrasFacturas.length === 0 ? (
               <Vacio
@@ -409,6 +405,27 @@ export default function BodegaPage() {
                   </section>
                 );
               })}
+              {vista === "inventario" && !q && (
+                // Bioseguridad: tarjeta en blanco, se le dará función más adelante
+                <section>
+                  <h2 className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                    <span aria-hidden="true">🛡️</span>
+                    Bioseguridad
+                  </h2>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex flex-col gap-1.5 rounded-2xl bg-white p-2.5 text-left ring-1 ring-slate-200/80">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-base" aria-hidden="true">🛡️</span>
+                        <Insignia clase="bg-slate-100 text-slate-500 ring-slate-200">Próximamente</Insignia>
+                      </div>
+                      <p className="line-clamp-2 text-[13px] font-semibold leading-tight text-slate-900">Bioseguridad</p>
+                      <p className="text-xl font-bold leading-none text-slate-300">—</p>
+                      <div className="h-1 w-full rounded-full bg-slate-100" />
+                      <p className="text-[10px] leading-tight text-slate-400">Sin función todavía</p>
+                    </div>
+                  </div>
+                </section>
+              )}
             </div>
           )}
         </>
