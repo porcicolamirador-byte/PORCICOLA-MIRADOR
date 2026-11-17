@@ -409,13 +409,13 @@ export default function BodegaPage() {
                 // Bioseguridad: tarjeta en blanco, se le dará función más adelante
                 <section>
                   <h2 className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                    <span aria-hidden="true">🛡️</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-3.5 w-3.5"><circle cx="12" cy="12" r="4.2" /><path d="M12 4v3.8M12 16.2V20M4 12h3.8M16.2 12H20M6.3 6.3l2.7 2.7M15 15l2.7 2.7M6.3 17.7 9 15M15 9l2.7-2.7M4 4l16 16" /></svg>
                     Bioseguridad
                   </h2>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="flex flex-col gap-1.5 rounded-2xl bg-white p-2.5 text-left ring-1 ring-slate-200/80">
                       <div className="flex items-start justify-between gap-2">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-base" aria-hidden="true">🛡️</span>
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-[18px] w-[18px]"><circle cx="12" cy="12" r="4.2" /><path d="M12 4v3.8M12 16.2V20M4 12h3.8M16.2 12H20M6.3 6.3l2.7 2.7M15 15l2.7 2.7M6.3 17.7 9 15M15 9l2.7-2.7M4 4l16 16" /></svg></span>
                         <Insignia clase="bg-slate-100 text-slate-500 ring-slate-200">Próximamente</Insignia>
                       </div>
                       <p className="line-clamp-2 text-[13px] font-semibold leading-tight text-slate-900">Bioseguridad</p>
