@@ -4,6 +4,7 @@
 //   { accion: "diario" }      → programada (7:30 a. m.): "Tienes alertas por atender en …" si hay alertas
 // Las programadas llevan el encabezado x-cron con el secreto guardado en push_config.
 import webpush from "npm:web-push@3.6.7";
+import mqtt from "npm:mqtt@5.10.1";
 import { admin, CORS, json, usuarioDeLaPeticion } from "../_compartido/comun.ts";
 import { alertasDeGranja, GRANJA_BASE, type Documento } from "./motor/alertas.ts";
 
@@ -114,6 +115,76 @@ async function diario() {
   return { enviados };
 }
 
+/* ───────── TEMPORAL: aviso de temperatura de la granja (ESP32 por EMQX) ─────────
+ * Cada minuto (pg_cron) se lee granja/temperatura. Se avisa una sola vez al pasar de 27,5 °C
+ * y una sola vez al bajar de 22 °C; vuelve a "normal" con 0,5 °C de margen.
+ * Para quitarlo: borrar este bloque y la acción "temperatura", y la migración 0016. */
+const TEMP_ALTA = 27.5;
+const TEMP_BAJA = 22;
+
+function leerTemperatura(cfg: { url: string; usuario: string | null; clave: string | null }): Promise<number | null> {
+  return new Promise((resolver) => {
+    let listo = false;
+    const cliente = mqtt.connect(cfg.url, {
+      username: cfg.usuario || undefined,
+      password: cfg.clave || undefined,
+      clientId: `servidor-alertas-${crypto.randomUUID().slice(0, 8)}`,
+      connectTimeout: 10000,
+      reconnectPeriod: 0,
+      clean: true,
+    });
+    const fin = (v: number | null) => {
+      if (listo) return;
+      listo = true;
+      clearTimeout(limite);
+      try {
+        cliente.end(true);
+      } catch {
+        // ya cerrado
+      }
+      resolver(v);
+    };
+    const limite = setTimeout(() => fin(null), 20000);
+    cliente.on("connect", () => cliente.subscribe("granja/temperatura"));
+    cliente.on("message", (_tema: string, msg: Uint8Array) => {
+      const n = Number(new TextDecoder().decode(msg).trim().replace(",", "."));
+      if (Number.isFinite(n)) fin(n);
+    });
+    cliente.on("error", (e: Error) => {
+      console.error("mqtt", e.message);
+      fin(null);
+    });
+  });
+}
+
+async function temperatura() {
+  const { data: cfg } = await admin.from("mqtt_servidor").select("url, usuario, clave").eq("id", 1).maybeSingle();
+  if (!cfg?.url) return { omitido: "sin conexión configurada" };
+  const t = await leerTemperatura(cfg);
+  if (t === null) return { omitido: "sin lectura" };
+  const { data: est } = await admin.from("temperatura_alerta").select("estado").eq("id", 1).maybeSingle();
+  const previo = (est?.estado as string) ?? "normal";
+  let nuevo = previo;
+  if (t > TEMP_ALTA) nuevo = "alta";
+  else if (t < TEMP_BAJA) nuevo = "baja";
+  else if (previo === "alta" && t <= TEMP_ALTA - 0.5) nuevo = "normal";
+  else if (previo === "baja" && t >= TEMP_BAJA + 0.5) nuevo = "normal";
+  let enviados = 0;
+  if (nuevo !== previo && nuevo !== "normal") {
+    const grados = `${t.toFixed(1).replace(".", ",")} °C`;
+    const aviso: Aviso =
+      nuevo === "alta"
+        ? { title: `Temperatura Límite ${grados}`, body: `La granja superó los 27,5 °C.`, tag: "temperatura-granja", url: "/monitoreo" }
+        : { title: `Temperatura baja ${grados}`, body: `La granja bajó de 22 °C.`, tag: "temperatura-granja", url: "/monitoreo" };
+    const { data: perfiles } = await admin.from("perfiles").select("id").eq("activo", true);
+    const activos = new Set((perfiles ?? []).map((p: { id: string }) => p.id));
+    const { data: subs } = await admin.from("suscripciones_push").select("id, usuario_id, endpoint, p256dh, auth");
+    for (const s of (subs ?? []) as Suscripcion[]) if (activos.has(s.usuario_id) && (await enviar(s, aviso))) enviados++;
+  }
+  await admin.from("temperatura_alerta").upsert({ id: 1, estado: nuevo, temperatura: t, actualizado_en: new Date().toISOString() });
+  return { temperatura: t, estado: nuevo, enviados };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "Método no permitido" }, 405);
@@ -126,6 +197,11 @@ Deno.serve(async (req) => {
   const accion = String(cuerpo.accion ?? "");
   try {
     const config = await configurar();
+
+    if (accion === "temperatura") {
+      if (req.headers.get("x-cron") !== config.cron_secreto) return json({ error: "No autorizado" }, 401);
+      return json(await temperatura());
+    }
 
     if (accion === "diario") {
       if (req.headers.get("x-cron") !== config.cron_secreto) return json({ error: "No autorizado" }, 401);

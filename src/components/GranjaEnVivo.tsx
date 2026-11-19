@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Boton, Campo, Entrada, Hoja, Insignia, Interruptor, Tarjeta, Vacio } from "@/components/ui";
 import { guardarConfigMqtt, normalizarUrl, type ConfigMqtt, type GranjaEnVivoEstado } from "@/lib/mqtt";
+import { api, perfilGuardado } from "@/lib/nube";
 
 const COLORES = [
   { nombre: "Rojo", hex: "#FF0000" },
@@ -355,10 +356,26 @@ function ConfigurarConexion({
   }
   if (!abierta && cargada) setCargada(false);
 
-  const guardar = (e: FormEvent) => {
+  const esAdmin = perfilGuardado()?.rol === "admin";
+  const [error, setError] = useState("");
+  const guardar = async (e: FormEvent) => {
     e.preventDefault();
     if (!url.trim()) return;
-    guardarConfigMqtt({ url: normalizarUrl(url), usuario: usuario.trim(), clave });
+    const datos = { url: normalizarUrl(url), usuario: usuario.trim(), clave };
+    guardarConfigMqtt(datos);
+    // TEMPORAL: el servidor también la usa para avisar por notificación si la temperatura pasa de 27,5 °C o baja de 22 °C
+    if (esAdmin) {
+      try {
+        await api("mqtt_servidor?on_conflict=id", {
+          method: "POST",
+          headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+          body: JSON.stringify({ id: 1, ...datos, actualizado_en: new Date().toISOString() }),
+        });
+      } catch {
+        setError("Se guardó en este teléfono, pero no en el servidor (sin conexión). Las alertas de temperatura no se activaron.");
+        return;
+      }
+    }
     onCerrar();
   };
 
@@ -382,7 +399,12 @@ function ConfigurarConexion({
         <Campo etiqueta="Contraseña">
           <Entrada type="password" value={clave} onChange={setClave} />
         </Campo>
-        <p className="text-xs text-slate-500">Estos datos se guardan solo en este teléfono.</p>
+        <p className="text-xs text-slate-500">
+          {esAdmin
+            ? "Se guardan en este teléfono y en el servidor, para avisarte por notificación si la temperatura pasa de 27,5 °C o baja de 22 °C."
+            : "Estos datos se guardan solo en este teléfono."}
+        </p>
+        {error && <p className="text-xs font-semibold text-red-600">{error}</p>}
         <Boton type="submit" className="mt-1 w-full py-3">
           Guardar y conectar
         </Boton>
