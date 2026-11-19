@@ -14,6 +14,9 @@ const COLORES = [
 type Control = "led" | "rele" | "rgb";
 type Pendiente = { valor: boolean; id: number };
 
+/** Controles del ESP32 (LED azul, relé y LED RGB): ocultos por ahora; poner en true para mostrarlos */
+const MOSTRAR_CONTROLES = false;
+
 /** Tiempo máximo para que el ESP32 confirme una orden */
 const ESPERA_CONFIRMACION = 6000;
 
@@ -25,23 +28,18 @@ function calidadWifi(dbm: number) {
   return { barras: 1, texto: "Débil", color: "text-red-600" };
 }
 
-function SenalWifi({ dbm }: { dbm: number }) {
+function BarrasWifi({ dbm, grande = false }: { dbm: number; grande?: boolean }) {
   const c = calidadWifi(dbm);
   return (
-    <div className="flex items-center gap-1.5" title={`Señal WiFi del ESP32: ${dbm} dBm`}>
-      <span aria-hidden="true" className="flex h-3.5 items-end gap-[2px]">
-        {[1, 2, 3, 4].map((n) => (
-          <span
-            key={n}
-            className={`w-[3px] rounded-sm ${n <= c.barras ? "bg-current" : "bg-slate-200"} ${c.color}`}
-            style={{ height: `${n * 25}%` }}
-          />
-        ))}
-      </span>
-      <span className={`text-xs font-semibold ${c.color}`}>
-        WiFi {c.texto} <span className="font-normal text-slate-500 tabular-nums">· {dbm} dBm</span>
-      </span>
-    </div>
+    <span aria-hidden="true" className={`flex items-end gap-[3px] ${grande ? "h-5" : "h-3.5"} ${c.color}`}>
+      {[1, 2, 3, 4].map((n) => (
+        <span
+          key={n}
+          className={`${grande ? "w-[5px]" : "w-[3px]"} rounded-sm ${n <= c.barras ? "bg-current" : "bg-slate-200"}`}
+          style={{ height: `${n * 25}%` }}
+        />
+      ))}
+    </span>
   );
 }
 
@@ -147,7 +145,10 @@ export default function GranjaEnVivo({ config, granja }: { config: ConfigMqtt | 
       granja.esp32 === false ? (
         <Insignia clase="bg-amber-50 text-amber-800 ring-amber-200">ESP32 desconectado</Insignia>
       ) : (
-        <Insignia clase="bg-emerald-50 text-emerald-700 ring-emerald-200">En vivo</Insignia>
+        <Insignia clase="bg-emerald-50 text-emerald-700 ring-emerald-200">
+          <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500 align-middle" aria-hidden="true" />
+          En vivo
+        </Insignia>
       )
     ) : granja.conexion === "conectando" ? (
       <Insignia clase="bg-slate-50 text-slate-600 ring-slate-200">Conectando…</Insignia>
@@ -171,38 +172,60 @@ export default function GranjaEnVivo({ config, granja }: { config: ConfigMqtt | 
           />
         ) : (
           <div className="flex flex-col gap-4">
+            {/* Lectura principal */}
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-xs font-medium text-slate-500">Sensor del ESP32</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Temperatura · sensor ESP32</p>
                 {granja.sensorError ? (
-                  <p className="mt-1 text-lg font-semibold text-red-600">Sensor no detectado</p>
+                  <p className="mt-2 text-lg font-semibold text-red-600">Sensor no detectado</p>
                 ) : granja.temperatura !== null ? (
-                  <p className="mt-1 text-4xl font-bold leading-none text-slate-900 tabular-nums">
+                  <p className="mt-1 flex items-start text-[56px] font-bold leading-none tracking-tight text-slate-900 tabular-nums">
                     {granja.temperatura.toFixed(1)}
-                    <span className="text-lg font-semibold text-slate-500"> °C</span>
+                    <span className="ml-1 mt-2 text-xl font-semibold text-slate-400">°C</span>
                   </p>
                 ) : (
-                  <p className="mt-1 text-lg font-semibold text-slate-400">Esperando lectura…</p>
-                )}
-                {granja.actualizado !== null && (
-                  <p className={`mt-1.5 text-xs ${sinDatosRecientes ? "font-semibold text-amber-700" : "text-slate-500"}`}>
-                    {sinDatosRecientes ? "Sin lecturas nuevas · " : "Actualizado "}
-                    {haceCuanto(ahora - granja.actualizado)}
-                  </p>
+                  <p className="mt-2 text-lg font-semibold text-slate-400">Esperando lectura…</p>
                 )}
               </div>
-              <div className="flex shrink-0 flex-col items-end gap-2">
-                {insignia}
-                {granja.wifi !== null && granja.conexion === "conectado" && granja.esp32 !== false && (
-                  <SenalWifi dbm={granja.wifi} />
-                )}
-              </div>
+              <div className="shrink-0">{insignia}</div>
             </div>
 
             {granja.conexion === "error" && granja.error && (
               <p className="rounded-2xl bg-red-50 px-3.5 py-2.5 text-sm text-red-700 ring-1 ring-red-200">{granja.error}</p>
             )}
 
+            {/* Estado del equipo */}
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="rounded-2xl bg-slate-50 px-3.5 py-3 ring-1 ring-slate-100">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Señal WiFi</p>
+                {granja.wifi !== null && granja.conexion === "conectado" && granja.esp32 !== false ? (
+                  <div className="mt-1.5 flex items-center gap-2.5">
+                    <BarrasWifi dbm={granja.wifi} grande />
+                    <div className="min-w-0 leading-tight">
+                      <p className={`text-sm font-bold ${calidadWifi(granja.wifi).color}`}>{calidadWifi(granja.wifi).texto}</p>
+                      <p className="text-[11px] text-slate-500 tabular-nums">{granja.wifi} dBm</p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-1.5 text-sm font-semibold text-slate-400">Sin dato</p>
+                )}
+              </div>
+              <div className="rounded-2xl bg-slate-50 px-3.5 py-3 ring-1 ring-slate-100">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Última lectura</p>
+                {granja.actualizado !== null ? (
+                  <div className="mt-1.5 leading-tight">
+                    <p className={`text-sm font-bold tabular-nums ${sinDatosRecientes ? "text-amber-700" : "text-slate-900"}`}>
+                      {haceCuanto(ahora - granja.actualizado).replace(/^hace /, "Hace ")}
+                    </p>
+                    <p className="text-[11px] text-slate-500">{sinDatosRecientes ? "Sin lecturas nuevas" : "Actualización continua"}</p>
+                  </div>
+                ) : (
+                  <p className="mt-1.5 text-sm font-semibold text-slate-400">Sin dato</p>
+                )}
+              </div>
+            </div>
+
+            {MOSTRAR_CONTROLES && (
             <ul className="flex flex-col divide-y divide-slate-100 border-t border-slate-100">
               <li className="flex items-center justify-between gap-3 py-3">
                 <div className="flex min-w-0 items-center gap-3">
@@ -298,6 +321,7 @@ export default function GranjaEnVivo({ config, granja }: { config: ConfigMqtt | 
                 </div>
               </li>
             </ul>
+            )}
           </div>
         )}
         {aviso && <p className="mt-3 text-center text-xs font-semibold text-red-600">{aviso}</p>}
