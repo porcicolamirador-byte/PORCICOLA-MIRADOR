@@ -16,6 +16,7 @@ import {
 } from "@/lib/datos";
 import { confirmar } from "@/components/Dialogo";
 import GranjaEnVivo, { haceCuanto } from "@/components/GranjaEnVivo";
+import LecturasSensor from "@/components/LecturasSensor";
 import { useConfigMqtt, useGranjaEnVivo } from "@/lib/mqtt";
 
 /** Rangos de confort recomendados por zona (°C) y humedad relativa (%) */
@@ -194,6 +195,10 @@ export default function MonitoreoPage() {
       </div>
 
       <Tarjeta titulo="Últimas lecturas">
+        <LecturasSensor />
+      </Tarjeta>
+
+      <Tarjeta titulo="Lecturas manuales">
         {!datos || datos.lecturas.length === 0 ? (
           <Vacio
             titulo="Sin lecturas registradas"

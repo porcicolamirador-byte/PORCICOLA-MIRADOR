@@ -182,6 +182,7 @@ async function temperatura() {
     for (const s of (subs ?? []) as Suscripcion[]) if (activos.has(s.usuario_id) && (await enviar(s, aviso))) enviados++;
   }
   await admin.from("temperatura_alerta").upsert({ id: 1, estado: nuevo, temperatura: t, actualizado_en: new Date().toISOString() });
+  // El historial de 7 días (temperatura_lecturas) lo guarda pg_cron cada 5 minutos desde esta fila
   return { temperatura: t, estado: nuevo, enviados };
 }
 
