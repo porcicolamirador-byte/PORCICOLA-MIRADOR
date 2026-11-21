@@ -140,7 +140,7 @@ export default function AjusteTemperatura() {
               <b className="text-orange-600">Límite:</b> si pasa de {gradosTexto(lim)}.
             </li>
             <li>
-              <b className="text-red-600">Crítica:</b> si pasa de {gradosTexto(cri)}, y otro aviso cuando vuelva a bajar de esa temperatura.
+              <b className="text-red-600">Crítica:</b> si pasa de {gradosTexto(cri)}.
             </li>
             <li className="text-slate-500">También te avisa cuando vuelve a lo normal. Para volver se usa medio grado de margen.</li>
           </>

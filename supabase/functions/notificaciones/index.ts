@@ -119,7 +119,7 @@ async function diario() {
  * Cada minuto (pg_cron) se lee granja/temperatura y se compara con los rangos que
  * el administrador pone en Ajustes (temperatura_config): mínima, límite y crítica.
  * Se avisa una sola vez al cambiar de estado (baja, normal, alta, crítica), con 0,5 °C de margen
- * para volver, y al bajar de la crítica o volver a lo normal también llega aviso.
+ * para volver; al volver a lo normal también llega aviso (al bajar de la crítica, no).
  * Para quitarlo: borrar este bloque y la acción "temperatura", y las migraciones 0016 a 0019. */
 const MARGEN = 0.5;
 const fmt = (v: number) => `${Number(v.toFixed(1)).toString().replace(".", ",")} °C`;
@@ -176,15 +176,14 @@ async function temperatura() {
   else if (t > LIM || (altas.includes(previo) && t > LIM - MARGEN)) nuevo = "alta";
   else if (t < MIN || (previo === "baja" && t < MIN + MARGEN)) nuevo = "baja";
   let enviados = 0;
-  if (nuevo !== previo) {
+  // Al bajar de la crítica (pero seguir sobre el límite) no se avisa
+  if (nuevo !== previo && !(nuevo === "alta" && previo === "critica")) {
     const g = `${t.toFixed(1).replace(".", ",")} °C`;
     const base = { tag: "temperatura-granja", url: "/monitoreo" };
     const aviso: Aviso =
       nuevo === "critica"
-        ? { ...base, title: `🚨 Alerta crítica · Temperatura ${g}`, body: `Superó la temperatura crítica de ${fmt(CRI)}. Revisa la ventilación y el agua de los animales.` }
-        : nuevo === "alta" && previo === "critica"
-          ? { ...base, title: `Bajó de la temperatura crítica · ${g}`, body: `Ya está por debajo de ${fmt(CRI)}, pero sigue sobre el límite de ${fmt(LIM)}.` }
-          : nuevo === "alta"
+        ? { ...base, title: `🚨 Alerta crítica · Temperatura ${g}`, body: `Se superaron los ${fmt(CRI)} críticos.` }
+        : nuevo === "alta"
             ? { ...base, title: `Temperatura Límite ${g}`, body: `La granja superó el límite de ${fmt(LIM)}.` }
             : nuevo === "baja"
               ? { ...base, title: `Temperatura baja ${g}`, body: `La granja bajó de la mínima de ${fmt(MIN)}.` }
