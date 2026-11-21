@@ -31,6 +31,7 @@ import {
 import { codigoDe, hoy, leerCorrales, leerProductos, notificarCambio, useVersionDatos } from "@/lib/datos";
 import CatalogoProductos from "@/components/CatalogoProductos";
 import CatalogoCorrales from "@/components/CatalogoCorrales";
+import AjusteTemperatura from "@/components/AjusteTemperatura";
 
 /**
  * Ajustes protegidos: entra el administrador o quien tenga el permiso
@@ -123,6 +124,15 @@ export default function AjustesAvanzadosPage() {
             donde="Engorde al eliminar un lote"
             onCambiar={(v) => guardar({ claveLotesActiva: v })}
           />
+        </Desplegable>
+      </Grupo>
+      )}
+
+      {/* Solo el administrador: rangos de las alertas de temperatura del sensor */}
+      {esAdmin && (
+      <Grupo titulo="Monitoreo">
+        <Desplegable icono="termometro" titulo="Alertas de temperatura" resumen="Mínima · límite · crítica" abierto={abierto === "temperatura"} onAlternar={() => alternar("temperatura")}>
+          <AjusteTemperatura />
         </Desplegable>
       </Grupo>
       )}
@@ -367,6 +377,12 @@ const TRAZOS_AJUSTES = {
     <>
       <path d="M8 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
       <path d="M9.5 8h5M9.5 12h5M9.5 16h3" />
+    </>
+  ),
+  termometro: (
+    <>
+      <path d="M14 14.76V5a2 2 0 0 0-4 0v9.76a4 4 0 1 0 4 0z" />
+      <path d="M12 10v6" />
     </>
   ),
   candado: (

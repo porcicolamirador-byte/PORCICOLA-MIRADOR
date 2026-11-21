@@ -116,12 +116,13 @@ async function diario() {
 }
 
 /* ───────── TEMPORAL: aviso de temperatura de la granja (ESP32 por EMQX) ─────────
- * Cada minuto (pg_cron) se lee granja/temperatura. Se avisa una sola vez al pasar de 27,5 °C
- * (alerta crítica, y otra cada vez que sube 1 °C más) y una sola vez al bajar de 22 °C;
- * vuelve a "normal" con 0,5 °C de margen y avisa que se normalizó.
- * Para quitarlo: borrar este bloque y la acción "temperatura", y la migración 0016. */
-const TEMP_ALTA = 27.5;
-const TEMP_BAJA = 22;
+ * Cada minuto (pg_cron) se lee granja/temperatura y se compara con los rangos que
+ * el administrador pone en Ajustes (temperatura_config): mínima, límite y crítica.
+ * Se avisa una sola vez al cambiar de estado (baja, normal, alta, crítica), con 0,5 °C de margen
+ * para volver, y al bajar de la crítica o volver a lo normal también llega aviso.
+ * Para quitarlo: borrar este bloque y la acción "temperatura", y las migraciones 0016 a 0019. */
+const MARGEN = 0.5;
+const fmt = (v: number) => `${Number(v.toFixed(1)).toString().replace(".", ",")} °C`;
 
 function leerTemperatura(cfg: { url: string; usuario: string | null; clave: string | null }): Promise<number | null> {
   return new Promise((resolver) => {
@@ -163,45 +164,41 @@ async function temperatura() {
   if (!cfg?.url) return { omitido: "sin conexión configurada" };
   const t = await leerTemperatura(cfg);
   if (t === null) return { omitido: "sin lectura" };
-  const { data: est } = await admin.from("temperatura_alerta").select("estado, aviso_temp").eq("id", 1).maybeSingle();
+  const { data: rangos } = await admin.from("temperatura_config").select("minima, limite, critica").eq("id", 1).maybeSingle();
+  const MIN = Number(rangos?.minima ?? 22);
+  const LIM = Number(rangos?.limite ?? 27.5);
+  const CRI = Number(rangos?.critica ?? 29);
+  const { data: est } = await admin.from("temperatura_alerta").select("estado").eq("id", 1).maybeSingle();
   const previo = (est?.estado as string) ?? "normal";
-  let avisoTemp = est?.aviso_temp == null ? null : Number(est.aviso_temp);
-  let nuevo = previo;
-  if (t > TEMP_ALTA) nuevo = "alta";
-  else if (t < TEMP_BAJA) nuevo = "baja";
-  else if (previo === "alta" && t <= TEMP_ALTA - 0.5) nuevo = "normal";
-  else if (previo === "baja" && t >= TEMP_BAJA + 0.5) nuevo = "normal";
+  const altas = ["alta", "critica"];
+  let nuevo = "normal";
+  if (t > CRI || (previo === "critica" && t > CRI - MARGEN)) nuevo = "critica";
+  else if (t > LIM || (altas.includes(previo) && t > LIM - MARGEN)) nuevo = "alta";
+  else if (t < MIN || (previo === "baja" && t < MIN + MARGEN)) nuevo = "baja";
   let enviados = 0;
-  // Sigue por encima del límite y subió 1 °C más desde la última alerta: otra alerta crítica
-  const sigueSubiendo = previo === "alta" && nuevo === "alta" && avisoTemp !== null && t >= avisoTemp + 1;
-  if (nuevo !== previo || sigueSubiendo) {
-    const grados = `${t.toFixed(1).replace(".", ",")} °C`;
+  if (nuevo !== previo) {
+    const g = `${t.toFixed(1).replace(".", ",")} °C`;
+    const base = { tag: "temperatura-granja", url: "/monitoreo" };
     const aviso: Aviso =
-      nuevo === "alta"
-        ? {
-            title: `🚨 Alerta crítica · Temperatura alta ${grados}`,
-            body: sigueSubiendo
-              ? "La temperatura sigue subiendo por encima del límite de 27,5 °C. Revisa la ventilación y el agua de los animales."
-              : "La granja superó el límite de 27,5 °C. Revisa la ventilación y el agua de los animales.",
-            tag: "temperatura-granja",
-            url: "/monitoreo",
-          }
-        : nuevo === "baja"
-          ? { title: `Temperatura baja ${grados}`, body: `La granja bajó de 22 °C.`, tag: "temperatura-granja", url: "/monitoreo" }
-          : {
-              title: `Temperatura normal ${grados}`,
-              body: previo === "alta" ? "La granja volvió a estar por debajo de 27,5 °C." : "La granja volvió a estar por encima de 22 °C.",
-              tag: "temperatura-granja",
-              url: "/monitoreo",
-            };
+      nuevo === "critica"
+        ? { ...base, title: `🚨 Alerta crítica · Temperatura ${g}`, body: `Superó la temperatura crítica de ${fmt(CRI)}. Revisa la ventilación y el agua de los animales.` }
+        : nuevo === "alta" && previo === "critica"
+          ? { ...base, title: `Bajó de la temperatura crítica · ${g}`, body: `Ya está por debajo de ${fmt(CRI)}, pero sigue sobre el límite de ${fmt(LIM)}.` }
+          : nuevo === "alta"
+            ? { ...base, title: `Temperatura Límite ${g}`, body: `La granja superó el límite de ${fmt(LIM)}.` }
+            : nuevo === "baja"
+              ? { ...base, title: `Temperatura baja ${g}`, body: `La granja bajó de la mínima de ${fmt(MIN)}.` }
+              : {
+                  ...base,
+                  title: `Temperatura normal ${g}`,
+                  body: altas.includes(previo) ? `La granja volvió a estar por debajo de ${fmt(LIM)}.` : `La granja volvió a estar por encima de ${fmt(MIN)}.`,
+                };
     const { data: perfiles } = await admin.from("perfiles").select("id").eq("activo", true);
     const activos = new Set((perfiles ?? []).map((p: { id: string }) => p.id));
     const { data: subs } = await admin.from("suscripciones_push").select("id, usuario_id, endpoint, p256dh, auth");
     for (const s of (subs ?? []) as Suscripcion[]) if (activos.has(s.usuario_id) && (await enviar(s, aviso))) enviados++;
   }
-  if (nuevo === "alta" && (previo !== "alta" || sigueSubiendo)) avisoTemp = t;
-  if (nuevo !== "alta") avisoTemp = null;
-  await admin.from("temperatura_alerta").upsert({ id: 1, estado: nuevo, temperatura: t, aviso_temp: avisoTemp, actualizado_en: new Date().toISOString() });
+  await admin.from("temperatura_alerta").upsert({ id: 1, estado: nuevo, temperatura: t, actualizado_en: new Date().toISOString() });
   // El historial de 7 días (temperatura_lecturas) lo guarda pg_cron cada 5 minutos desde esta fila
   return { temperatura: t, estado: nuevo, enviados };
 }

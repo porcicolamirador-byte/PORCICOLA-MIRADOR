@@ -8,6 +8,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/nube";
+import { gradosTexto, useRangosTemperatura } from "@/components/AjusteTemperatura";
 
 interface Fila {
   fecha: string;
@@ -18,15 +19,14 @@ interface Punto {
   v: number; // °C
 }
 
-const ALTA = 27.5;
-const BAJA = 22;
 const diaLocal = (ms: number) => {
   const d = new Date(ms);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 const horaLocal = (ms: number) => new Date(ms).toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit", hour12: true });
 const grados = (v: number) => `${v.toFixed(1).replace(".", ",")}°`;
-const colorDe = (v: number) => (v > ALTA ? "bg-red-50 text-red-700" : v < BAJA ? "bg-sky-50 text-sky-700" : "bg-orange-50 text-orange-800");
+const colorDe = (v: number, r: { minima: number; limite: number; critica: number }) =>
+  v > r.critica ? "bg-red-600 text-white" : v > r.limite ? "bg-red-50 text-red-700" : v < r.minima ? "bg-sky-50 text-sky-700" : "bg-orange-50 text-orange-800";
 
 function nombreDia(dia: string) {
   const hoyD = diaLocal(Date.now());
@@ -50,7 +50,7 @@ async function cargar(): Promise<Punto[]> {
 }
 
 /** Gráfica de la temperatura del día (0 a 24 h) con las franjas de 22 y 27,5 °C */
-function Grafica({ puntos, dia }: { puntos: Punto[]; dia: string }) {
+function Grafica({ puntos, dia, ALTA, BAJA }: { puntos: Punto[]; dia: string; ALTA: number; BAJA: number }) {
   const [a, m, d] = dia.split("-").map(Number);
   const inicio = new Date(a, m - 1, d).getTime();
   const W = 320;
@@ -75,7 +75,7 @@ function Grafica({ puntos, dia }: { puntos: Punto[]; dia: string }) {
           <g key={v}>
             <line x1={0} x2={W} y1={y(v)} y2={y(v)} className={v === ALTA ? "stroke-red-400" : "stroke-sky-400"} strokeDasharray="3 3" strokeWidth={0.8} />
             <text x={-4} y={y(v) + 3} textAnchor="end" className="fill-slate-400 text-[8px] tabular-nums">
-              {String(v).replace(".", ",")}
+              {String(Number(v.toFixed(1))).replace(".", ",")}
             </text>
           </g>
         ))}
@@ -95,6 +95,7 @@ export default function LecturasSensor() {
   const [error, setError] = useState(false);
   const [dia, setDia] = useState(() => diaLocal(Date.now()));
   const [todas, setTodas] = useState(false);
+  const rangos = useRangosTemperatura();
 
   useEffect(() => {
     let vivo = true;
@@ -128,7 +129,7 @@ export default function LecturasSensor() {
   const promedio = vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : null;
   const tMin = delDia.find((p) => p.v === minimo);
   const tMax = delDia.find((p) => p.v === maximo);
-  const fuera = delDia.filter((p) => p.v > ALTA || p.v < BAJA).length;
+  const fuera = delDia.filter((p) => p.v > rangos.limite || p.v < rangos.minima).length;
   const lista = todas ? delDia : delDia.slice(0, 12);
 
   return (
@@ -173,16 +174,16 @@ export default function LecturasSensor() {
               </div>
             ))}
           </div>
-          <Grafica puntos={delDia} dia={dia} />
+          <Grafica puntos={delDia} dia={dia} ALTA={rangos.limite} BAJA={rangos.minima} />
           {fuera > 0 && (
             <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 ring-1 ring-red-100">
-              {fuera} {fuera === 1 ? "lectura" : "lecturas"} fuera de 22 – 27,5 °C (≈ {fuera * 5} min)
+              {fuera} {fuera === 1 ? "lectura" : "lecturas"} fuera de {gradosTexto(rangos.minima)} a {gradosTexto(rangos.limite)} (≈ {fuera * 5} min)
             </p>
           )}
           <ul className="flex flex-col divide-y divide-slate-100">
             {lista.map((p) => (
               <li key={p.t} className="flex items-center gap-3 py-2">
-                <span className={`flex h-8 w-14 shrink-0 items-center justify-center rounded-xl text-sm font-bold tabular-nums ${colorDe(p.v)}`}>{grados(p.v)}</span>
+                <span className={`flex h-8 w-14 shrink-0 items-center justify-center rounded-xl text-sm font-bold tabular-nums ${colorDe(p.v, rangos)}`}>{grados(p.v)}</span>
                 <p className="min-w-0 flex-1 truncate text-sm text-slate-700">Sensor ESP32</p>
                 <span className="shrink-0 text-xs tabular-nums text-slate-500">{horaLocal(p.t)}</span>
               </li>
