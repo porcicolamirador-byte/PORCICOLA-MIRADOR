@@ -117,7 +117,7 @@ async function diario() {
 
 /* ───────── TEMPORAL: aviso de temperatura de la granja (ESP32 por EMQX) ─────────
  * Cada minuto (pg_cron) se lee granja/temperatura. Se avisa una sola vez al pasar de 27,5 °C
- * y una sola vez al bajar de 22 °C; vuelve a "normal" con 0,5 °C de margen.
+ * y una sola vez al bajar de 22 °C; vuelve a "normal" con 0,5 °C de margen y avisa que se normalizó.
  * Para quitarlo: borrar este bloque y la acción "temperatura", y la migración 0016. */
 const TEMP_ALTA = 27.5;
 const TEMP_BAJA = 22;
@@ -170,12 +170,19 @@ async function temperatura() {
   else if (previo === "alta" && t <= TEMP_ALTA - 0.5) nuevo = "normal";
   else if (previo === "baja" && t >= TEMP_BAJA + 0.5) nuevo = "normal";
   let enviados = 0;
-  if (nuevo !== previo && nuevo !== "normal") {
+  if (nuevo !== previo) {
     const grados = `${t.toFixed(1).replace(".", ",")} °C`;
     const aviso: Aviso =
       nuevo === "alta"
         ? { title: `Temperatura Límite ${grados}`, body: `La granja superó los 27,5 °C.`, tag: "temperatura-granja", url: "/monitoreo" }
-        : { title: `Temperatura baja ${grados}`, body: `La granja bajó de 22 °C.`, tag: "temperatura-granja", url: "/monitoreo" };
+        : nuevo === "baja"
+          ? { title: `Temperatura baja ${grados}`, body: `La granja bajó de 22 °C.`, tag: "temperatura-granja", url: "/monitoreo" }
+          : {
+              title: `Temperatura normal ${grados}`,
+              body: previo === "alta" ? "La granja volvió a estar por debajo de 27,5 °C." : "La granja volvió a estar por encima de 22 °C.",
+              tag: "temperatura-granja",
+              url: "/monitoreo",
+            };
     const { data: perfiles } = await admin.from("perfiles").select("id").eq("activo", true);
     const activos = new Set((perfiles ?? []).map((p: { id: string }) => p.id));
     const { data: subs } = await admin.from("suscripciones_push").select("id, usuario_id, endpoint, p256dh, auth");
