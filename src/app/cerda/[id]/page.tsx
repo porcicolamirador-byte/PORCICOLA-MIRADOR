@@ -11,7 +11,7 @@ import { useEffect, useRef, useState, type TouchEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import usePageBackground from "@/hooks/usePageBackground";
 import { cargarLogoJpeg, entregarPdf, generarPdfFicha, type LogoJpeg } from "@/lib/pdfFicha";
-import { confirmar } from "@/components/Dialogo";
+import { avisar, confirmar } from "@/components/Dialogo";
 import { CONFIRMACIONES_GESTACION } from "@/utils/pendingTasks";
 import {
   confirmarGestacion,
@@ -277,11 +277,20 @@ export default function CerdaDetalle() {
     const q = new URLSearchParams(window.location.search);
     if (q.get("registro") !== "compra-genetica") return;
     window.history.replaceState(null, "", window.location.pathname);
-    if (pendiente) return;
+    if (pendiente || cerda.activa === false) return;
     setTipo("Compra de genética");
     setMostrarForm(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cerda?.id]);
+  // Cerda inactiva: no se ingresan reportes
+  const inactiva = cerda?.activa === false;
+  const abrirRegistro = () => {
+    if (inactiva) {
+      void avisar({ titulo: "Cerda inactiva", mensaje: "No se pueden ingresar reportes ni se registran consumos. Actívala en Gestación › Editar." });
+      return;
+    }
+    setMostrarForm(true);
+  };
   const totalRegistros = registros.length + (pendiente ? 1 : 0) + (Array.isArray(cerda?.geneticasPerdidas) ? cerda.geneticasPerdidas.length : 0);
   function guardarPendiente(valor: typeof pendiente) {
     const lista = JSON.parse(localStorage.getItem("cerdas") || "[]");
@@ -1363,6 +1372,15 @@ export default function CerdaDetalle() {
                 </div>
               </Modal>
             )}
+            {inactiva && (
+              <div className="mb-3 flex items-center gap-3 rounded-2xl bg-slate-100 px-4 py-3 ring-1 ring-slate-200">
+                <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-300 text-sm font-bold text-white">⏸</span>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-800">Cerda inactiva</p>
+                  <p className="text-xs text-slate-500">No se registran consumos ni se pueden ingresar reportes.</p>
+                </div>
+              </div>
+            )}
             <section className="mb-3 overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
               <div className="flex items-center justify-between gap-3 px-4 pt-4">
                 <div className="min-w-0">
@@ -1372,8 +1390,8 @@ export default function CerdaDetalle() {
                   </p>
                 </div>
                 <button
-                  onClick={() => setMostrarForm(true)}
-                  className="shrink-0 whitespace-nowrap rounded-full bg-sky-900 px-3.5 py-2 text-sm font-bold text-white transition hover:bg-sky-950 active:scale-95"
+                  onClick={abrirRegistro}
+                  className={`shrink-0 whitespace-nowrap rounded-full ${inactiva ? "bg-slate-300" : "bg-sky-900"} px-3.5 py-2 text-sm font-bold text-white transition hover:bg-sky-950 active:scale-95`}
                 >
                   + Registro
                 </button>
@@ -1894,9 +1912,9 @@ export default function CerdaDetalle() {
 
       {/* FAB: botón flotante */}
       <button
-        onClick={() => setMostrarForm(true)}
+        onClick={abrirRegistro}
         style={{ bottom: "calc(env(safe-area-inset-bottom) + 1.5rem)" }}
-        className="fixed right-5 z-50 bg-sky-900 w-12 h-12 rounded-full shadow-lg flex items-center justify-center text-white text-2xl hover:bg-sky-950"
+        className={`fixed right-5 z-50 ${inactiva ? "bg-slate-300" : "bg-sky-900"} w-12 h-12 rounded-full shadow-lg flex items-center justify-center text-white text-2xl hover:bg-sky-950`}
         aria-label="Nuevo registro"
       >
         +

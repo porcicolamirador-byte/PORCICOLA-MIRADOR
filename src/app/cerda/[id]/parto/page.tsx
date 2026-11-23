@@ -78,6 +78,7 @@ export default function RegistrarParto() {
 
   const [historial, setHistorial] = useState<Registro[] | null>(null);
   const [existe, setExiste] = useState(true);
+  const [inactiva, setInactiva] = useState(false);
 
   const [fecha, setFecha] = useState("");
   const [horaInicio, setHoraInicio] = useState("");
@@ -97,6 +98,7 @@ export default function RegistrarParto() {
   useEffect(() => {
     const cerdas = JSON.parse(localStorage.getItem("cerdas") || "[]");
     setExiste(Array.isArray(cerdas) && cerdas.some((c: { id?: string }) => c.id === id));
+    setInactiva(Array.isArray(cerdas) && cerdas.some((c: { id?: string; activa?: boolean }) => c.id === id && c.activa === false));
     const hist = JSON.parse(localStorage.getItem(`historial-${id}`) || "[]");
     setHistorial(Array.isArray(hist) ? hist : []);
     setFecha(fechaLocalISO(new Date()));
@@ -191,6 +193,18 @@ export default function RegistrarParto() {
         <p className="text-black">Cerda no encontrada</p>
         <button onClick={() => router.push("/gestacion")} className="rounded-2xl bg-sky-900 px-4 py-2 text-sm font-bold text-white">
           Ir a Gestación
+        </button>
+      </main>
+    );
+  }
+
+  if (inactiva) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-white px-6 text-center">
+        <p className="font-semibold text-slate-900">Cerda {id} inactiva</p>
+        <p className="text-sm text-slate-500">No se pueden ingresar reportes. Actívala en Gestación › Editar.</p>
+        <button onClick={volver} className="rounded-2xl bg-sky-900 px-4 py-2 text-sm font-bold text-white">
+          Volver
         </button>
       </main>
     );

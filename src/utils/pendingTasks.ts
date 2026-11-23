@@ -71,6 +71,8 @@ export function cargarHistorialDeCerda(cerdaId: string): Registro[] {
 
 export function generarTareasPendientes(cerda: Cerda): PendingTask[] {
   const tareas: PendingTask[] = [];
+  // Cerda inactiva: no se le ingresan reportes, así que tampoco genera alertas
+  if ((cerda as { activa?: boolean }).activa === false) return tareas;
   const d = new Date();
   const hoy = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const historial = cargarHistorialDeCerda(cerda.id);

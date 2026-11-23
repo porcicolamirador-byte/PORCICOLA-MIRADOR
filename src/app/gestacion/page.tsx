@@ -761,7 +761,7 @@ export default function Gestacion() {
                   key={cerda.id}
                   type="button"
                   onClick={() => router.push(`/cerda/${encodeURIComponent(cerda.id)}`)}
-                  className="tarjeta-boton relative flex min-w-0 flex-col items-start gap-2.5 overflow-hidden rounded-3xl border border-slate-200 bg-white px-3.5 py-3.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600"
+                  className={`tarjeta-boton relative flex min-w-0 flex-col items-start gap-2.5 overflow-hidden rounded-3xl border border-slate-200 px-3.5 py-3.5 text-left ${cerda.activa === false ? "bg-slate-100 grayscale opacity-60" : "bg-white"} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600`}
                 >
                   <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${obtenerBarraColor(estadoLabel)}`} />
                   {iconoGenetica(cerda.id, "absolute right-3 top-3")}
@@ -854,7 +854,7 @@ export default function Gestacion() {
                   </div>
 
                   <div
-                    className="relative z-10 cursor-pointer bg-white px-2.5 py-2"
+                    className={`relative z-10 cursor-pointer px-2.5 py-2 ${cerda.activa === false ? "bg-slate-100 grayscale opacity-60" : "bg-white"}`}
                     onClick={() => {
                       // Después de mantener presionado no se abre la cerda
                       if (ignorarClic.current) {
@@ -1193,7 +1193,7 @@ export default function Gestacion() {
               <span className="min-w-0 flex-1">
                 <span className="block text-[15px] font-medium text-slate-900">Cerda activa</span>
                 <span className="block text-xs text-slate-500">
-                  {activa ? "Se le descuenta alimento de bodega cada día." : "Inactiva: no se le descuenta alimento."}
+                  {activa ? "Consumo automático habilitado" : "Desactivada, no se registrarán consumos"}
                 </span>
               </span>
               <Interruptor activo={activa} onCambiar={setActiva} />
