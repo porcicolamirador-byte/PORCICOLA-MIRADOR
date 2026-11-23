@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import { useRouter } from "next/navigation";
 import PageShell from "@/components/PageShell";
 import Modal from "@/components/Modal";
-import { Boton, Campo, Selector } from "@/components/ui";
+import { Boton, Campo, Interruptor, Selector } from "@/components/ui";
 import { avisar, confirmar } from "@/components/Dialogo";
 import { puede } from "@/lib/nube";
 import { leerConfig } from "@/lib/config";
@@ -70,6 +70,8 @@ export default function Gestacion() {
   const [id, setId] = useState("");
   const [idError, setIdError] = useState("");
   const [raza, setRaza] = useState("Camborough");
+  // Cerda activa: si está inactiva no se le descuenta alimento
+  const [activa, setActiva] = useState(true);
   const [otraRaza, setOtraRaza] = useState("");
   const [peso, setPeso] = useState("");
   const [pesoError, setPesoError] = useState("");
@@ -177,6 +179,7 @@ export default function Gestacion() {
     setFechaError("");
     setRazaError("");
     setCaracteristicas("");
+    setActiva(true);
     setEditIndex(null);
   }
 
@@ -246,6 +249,7 @@ export default function Gestacion() {
     setPeso(c.peso || "");
 
     setCaracteristicas(c.caracteristicas);
+    setActiva(c.activa !== false);
 
     setEditIndex(index);
 
@@ -514,6 +518,9 @@ export default function Gestacion() {
       fecha,
       caracteristicas,
       estado: "GESTACIÓN",
+      activa,
+      // Desde qué día está inactiva (si ya lo estaba, se conserva la fecha)
+      inactivaDesde: activa ? undefined : editIndex !== null && cerdas[editIndex]?.activa === false ? cerdas[editIndex].inactivaDesde ?? fechaLocalISO(new Date()) : fechaLocalISO(new Date()),
     };
 
     if (editIndex !== null) {
@@ -763,7 +770,7 @@ export default function Gestacion() {
                     <span className="truncate text-base font-black tabular-nums text-amber-950 arete-id">{cerda.id}</span>
                   </div>
                   <div className="w-full min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-950">{cerda.raza || "Sin raza"}</p>
+                    <p className="truncate text-sm font-semibold text-slate-950">{cerda.raza || "Sin raza"}{cerda.activa === false && <span className="ml-1 inline-flex items-center rounded-full bg-slate-200 px-1.5 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wide text-slate-600">Inactiva</span>}</p>
                     <span className={`mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${obtenerEstadoStyles(estadoLabel)}`}>
                       <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-current" />
                       <span className="truncate">{estadoLabel}</span>
@@ -883,7 +890,7 @@ export default function Gestacion() {
                         </div>
 
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold leading-tight text-slate-900">{cerda.raza || "Sin raza"}</p>
+                          <p className="truncate text-sm font-semibold leading-tight text-slate-900">{cerda.raza || "Sin raza"}{cerda.activa === false && <span className="ml-1 inline-flex items-center rounded-full bg-slate-200 px-1.5 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wide text-slate-600">Inactiva</span>}</p>
                           <span className={`mt-0.5 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${obtenerEstadoStyles(estadoLabel)}`}>
                             <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
                             {estadoLabel}
@@ -1182,6 +1189,15 @@ export default function Gestacion() {
               </Campo>
             </div>
             {(fechaError || pesoError) && <p className="-mt-2 text-[13px] text-red-600">{fechaError || pesoError}</p>}
+            <label className="flex cursor-pointer items-center gap-3 rounded-2xl bg-slate-50 px-3.5 py-3 ring-1 ring-slate-200">
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-medium text-slate-900">Cerda activa</span>
+                <span className="block text-xs text-slate-500">
+                  {activa ? "Se le descuenta alimento de bodega cada día." : "Inactiva: no se le descuenta alimento."}
+                </span>
+              </span>
+              <Interruptor activo={activa} onCambiar={setActiva} />
+            </label>
             <Campo etiqueta="Notas">
               <textarea
                 value={caracteristicas}

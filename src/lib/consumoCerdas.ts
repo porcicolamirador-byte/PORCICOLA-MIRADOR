@@ -50,7 +50,11 @@ type Regla = "g" | "pre" | "lac" | "x";
  *  - Inseminación con el día de cambio (100) cumplido → pre-parto ("pre", alimento de lactancia);
  *  - cualquier otro estado → alimento de gestación ("g").
  */
-function reglaDe(historial: { tipo: string; fecha: string }[], diaCambio: number, hoyIso: string): Regla {
+/** Cerda inactiva (desde esa fecha): no come alimento de bodega */
+const inactivaEl = (c: { activa?: boolean; inactivaDesde?: string }, fecha: string) => c.activa === false && (c.inactivaDesde ?? "") <= fecha;
+
+function reglaDe(historial: { tipo: string; fecha: string }[], diaCambio: number, hoyIso: string, cerda?: { activa?: boolean; inactivaDesde?: string }): Regla {
+  if (cerda && inactivaEl(cerda, hoyIso)) return "x";
   const ultimo = historial[0];
   if (ultimo?.tipo === "Baja") return "x";
   if (ultimo?.tipo === "Parto") return "lac";
@@ -91,7 +95,9 @@ function registroDeHoy(diaCambio: number, guardar: boolean): RegistroDia {
   const hoyIso = hoy();
   const hora = new Date().getHours();
   const previo = leerDia();
-  const actuales = new Map(leerCerdas().map((c) => [c.id, leerHistorial(c.id)] as const));
+  const lista = leerCerdas();
+  const fichas = new Map(lista.map((c) => [c.id, c as { activa?: boolean; inactivaDesde?: string }] as const));
+  const actuales = new Map(lista.map((c) => [c.id, leerHistorial(c.id)] as const));
   let dia: RegistroDia;
   if (previo && previo.fecha === hoyIso) {
     dia = { fecha: hoyIso, cerdas: { ...previo.cerdas } };
@@ -101,14 +107,14 @@ function registroDeHoy(diaCambio: number, guardar: boolean): RegistroDia {
     const ayer = previo && previo.fecha === sumarDias(hoyIso, -1) ? previo.cerdas : {};
     dia = { fecha: hoyIso, cerdas: {} };
     for (const [id, historial] of actuales) {
-      const ahora = reglaDe(historial, diaCambio, hoyIso);
+      const ahora = reglaDe(historial, diaCambio, hoyIso, fichas.get(id));
       const cambioHoy = historial[0]?.fecha === hoyIso;
       dia.cerdas[id] = { am: cambioHoy && ayer[id] ? ayer[id].pm : ahora, pm: ahora };
     }
   }
   if (hora < HORA_CIERRE) {
     for (const [id, historial] of actuales) {
-      const ahora = reglaDe(historial, diaCambio, hoyIso);
+      const ahora = reglaDe(historial, diaCambio, hoyIso, fichas.get(id));
       const e = dia.cerdas[id];
       if (!e) dia.cerdas[id] = { am: "x", pm: ahora }; // nueva hoy: solo la comida de la tarde
       else if (e.pm !== ahora) dia.cerdas[id] = { ...e, pm: ahora };
@@ -152,7 +158,7 @@ function contarCerdas(diaCambio: number, fecha = hoy()) {
   const n: Record<Regla, number> = { g: 0, pre: 0, lac: 0, x: 0 };
   // Estado de cada cerda ese día: solo cuentan los registros hasta esa fecha
   // (un día pasado no se cobra con el estado de hoy, p. ej. lactancia por un parto posterior)
-  for (const c of leerCerdas()) n[reglaDe(leerHistorial(c.id).filter((r) => (r.fecha || "") <= fecha), diaCambio, fecha)]++;
+  for (const c of leerCerdas()) n[reglaDe(leerHistorial(c.id).filter((r) => (r.fecha || "") <= fecha), diaCambio, fecha, c as { activa?: boolean; inactivaDesde?: string })]++;
   return { gestacion: n.g, preparto: n.pre, lactando: n.lac };
 }
 
