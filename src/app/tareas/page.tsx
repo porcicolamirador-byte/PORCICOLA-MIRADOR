@@ -49,7 +49,7 @@ export default function TareasPage() {
   const [conTodas, setConTodas] = useState(false);
   useEffect(() => setConTodas(alertasDeTodasActivas()), [otras]);
   const nombreActual = useMemo(() => leerGranjas().find((g) => g.id === granjaActual())?.nombre ?? "", [version]);
-  const tareas = useMemo(() => {
+  const tareas = useMemo<(PendingTask & { otra?: AlertaOtraGranja })[] | null>(() => {
     if (version < 0) return null;
     const locales: (PendingTask & { otra?: AlertaOtraGranja })[] = calcularTareasPendientes(leerCerdas());
     return [...locales, ...otras.map((a) => ({ id: a.id, tipo: a.tipo, prioridad: a.prioridad, descripcion: a.descripcion, dias: a.dias, otra: a }))].sort(

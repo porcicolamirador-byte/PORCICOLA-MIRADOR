@@ -21,6 +21,7 @@ import {
   type Cerda,
 } from "@/utils/pendingTasks";
 import { useAlertasOtrasGranjas } from "@/lib/alertasGranjas";
+import type { PendingTask } from "@/utils/pendingTasks";
 
 // Color de la página: pinta el fondo y la zona de la isla dinámica del iPhone.
 const COLOR_PAGINA = "#ffffff";
@@ -253,7 +254,7 @@ export default function Dashboard() {
 
   // Alertas de la granja abierta y, si el usuario lo activó, las de sus otras granjas
   const otrasGranjas = useAlertasOtrasGranjas();
-  const pendingTasks = useMemo(
+  const pendingTasks = useMemo<PendingTask[]>(
     () => [...calcularTareasPendientes(cerdas), ...otrasGranjas.map((a) => ({ id: a.id, tipo: a.tipo, prioridad: a.prioridad, descripcion: a.descripcion, dias: a.dias }))],
     [cerdas, otrasGranjas],
   );
