@@ -2,6 +2,7 @@
 // Acciones:
 //   { accion: "prueba" }      → con sesión: manda 3 notificaciones de prueba (cada 15 s) a los teléfonos del usuario
 //   { accion: "diario" }      → programada (7:30 a. m.): "Tienes alertas por atender en …" si hay alertas
+//   { accion: "alertas" }     → con sesión: alertas de todas las granjas que el usuario puede ver
 // Las programadas llevan el encabezado x-cron con el secreto guardado en push_config.
 import webpush from "npm:web-push@3.6.7";
 import mqtt from "npm:mqtt@5.10.1";
@@ -20,6 +21,8 @@ interface Perfil {
   rol: string;
   granjas: string[] | null;
   notificaciones_granjas: string[] | null;
+  /** El usuario eligió recibir las alertas de todas sus granjas */
+  notificaciones_todas?: boolean | null;
   activo: boolean;
 }
 interface Aviso {
@@ -73,9 +76,9 @@ function granjasDe(docs: Documento[]) {
 
 const NOMBRE_APP = "Porcícola El Mirador";
 const puedeVer = (p: Perfil, granja: string) => p.rol === "admin" || p.granjas === null || p.granjas.includes(granja);
-/** Granjas de las que el usuario recibe notificaciones (las suyas, filtradas por lo que eligió el administrador) */
+/** Granjas de las que el usuario recibe notificaciones: todas las suyas si lo eligió; si no, las que eligió el administrador */
 const granjasANotificar = <G extends { id: string }>(p: Perfil, granjas: G[]) =>
-  granjas.filter((g) => puedeVer(p, g.id) && (p.notificaciones_granjas === null || p.notificaciones_granjas.includes(g.id)));
+  granjas.filter((g) => puedeVer(p, g.id) && (p.notificaciones_todas || p.notificaciones_granjas == null || p.notificaciones_granjas.includes(g.id)));
 
 const lista = (nombres: string[]) => (nombres.length <= 1 ? nombres.join("") : `${nombres.slice(0, -1).join(", ")} y ${nombres[nombres.length - 1]}`);
 
@@ -83,7 +86,7 @@ const lista = (nombres: string[]) => (nombres.length <= 1 ? nombres.join("") : `
 async function diario() {
   const docs = await todosLosDocumentos();
   const granjas = granjasDe(docs);
-  const { data: perfiles } = await admin.from("perfiles").select("id, rol, granjas, notificaciones_granjas, activo").eq("activo", true);
+  const { data: perfiles } = await admin.from("perfiles").select("id, rol, granjas, notificaciones_granjas, notificaciones_todas, activo").eq("activo", true);
   const { data: subs } = await admin.from("suscripciones_push").select("id, usuario_id, endpoint, p256dh, auth");
   if (!subs?.length || !perfiles?.length) return { enviados: 0 };
   const porUsuario = new Map<string, Suscripcion[]>();
@@ -227,6 +230,13 @@ Deno.serve(async (req) => {
 
     const yo = await usuarioDeLaPeticion(req);
     if (!yo) return json({ error: "Sesión no válida" }, 401);
+
+    if (accion === "alertas") {
+      // Alertas de cada granja que el usuario puede ver (la app muestra las de las otras granjas)
+      const docs = await todosLosDocumentos();
+      const granjas = granjasDe(docs).filter((g) => puedeVer(yo as Perfil, g.id));
+      return json({ granjas: granjas.map((g) => ({ id: g.id, nombre: g.nombre, alertas: alertasDeGranja(docs, g.id) })) });
+    }
 
     if (accion === "prueba") {
       // 3 notificaciones, una cada 15 segundos, para probar con la app cerrada

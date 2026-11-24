@@ -20,6 +20,7 @@ import {
   calcularTareasPendientes,
   type Cerda,
 } from "@/utils/pendingTasks";
+import { useAlertasOtrasGranjas } from "@/lib/alertasGranjas";
 
 // Color de la página: pinta el fondo y la zona de la isla dinámica del iPhone.
 const COLOR_PAGINA = "#ffffff";
@@ -250,7 +251,12 @@ export default function Dashboard() {
     setSaludo(hora < 12 ? "Buenos días" : hora < 19 ? "Buenas tardes" : "Buenas noches");
   }, []);
 
-  const pendingTasks = useMemo(() => calcularTareasPendientes(cerdas), [cerdas]);
+  // Alertas de la granja abierta y, si el usuario lo activó, las de sus otras granjas
+  const otrasGranjas = useAlertasOtrasGranjas();
+  const pendingTasks = useMemo(
+    () => [...calcularTareasPendientes(cerdas), ...otrasGranjas.map((a) => ({ id: a.id, tipo: a.tipo, prioridad: a.prioridad, descripcion: a.descripcion, dias: a.dias }))],
+    [cerdas, otrasGranjas],
+  );
   // Campana de Bodega: naranja si el alimento de cerdas alcanza para 2 días o menos, roja si va en negativo
   const versionDatos = useVersionDatos();
   const alarmaBodega = useMemo<"roja" | "naranja" | null>(() => {

@@ -8,7 +8,8 @@ import { confirmarGestacion, hierroAplicado, leerCerdas, loteDelParto, useVersio
 import ConfirmarHierro from "@/components/ConfirmarHierro";
 import ConfirmarVacuna from "@/components/ConfirmarVacuna";
 import { confirmar } from "@/components/Dialogo";
-import { calcularTareasPendientes } from "@/utils/pendingTasks";
+import { calcularTareasPendientes, type PendingTask } from "@/utils/pendingTasks";
+import { alertasDeTodasActivas, useAlertasOtrasGranjas, type AlertaOtraGranja } from "@/lib/alertasGranjas";
 import { cambiarGranja, granjaActual, leerGranjas, sincronizar } from "@/lib/sincronizar";
 import { puedeVerGranja } from "@/lib/nube";
 
@@ -43,12 +44,31 @@ export default function TareasPage() {
     window.history.replaceState(null, "", "/tareas");
   }, []);
 
+  // Si el usuario lo activó en Ajustes, también las alertas de sus otras granjas
+  const otras = useAlertasOtrasGranjas();
+  const [conTodas, setConTodas] = useState(false);
+  useEffect(() => setConTodas(alertasDeTodasActivas()), [otras]);
+  const nombreActual = useMemo(() => leerGranjas().find((g) => g.id === granjaActual())?.nombre ?? "", [version]);
   const tareas = useMemo(() => {
     if (version < 0) return null;
-    return calcularTareasPendientes(leerCerdas()).sort(
+    const locales: (PendingTask & { otra?: AlertaOtraGranja })[] = calcularTareasPendientes(leerCerdas());
+    return [...locales, ...otras.map((a) => ({ id: a.id, tipo: a.tipo, prioridad: a.prioridad, descripcion: a.descripcion, dias: a.dias, otra: a }))].sort(
       (a, b) => (ORDEN[a.prioridad] ?? 9) - (ORDEN[b.prioridad] ?? 9)
     );
-  }, [version]);
+  }, [version, otras]);
+
+  // Alerta de otra granja: se abre esa granja para atenderla
+  const abrirGranja = async (a: AlertaOtraGranja) => {
+    const ok = await confirmar({
+      titulo: `Abrir ${a.nombreGranja}`,
+      mensaje: `Esta alerta es de la granja ${a.nombreGranja}. ¿Cambiar a esa granja para atenderla?`,
+      aceptar: "Abrir granja",
+    });
+    if (!ok) return;
+    cambiarGranja(a.granja);
+    void sincronizar();
+    window.location.replace(`/cerda/${encodeURIComponent(a.id)}`);
+  };
 
   const cuenta = (p: string) => tareas?.filter((t) => t.prioridad === p).length ?? 0;
   const visibles = tareas?.filter((t) => filtro === "todas" || t.prioridad === filtro) ?? [];
@@ -135,16 +155,19 @@ export default function TareasPage() {
               <ul className="flex flex-col gap-2">
                 {g.items.map((t) => {
                   const e = ESTILO[t.prioridad] ?? ESTILO.media;
-                  const accion = t.hierroLote ? () => setHierro(t.hierroLote!) : t.confirmar ? () => confirmarG(t.id, t.confirmar!) : t.geneticaRegistro || t.tipo === "Solicitar material genético" ? () => router.push(`/cerda/${encodeURIComponent(t.id)}?registro=compra-genetica`) : t.vacunaParto ? () => confirmarVacuna(t.id, t.vacunaParto!, t.tipo) : null;
+                  const otra = t.otra;
+                  const accion = otra ? null : t.hierroLote ? () => setHierro(t.hierroLote!) : t.confirmar ? () => confirmarG(t.id, t.confirmar!) : t.geneticaRegistro || t.tipo === "Solicitar material genético" ? () => router.push(`/cerda/${encodeURIComponent(t.id)}?registro=compra-genetica`) : t.vacunaParto ? () => confirmarVacuna(t.id, t.vacunaParto!, t.tipo) : null;
                   return (
-                    <li key={`${t.id}-${t.tipo}`} className="relative overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/80">
+                    <li key={`${otra?.granja ?? "actual"}-${t.id}-${t.tipo}`} className="relative overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/80">
                       <span className={`absolute inset-y-0 left-0 w-1 ${e.barra}`} aria-hidden="true" />
                       <div className="flex items-center gap-3 py-2.5 pl-4 pr-2.5">
                         <button
                           type="button"
                           onClick={() =>
-                            // La alerta de hierro lleva al lote de la camada; las demás, a la cerda
-                            router.push(t.hierroLote ? `/engorde?lote=${encodeURIComponent(t.hierroLote)}` : `/cerda/${encodeURIComponent(t.id)}`)
+                            otra
+                              ? void abrirGranja(otra)
+                              : // La alerta de hierro lleva al lote de la camada; las demás, a la cerda
+                                router.push(t.hierroLote ? `/engorde?lote=${encodeURIComponent(t.hierroLote)}` : `/cerda/${encodeURIComponent(t.id)}`)
                           }
                           className="flex min-w-0 flex-1 items-center gap-3 text-left active:opacity-70"
                         >
@@ -156,6 +179,18 @@ export default function TareasPage() {
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-[15px] font-semibold leading-tight text-slate-900">{t.tipo}</span>
                             <span className="mt-0.5 block truncate text-xs text-slate-500">{t.descripcion}</span>
+                            {conTodas && (
+                              <span
+                                className={`mt-1 inline-flex max-w-full items-center gap-1 truncate rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                  otra ? "bg-violet-50 text-violet-700 ring-1 ring-violet-100" : "bg-slate-100 text-slate-500"
+                                }`}
+                              >
+                                <svg viewBox="0 0 24 24" className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                  <path d="M3 21h18M5 21V10l7-5 7 5v11" />
+                                </svg>
+                                {otra ? otra.nombreGranja : nombreActual || "Granja abierta"}
+                              </span>
+                            )}
                           </span>
                         </button>
                         {accion ? (

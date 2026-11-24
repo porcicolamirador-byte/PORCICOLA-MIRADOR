@@ -33,6 +33,8 @@ export interface PerfilNube {
   granjas?: string[] | null;
   /** Granjas de las que recibe notificaciones (null = todas sus granjas) */
   notificaciones_granjas?: string[] | null;
+  /** El usuario eligió ver y recibir las alertas de todas sus granjas */
+  notificaciones_todas?: boolean;
   /** Módulos del Dashboard desactivados para este usuario (vacío = todos activos; el administrador siempre ve todos) */
   modulos_ocultos?: string[];
   /** Solo para el administrador: módulos desactivados para todos los demás */
